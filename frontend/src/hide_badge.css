@@ -1,0 +1,7 @@
+/* Hide the Emergent badge by ID if it gets injected dynamically */
+#emergent-badge {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
