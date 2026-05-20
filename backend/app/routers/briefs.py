@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import uuid, datetime, json
 from app.database import get_db
-from app.models import WeeklyBrief, Recommendation, DeltaScore, SkillNode, MarketSnapshot
+from app.models import WeeklyBrief, Recommendation, DeltaScore, SkillNode, MarketSnapshot, User
 from app.schemas.brief import BriefResponse, RecommendationComplete
 from app.schemas.delta import DeltaScoreResponse
+from app.services.brief_generator import generate_weekly_brief
+from app.services.delta_score import compute_delta_score
 
 router = APIRouter(prefix="/api/briefs", tags=["briefs"])
 
@@ -18,7 +20,7 @@ EVIDENCE_WEIGHTS = {
 def get_latest_brief(user_id: str, db: Session = Depends(get_db)):
     brief = db.query(WeeklyBrief).filter(
         WeeklyBrief.user_id == user_id
-    ).order_by(WeeklyBrief.week_start.desc()).first()
+    ).order_by(WeeklyBrief.week_start.desc(), WeeklyBrief.created_at.desc()).first()
     if not brief:
         raise HTTPException(status_code=404, detail="No brief found")
     return brief
@@ -26,59 +28,115 @@ def get_latest_brief(user_id: str, db: Session = Depends(get_db)):
 
 @router.post("/generate/{user_id}", response_model=BriefResponse)
 def generate_brief(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     skills = db.query(SkillNode).filter(SkillNode.user_id == user_id).all()
     market = db.query(MarketSnapshot).filter(
         MarketSnapshot.user_id == user_id
     ).order_by(MarketSnapshot.snapshot_date.desc()).first()
 
-    # Compute current delta score
-    total_weight = sum(s.evidence_weight * s.proficiency for s in skills) if skills else 0
-    max_weight = len(skills) * 10 if skills else 1
-    current_score = round((total_weight / max(max_weight, 1)) * 100, 1)
+    if not market:
+        # Create a premium default market snapshot for their target role
+        market_id = str(uuid.uuid4())
+        market = MarketSnapshot(
+            id=market_id,
+            user_id=user_id,
+            target_role=user.target_role or "AI Developer / Software Engineer",
+            snapshot_date=datetime.date.today(),
+            top_demanded_skills=json.dumps(["LLMs", "Docker", "System Design", "Kubernetes", "MLOps"]),
+            emerging_skills=json.dumps(["AI Agents", "RAG Pipelines", "Vector Databases"]),
+            confidence_score=0.85,
+        )
+        db.add(market)
+        db.commit()
+        db.refresh(market)
 
-    # Determine gaps
-    gaps = []
-    if market and market.top_demanded_skills:
+    # 1. Compute current dynamic delta score (using upgraded formula)
+    completed_count = db.query(Recommendation).filter(
+        Recommendation.user_id == user_id,
+        Recommendation.status == "completed"
+    ).count()
+
+    market_demands = []
+    if market.top_demanded_skills:
         try:
-            demanded = json.loads(market.top_demanded_skills)
-        except (json.JSONDecodeError, TypeError):
-            demanded = []
-        user_names = {s.name.lower() for s in skills}
-        gaps = [d for d in demanded if d.lower() not in user_names]
+            market_demands = json.loads(market.top_demanded_skills) if isinstance(market.top_demanded_skills, str) else market.top_demanded_skills
+        except Exception:
+            market_demands = ["LLMs", "Docker", "System Design", "Kubernetes", "MLOps"]
 
-    # Create brief
+    current_score = compute_delta_score(skills, market_demands, completed_count)
+
+    # 2. Invoke rich roadmap compiler
+    roadmap_res = generate_weekly_brief(user, skills, market)
+
+    # 3. Create brief entry
     brief_id = str(uuid.uuid4())
     brief = WeeklyBrief(
         id=brief_id,
         user_id=user_id,
         week_start=datetime.date.today(),
         delta_score_start=current_score,
+        recommendations=json.dumps(roadmap_res), # serialize roadmap dataset here!
     )
     db.add(brief)
 
-    # Generate 3 recommendations
-    resources = [
-        {"skill": gaps[0] if len(gaps) > 0 else "Python", "title": "AI Engineer - Developer Roadmaps", "url": "https://roadmap.sh/ai-engineer", "type": "roadmap", "hours": 2.5, "signal": "Critical demand in market", "impact": 3.5},
-        {"skill": gaps[1] if len(gaps) > 1 else "React", "title": "Software Engineer to AI Engineer Roadmap (2026 Guide)", "url": "https://roadmap.sh/ai-engineer", "type": "course", "hours": 4.0, "signal": "Emerging skill requirement", "impact": 2.8},
-        {"skill": gaps[2] if len(gaps) > 2 else "FastAPI", "title": "AI Learning Roadmap: From Beginner to Expert (2026) - Coursera", "url": "https://www.coursera.org/ai", "type": "course", "hours": 3.0, "signal": "High market signal", "impact": 2.5},
-    ]
-    for r in resources:
+    # 4. Extract target recommendations from the roadmap nodes (pick up to 3 that are not mastered)
+    recs_to_add = []
+    for phase in roadmap_res.get("phases", []):
+        for node in phase.get("nodes", []):
+            if node.get("status") in ("locked", "in_progress"):
+                recs_to_add.append(node)
+                if len(recs_to_add) >= 3:
+                    break
+        if len(recs_to_add) >= 3:
+            break
+
+    # Fallback to make sure we always have 3 recommendations to interact with
+    if len(recs_to_add) < 3:
+        for phase in roadmap_res.get("phases", []):
+            for node in phase.get("nodes", []):
+                if node not in recs_to_add:
+                    recs_to_add.append(node)
+                    if len(recs_to_add) >= 3:
+                        break
+            if len(recs_to_add) >= 3:
+                break
+
+    # Map selected node IDs to actual SkillNode database keys
+    NODE_SKILL_MAP = {
+        "node-python": "Python",
+        "node-fastapi": "FastAPI",
+        "node-sql": "SQL",
+        "node-docker": "Docker",
+        "node-system-design": "System Design",
+        "node-llms": "LLMs",
+        "node-mlops": "MLOps",
+    }
+
+    for node in recs_to_add:
+        skill_name = NODE_SKILL_MAP.get(node["id"], node["id"].replace("node-", "").capitalize())
+        
+        # Determine projected delta impact: locked nodes have higher learning impact
+        impact = 4.0 if node.get("status") == "locked" else 2.5
+        
         rec = Recommendation(
             id=str(uuid.uuid4()),
             brief_id=brief_id,
             user_id=user_id,
-            skill=r["skill"],
-            resource_title=r["title"],
-            resource_url=r["url"],
-            resource_type=r["type"],
-            estimated_hours=r["hours"],
-            market_signal_text=r["signal"],
-            projected_delta_impact=r["impact"],
-            evidence_collection_path=f"Complete {r['title']} and submit evidence",
+            skill=skill_name,
+            resource_title=node["label"],
+            resource_url=node.get("resource_url", "https://roadmap.sh"),
+            resource_type="roadmap" if "roadmap" in node.get("resource_url", "") else "course",
+            estimated_hours=3.0,
+            market_signal_text=node.get("tech_twist", "High market demand"),
+            projected_delta_impact=impact,
+            evidence_collection_path=f"Build a GitHub project for {node['label']} and submit the repository link.",
         )
         db.add(rec)
 
-    # Save delta score
+    # 5. Save delta score history entry
     score_entry = DeltaScore(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -90,6 +148,7 @@ def generate_brief(user_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(brief)
     return brief
+
 
 
 @router.get("/scores/{user_id}/current", response_model=DeltaScoreResponse)

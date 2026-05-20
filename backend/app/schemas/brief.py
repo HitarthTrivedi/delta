@@ -29,6 +29,22 @@ class RecommendationComplete(BaseModel):
     evidence_url: str
     evidence_type: str = "github"
 
+class RoadmapNode(BaseModel):
+    id: str
+    label: str
+    status: str
+    description: str
+    tech_twist: Optional[str] = None
+    architect_warning: Optional[str] = None
+    certification: Optional[str] = None
+    resource_url: Optional[str] = None
+
+class RoadmapPhase(BaseModel):
+    id: str
+    name: str
+    description: str
+    nodes: List[RoadmapNode]
+
 class BriefResponse(BaseModel):
     id: str
     user_id: str
@@ -38,6 +54,12 @@ class BriefResponse(BaseModel):
     email_sent_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     recommendation_items: List[RecommendationResponse] = []
+    
+    # Custom Roadmap Integrations
+    phases: Optional[List[RoadmapPhase]] = None
+    demanded_skills: Optional[List[str]] = None
+    user_skills: Optional[List[str]] = None
 
     class Config:
         from_attributes = True
+

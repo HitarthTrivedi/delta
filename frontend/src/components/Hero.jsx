@@ -65,7 +65,7 @@ const Hero = () => {
 
           <button
             className="btn-primary flex items-center justify-center gap-2 px-8 py-4 text-lg w-full sm:w-auto"
-            onClick={() => window.location.href = 'https://delta-back-gbl2.onrender.com/'}
+            onClick={() => window.location.href = '/onboarding'}
           >
             {heroData.ctaPrimary}
             <ArrowRight size={20} />

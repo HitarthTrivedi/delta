@@ -104,7 +104,7 @@ const HowItWorks = () => {
           <button
             className="btn-primary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-            onClick={() => window.location.href = 'https://delta-back-gbl2.onrender.com/'}
+            onClick={() => window.location.href = '/onboarding'}
           >
             Start Your Journey Today
             <ArrowRight size={16} />

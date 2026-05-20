@@ -1,3 +1,4 @@
+import json
 from sqlalchemy import Column, String, Float, Date, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -17,3 +18,45 @@ class WeeklyBrief(Base):
 
     user = relationship("User")
     recommendation_items = relationship("Recommendation", back_populates="brief", lazy="selectin")
+
+    @property
+    def phases(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("phases", [])
+        except Exception:
+            return []
+
+    @property
+    def demanded_skills(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            raw = data.get("demanded_skills", [])
+            normalized = []
+            for item in raw:
+                if isinstance(item, dict):
+                    skill_name = item.get("skill") or item.get("name")
+                    if skill_name:
+                        normalized.append(str(skill_name))
+                elif isinstance(item, str):
+                    normalized.append(item)
+                else:
+                    normalized.append(str(item))
+            return normalized
+        except Exception:
+            return []
+
+    @property
+    def user_skills(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("user_skills", [])
+        except Exception:
+            return []
+

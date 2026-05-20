@@ -47,6 +47,14 @@ def get_user_stats(user_id: str, db: Session = Depends(get_db)):
         MarketSnapshot.user_id == user_id
     ).order_by(MarketSnapshot.snapshot_date.desc()).first()
 
+    # Dynamic completed recommendation habits
+    from app.models.recommendation import Recommendation
+    completed_recs = db.query(Recommendation).filter(
+        Recommendation.user_id == user_id,
+        Recommendation.status == "completed"
+    ).all()
+    completed_count = len(completed_recs)
+
     # Compute stats
     total_skills = len(skills)
     verified_skills = [s for s in skills if s.evidence_type in ("github", "certification", "verified")]
@@ -60,10 +68,24 @@ def get_user_stats(user_id: str, db: Session = Depends(get_db)):
         except (json.JSONDecodeError, TypeError):
             demanded = []
         user_skill_names = {s.name.lower() for s in skills}
-        gaps = [d for d in demanded if d.lower() not in user_skill_names]
-        role_alignment = 1 - (len(gaps) / max(len(demanded), 1))
+        
+        # Defensive normalization to support both string list and object list formats
+        demanded_names = []
+        for item in demanded:
+            if isinstance(item, dict):
+                name = item.get("name") or item.get("skill") or ""
+                if name:
+                    demanded_names.append(name)
+            elif isinstance(item, str):
+                demanded_names.append(item)
+
+        gaps = [d for d in demanded_names if d.lower() not in user_skill_names]
+        role_alignment = 1 - (len(gaps) / max(len(demanded_names), 1))
     else:
-        role_alignment = 0.0
+        role_alignment = 0.5
+
+    # Consistency rating
+    consistency_index = round(min(60.0 + (completed_count * 10.0), 100.0), 1)
 
     return {
         "role_alignment": round(role_alignment, 2),
@@ -72,4 +94,6 @@ def get_user_stats(user_id: str, db: Session = Depends(get_db)):
         "gaps": gaps,
         "total_skills": total_skills,
         "verified_count": len(verified_skills),
+        "consistency_index": consistency_index,
+        "completed_recommendations_count": completed_count
     }

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.models import *  # noqa: F401,F403 — ensures all models register with Base
-from app.routers import users, skills, briefs, chat, resume
+from app.routers import users, skills, briefs, chat, resume, calendar, dossier
 
 app = FastAPI(
     title="Delta 2.0 API",
@@ -25,6 +25,9 @@ app.include_router(skills.router)
 app.include_router(briefs.router)
 app.include_router(chat.router)
 app.include_router(resume.router)
+app.include_router(calendar.router)
+app.include_router(dossier.router)
+
 
 
 @app.on_event("startup")

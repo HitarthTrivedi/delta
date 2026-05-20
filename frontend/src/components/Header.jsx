@@ -82,7 +82,7 @@ const Header = () => {
           <button className="btn-secondary !ml-[50px]">
             Sign In
           </button>
-          <button className="btn-primary !ml-[-10px]" onClick={() => window.location.href = 'https://delta-back-gbl2.onrender.com/'}>
+          <button className="btn-primary !ml-[-10px]" onClick={() => window.location.href = '/onboarding'}>
             Get Started
           </button>
         </div>
@@ -136,7 +136,7 @@ const Header = () => {
               <button className="btn-secondary" style={{ width: '100%' }}>
                 Sign In
               </button>
-              <button className="btn-primary" style={{ width: '100%' }} onClick={() => window.location.href = 'https://delta-back-gbl2.onrender.com/'}>
+              <button className="btn-primary" style={{ width: '100%' }} onClick={() => window.location.href = '/onboarding'}>
                 Get Started
               </button>
             </div>

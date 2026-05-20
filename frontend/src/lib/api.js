@@ -43,4 +43,14 @@ export const resumeAPI = {
   }).then(r => r.data),
 };
 
+// ── Calendar API ──
+export const calendarAPI = {
+  getEvents: (userId) => api.get(`/calendar/events?user_id=${userId}`).then(r => r.data),
+};
+
+// ── Dossier API ──
+export const dossierAPI = {
+  getWeekly: (userId) => api.get(`/dossier/weekly/${userId}`).then(r => r.data),
+};
+
 export default api;

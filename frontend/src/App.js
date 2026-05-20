@@ -28,6 +28,11 @@ import {
   Profile
 } from "./pages/FeaturePages";
 
+// Core high-fidelity custom pages
+import Onboarding from "./pages/Onboarding";
+import Dashboard from "./pages/Dashboard";
+import CareerChat from "./pages/CareerChat";
+
 // Core connection hooks
 import { useUserWithSkills } from "./hooks/useUser";
 import { useAuthStore } from "./store/authStore";
@@ -64,7 +69,7 @@ function LayoutWrapper({ children }) {
   const userId = useAuthStore((state) => state.userId);
   const { data: user } = useUserWithSkills(userId);
 
-  const isLanding = location.pathname === "/";
+  const isLanding = location.pathname === "/" || location.pathname === "/onboarding";
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-primary-500/30 selection:text-white">
@@ -81,26 +86,15 @@ function AppContent() {
     <LayoutWrapper>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/chat" element={<CareerChat />} />
         <Route path="/ledger" element={<Ledger />} />
         <Route path="/briefs" element={<Briefs />} />
         <Route path="/pulse" element={<Pulse />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/profile" element={<Profile />} />
-        
-        {/* Placeholder paths that Gemini will override */}
-        <Route path="/dashboard" element={
-          <div className="pt-24 px-6 max-w-7xl mx-auto min-h-screen text-slate-400 font-mono text-center">
-            <h1 className="text-3xl font-black text-white tracking-widest uppercase mb-4">Dashboard Loading...</h1>
-            <p className="text-sm">Awaiting Gemini frontend component injection (DashboardConnected.jsx / Dashboard.jsx)</p>
-          </div>
-        } />
-        <Route path="/chat" element={
-          <div className="pt-24 px-6 max-w-7xl mx-auto min-h-screen text-slate-400 font-mono text-center">
-            <h1 className="text-3xl font-black text-white tracking-widest uppercase mb-4">Career AI Core</h1>
-            <p className="text-sm">Awaiting Gemini frontend component injection (CareerChat.jsx)</p>
-          </div>
-        } />
       </Routes>
     </LayoutWrapper>
   );
