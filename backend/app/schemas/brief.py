@@ -59,7 +59,17 @@ class BriefResponse(BaseModel):
     phases: Optional[List[RoadmapPhase]] = None
     demanded_skills: Optional[List[str]] = None
     user_skills: Optional[List[str]] = None
+    proof_projects: Optional[List[dict]] = None
+    portfolio_assessment: Optional[dict] = None
+
+    # Weekly Brief Blueprint Fields
+    track_status: Optional[str] = "on_track"
+    market_changes: Optional[List[str]] = []
+    personal_changes: Optional[List[str]] = []
+    roadmap_updates: Optional[List[str]] = []
+    actions: Optional[List[str]] = []
+    opportunities: Optional[List[str]] = []
+    questions_for_user: Optional[List[str]] = []
 
     class Config:
         from_attributes = True
-

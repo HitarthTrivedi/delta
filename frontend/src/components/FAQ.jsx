@@ -1,76 +1,55 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { faqData } from '../mockData';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, HelpCircle } from 'lucide-react';
+import GlassPanel from './ui/GlassPanel';
 
 const FAQItem = ({ faq, index, isOpen, onToggle }) => {
   return (
     <motion.div
-      style={{
-        background: 'var(--bg-card)',
-        borderRadius: '0.75rem',
-        marginBottom: '1rem',
-        border: '1px solid var(--border-light)',
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
-        overflow: 'hidden'
-      }}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: index * 0.05 }}
+      transition={{ duration: 0.4, delay: index * 0.05 }}
+      className="mb-4 group select-none"
     >
-      {/* Question */}
-      <button
-        onClick={onToggle}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '1.5rem',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          textAlign: 'left',
-          gap: '1rem'
-        }}
-      >
-        <h3 className="heading-3" style={{ fontWeight: '500', color: 'var(--text-primary)', margin: 0 }}>
-          {faq.question}
-        </h3>
-        <motion.div
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-          style={{ flexShrink: 0 }}
+      <GlassPanel className={`border transition-all duration-300 font-mono ${
+        isOpen ? 'border-indigo-500/30 bg-slate-950/60' : 'border-white/5 bg-slate-950/40 hover:border-indigo-500/20'
+      }`}>
+        {/* Question Button */}
+        <button
+          onClick={onToggle}
+          className="w-full flex items-center justify-between p-5 bg-transparent border-none cursor-pointer text-left gap-4 focus:outline-none"
         >
-          <ChevronDown size={20} color="var(--text-muted)" />
-        </motion.div>
-      </button>
-
-      {/* Answer */}
-      <AnimatePresence>
-        {isOpen && (
+          <span className="text-xs font-bold uppercase tracking-wider text-white group-hover:text-indigo-300 transition-colors">
+            {faq.question}
+          </span>
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            style={{ overflow: 'hidden' }}
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="shrink-0 text-slate-500 group-hover:text-indigo-400 transition-colors"
           >
-            <p 
-              className="body-medium" 
-              style={{ 
-                color: 'var(--text-secondary)', 
-                padding: '0 1.5rem 1.5rem',
-                lineHeight: '1.6',
-                margin: 0
-              }}
-            >
-              {faq.answer}
-            </p>
+            <ChevronDown size={16} />
           </motion.div>
-        )}
-      </AnimatePresence>
+        </button>
+
+        {/* Answer Box */}
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="px-5 pb-5 text-slate-400 text-xs leading-relaxed uppercase tracking-wider border-t border-white/5 pt-4 text-justify">
+                {faq.answer.replaceAll("Delta", "Delta OS")}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GlassPanel>
     </motion.div>
   );
 };
@@ -83,26 +62,32 @@ const FAQ = () => {
   };
 
   return (
-    <section id="faq" style={{ padding: '5rem 1.2rem', background: 'var(--bg-section)' }}>
-      <div className="container">
+    <section id="faq" style={{ padding: '7rem 1.5rem 6rem', background: 'var(--bg-page)' }} className="relative">
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[180px] pointer-events-none" />
+
+      <div className="container max-w-4xl mx-auto">
         {/* Section Header */}
         <motion.div
-          style={{ textAlign: 'center', marginBottom: '3rem', maxWidth: '700px', marginLeft: 'auto', marginRight: 'auto' }}
-          initial={{ opacity: 0, y: 20 }}
+          style={{ textAlign: 'center', marginBottom: '4rem', maxWidth: '700px', marginLeft: 'auto', marginRight: 'auto' }}
+          initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
+          className="font-mono text-center"
         >
-          <h2 className="heading-1" style={{ marginBottom: '1rem' }}>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[10px] uppercase font-bold tracking-widest text-indigo-400 mb-4 select-none">
+            <HelpCircle size={10} className="animate-pulse" /> FAQ DATABASE
+          </div>
+          <h2 className="heading-1 text-3xl font-black uppercase tracking-wider text-white mb-4">
             Frequently Asked Questions
           </h2>
-          <p className="body-large" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-slate-400 text-xs sm:text-sm uppercase tracking-wider">
             Everything you need to know about Delta and how it works.
           </p>
         </motion.div>
 
         {/* FAQ List */}
-        <div style={{ maxWidth: '800px', marginLeft: 'auto', marginRight: 'auto' }}>
+        <div className="max-w-3xl mx-auto">
           {faqData.map((faq, index) => (
             <FAQItem
               key={index}
@@ -116,17 +101,17 @@ const FAQ = () => {
 
         {/* Contact CTA */}
         <motion.div
-          style={{ textAlign: 'center', marginTop: '3rem' }}
-          initial={{ opacity: 0, y: 20 }}
+          className="text-center mt-12 font-mono"
+          initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <p className="body-medium" style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-            Still have questions? We're here to help.
+          <p className="text-slate-400 text-xs uppercase tracking-wider mb-4">
+            Still have questions? Awaiting neural ping.
           </p>
-          <button className="btn-secondary">
-            Contact Support
+          <button className="btn-secondary px-6 py-2.5 text-xs uppercase tracking-widest font-bold font-mono border border-white/5 hover:border-indigo-500/30 transition-all rounded-lg">
+            Contact Support Protocols
           </button>
         </motion.div>
       </div>

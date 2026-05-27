@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Zap, Cpu, RefreshCw, Sparkles, BookOpen, User } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import GlassPanel from '../components/ui/GlassPanel';
-import { chatAPI, briefsAPI } from '../lib/api';
+import { chatAPI, briefsAPI, careerOSAPI } from '../lib/api';
 import { toast } from 'sonner';
 
 export default function CareerChat() {
@@ -12,24 +12,28 @@ export default function CareerChat() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [activeBrief, setActiveBrief] = useState(null);
+  const [careerContext, setCareerContext] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const history = await chatAPI.getHistory(userId);
+      const [history, briefRes, contextRes] = await Promise.all([
+        chatAPI.getHistory(userId),
+        briefsAPI.getLatest(userId),
+        careerOSAPI.getContext(userId),
+      ]);
       setMessages(history.messages || []);
-
-      const briefRes = await briefsAPI.getLatest(userId);
       setActiveBrief(briefRes);
+      setCareerContext(contextRes);
     } catch (err) {
       console.error(err);
       toast.error('Unable to establish SQLite websocket link. Reverting to offline thread.');
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     loadData();
-  }, [userId]);
+  }, [loadData]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -58,6 +62,7 @@ export default function CareerChat() {
 
       // Append AI response
       setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
+      await loadData();
     } catch (err) {
       console.error(err);
       toast.error('AI Core handshake failed. SQLite database roll-back completed.');
@@ -76,6 +81,11 @@ export default function CareerChat() {
     const chosen = questions[Math.floor(Math.random() * questions.length)];
     setInput(chosen);
   };
+
+  const proofProjects = careerContext?.proof_projects || [];
+  const portfolio = careerContext?.portfolio_assessment || {};
+  const targetRole = careerContext?.memory?.ambitions?.target_role || 'Career-ready professional';
+  const activePhase = careerContext?.roadmap?.weekly_focus?.phase_name || 'Building proof-backed skills';
 
   return (
     <div className="pt-20 px-6 max-w-7xl mx-auto min-h-screen text-slate-300 font-mono pb-12 relative overflow-hidden flex flex-col">
@@ -107,7 +117,7 @@ export default function CareerChat() {
                 <BookOpen size={12} /> Active Targets Context
               </h2>
               <p className="text-[8px] text-slate-500 uppercase leading-normal">
-                Click any context chip below to auto-populate senior-developer prompts mapped directly to your active roadmap nodes.
+                Target: {targetRole}. Current phase: {activePhase}. Click any context chip below to ask from your live Career OS state.
               </p>
 
               <div className="flex flex-wrap gap-2 pt-2">
@@ -124,11 +134,28 @@ export default function CareerChat() {
             </div>
 
             <div className="border-t border-white/5 pt-4 mt-6">
-              <h3 className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">Cognitive Capabilities Active</h3>
+              <h3 className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">Proof Projects</h3>
+              <div className="space-y-2 font-mono text-[8px] text-slate-400 uppercase">
+                {proofProjects.slice(0, 3).map((project) => (
+                  <button
+                    key={project.id}
+                    onClick={() => setInput(`Help me build this proof project: ${project.title}. Give me the exact milestones and README structure.`)}
+                    className="w-full text-left p-2 rounded bg-slate-950/60 border border-white/5 hover:border-primary-500/20 transition-colors"
+                  >
+                    <span className="block text-primary-400 font-bold">{project.title}</span>
+                    <span className="block text-slate-500 mt-1 leading-normal">{project.resume_headline}</span>
+                  </button>
+                ))}
+                {!proofProjects.length && <p>+ No proof projects indexed yet</p>}
+              </div>
+            </div>
+
+            <div className="border-t border-white/5 pt-4 mt-4">
+              <h3 className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-2">Portfolio Readiness</h3>
               <div className="space-y-1.5 font-mono text-[8px] text-slate-400 uppercase">
-                <p>+ Contextual RAG matching enabled</p>
-                <p>+ SQLite history tracking live</p>
-                <p>+ Bangalore hiring standards mapping</p>
+                <p>+ Status: <span className="text-primary-400 font-bold">{portfolio.readiness || 'unknown'}</span></p>
+                <p>+ Evidence Density: <span className="text-cyan-400 font-bold">{portfolio.evidence_density ?? 0}</span></p>
+                <p>+ Missing Proof: {(portfolio.missing_market_proof || []).slice(0, 3).join(', ') || 'None indexed'}</p>
               </div>
             </div>
           </GlassPanel>

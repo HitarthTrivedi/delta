@@ -1,48 +1,46 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 
 const FloatingShapes = () => {
-  const shapes = [
-    { id: 1, size: 80, color: 'rgba(252, 202, 199, 0.4)', duration: 20, delay: 0, x: '10%', y: '20%' },
-    { id: 2, size: 60, color: 'rgba(253, 215, 197, 0.3)', duration: 25, delay: 2, x: '80%', y: '15%' },
-    { id: 3, size: 100, color: 'rgba(254, 241, 229, 0.35)', duration: 30, delay: 4, x: '15%', y: '70%' },
-    { id: 4, size: 70, color: 'rgba(252, 202, 199, 0.3)', duration: 22, delay: 1, x: '85%', y: '75%' },
-    { id: 5, size: 90, color: 'rgba(253, 215, 197, 0.25)', duration: 28, delay: 3, x: '50%', y: '50%' },
+  const glows = [
+    { id: 1, size: 450, color: 'rgba(99, 102, 241, 0.08)', duration: 15, delay: 0, x: '5%', y: '10%' },
+    { id: 2, size: 350, color: 'rgba(139, 92, 246, 0.08)', duration: 18, delay: 2, x: '75%', y: '15%' },
+    { id: 3, size: 500, color: 'rgba(6, 182, 212, 0.05)', duration: 25, delay: 4, x: '10%', y: '60%' },
+    { id: 4, size: 300, color: 'rgba(236, 72, 153, 0.04)', duration: 20, delay: 1, x: '80%', y: '70%' },
+    { id: 5, size: 400, color: 'rgba(16, 185, 129, 0.04)', duration: 22, delay: 3, x: '45%', y: '40%' },
   ];
 
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
-      {shapes.map((shape) => (
+      {glows.map((glow) => (
         <motion.div
-          key={shape.id}
+          key={glow.id}
           style={{
             position: 'absolute',
-            left: shape.x,
-            top: shape.y,
-            width: shape.size,
-            height: shape.size,
-            borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%',
-            background: shape.color,
-            filter: 'blur(40px)',
+            left: glow.x,
+            top: glow.y,
+            width: glow.size,
+            height: glow.size,
+            borderRadius: '50%',
+            background: glow.color,
+            filter: 'blur(100px)',
           }}
           animate={{
-            y: [0, -30, 0],
-            x: [0, 20, 0],
-            rotate: [0, 180, 360],
-            borderRadius: [
-              '30% 70% 70% 30% / 30% 30% 70% 70%',
-              '70% 30% 30% 70% / 70% 70% 30% 30%',
-              '30% 70% 70% 30% / 30% 30% 70% 70%',
-            ],
+            y: [0, -40, 0],
+            x: [0, 30, 0],
+            scale: [1, 1.1, 1],
           }}
           transition={{
-            duration: shape.duration,
-            delay: shape.delay,
+            duration: glow.duration,
+            delay: glow.delay,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
         />
       ))}
+      
+      {/* Sleek Cybersecurity Scanline and Tech Grids */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.005)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.005)_1px,transparent_1px)] bg-[size:30px_30px] opacity-40 pointer-events-none" />
     </div>
   );
 };

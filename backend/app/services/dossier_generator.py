@@ -2,6 +2,8 @@
 import datetime
 import json
 from app.models import DeltaScore, Recommendation, SkillNode
+from app.services.portfolio_engine import assess_portfolio
+from app.services.project_engine import recommend_proof_projects
 
 def compile_weekly_dossier(user, skills: list, db) -> dict:
     """
@@ -107,6 +109,31 @@ def compile_weekly_dossier(user, skills: list, db) -> dict:
     if "fastapi" in user_skill_names:
         keep_doing.append("Separating your SQLAlchemy database models from FastAPI request payloads using Pydantic validation models.")
 
+    memory = {
+        "ambitions": {"target_role": user.target_role},
+        "capabilities": {
+            "skills": [
+                {
+                    "name": skill.name,
+                    "category": skill.category,
+                    "proficiency": skill.proficiency,
+                    "evidence_type": skill.evidence_type,
+                    "evidence_url": skill.evidence_url,
+                    "evidence_weight": skill.evidence_weight,
+                }
+                for skill in skills
+            ],
+        },
+        "evidence": {"projects": [], "certifications": [], "portfolio_links": []},
+    }
+    market = {
+        "target_role": user.target_role,
+        "top_demanded_skills": ["Python", "SQL", "Docker", "System Design", "LLMs"],
+    }
+    roadmap = {"phases": [], "active_phase_id": None}
+    proof_projects = recommend_proof_projects(memory, roadmap, market)
+    portfolio_assessment = assess_portfolio(memory, [], proof_projects, market)
+
     return {
         "user_id": user_id,
         "week_label": week_label,
@@ -133,6 +160,8 @@ def compile_weekly_dossier(user, skills: list, db) -> dict:
             "mistakes_to_avoid": mistakes_to_avoid,
             "industry_expectations": industry_expectations
         },
+        "proof_projects": proof_projects,
+        "portfolio_assessment": portfolio_assessment,
         "shareable_portfolio_link": f"https://delta.dev/portfolio/share/{user_id[:8]}",
         "dossier_pdf_url": f"/api/dossier/export/{user_id}.pdf"
     }

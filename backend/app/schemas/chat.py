@@ -17,6 +17,7 @@ class OnboardingStartResponse(BaseModel):
     ambition_summary: str
     adaptive_questions: List[str]
     market_demand_focus: str
+    market_snapshot: Optional[dict] = None
 
 class OnboardingFinalizeRequest(BaseModel):
     user_id: str
@@ -27,3 +28,4 @@ class OnboardingFinalizeRequest(BaseModel):
 class OnboardingFinalizeResponse(BaseModel):
     status: str
     profile: dict
+    career_os: Optional[dict] = None

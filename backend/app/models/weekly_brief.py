@@ -60,3 +60,92 @@ class WeeklyBrief(Base):
         except Exception:
             return []
 
+    @property
+    def proof_projects(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("proof_projects", [])
+        except Exception:
+            return []
+
+    @property
+    def portfolio_assessment(self):
+        if not self.recommendations:
+            return {}
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("portfolio_assessment", {})
+        except Exception:
+            return {}
+
+    @property
+    def track_status(self):
+        if not self.recommendations:
+            return "on_track"
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("track_status", "on_track")
+        except Exception:
+            return "on_track"
+
+    @property
+    def market_changes(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("market_changes", [])
+        except Exception:
+            return []
+
+    @property
+    def personal_changes(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("personal_changes", [])
+        except Exception:
+            return []
+
+    @property
+    def roadmap_updates(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("roadmap_updates", [])
+        except Exception:
+            return []
+
+    @property
+    def actions(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("actions", [])
+        except Exception:
+            return []
+
+    @property
+    def opportunities(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("opportunities", [])
+        except Exception:
+            return []
+
+    @property
+    def questions_for_user(self):
+        if not self.recommendations:
+            return []
+        try:
+            data = json.loads(self.recommendations)
+            return data.get("questions_for_user", [])
+        except Exception:
+            return []

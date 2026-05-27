@@ -6,7 +6,10 @@ from app.models import WeeklyBrief, Recommendation, DeltaScore, SkillNode, Marke
 from app.schemas.brief import BriefResponse, RecommendationComplete
 from app.schemas.delta import DeltaScoreResponse
 from app.services.brief_generator import generate_weekly_brief
+from app.services.central_engine import log_journey_event
 from app.services.delta_score import compute_delta_score
+from app.services.portfolio_engine import assess_portfolio
+from app.services.project_engine import recommend_proof_projects
 
 router = APIRouter(prefix="/api/briefs", tags=["briefs"])
 
@@ -70,6 +73,37 @@ def generate_brief(user_id: str, db: Session = Depends(get_db)):
 
     # 2. Invoke rich roadmap compiler
     roadmap_res = generate_weekly_brief(user, skills, market)
+    market_context = {
+        "target_role": market.target_role,
+        "top_demanded_skills": market_demands,
+        "emerging_skills": json.loads(market.emerging_skills or "[]"),
+        "confidence_score": market.confidence_score,
+    }
+    memory_context = {
+        "ambitions": {"target_role": user.target_role},
+        "capabilities": {
+            "skills": [
+                {
+                    "name": s.name,
+                    "category": s.category,
+                    "proficiency": s.proficiency,
+                    "evidence_type": s.evidence_type,
+                    "evidence_url": s.evidence_url,
+                    "evidence_weight": s.evidence_weight,
+                }
+                for s in skills
+            ],
+        },
+        "evidence": {"projects": [], "certifications": [], "portfolio_links": []},
+    }
+    roadmap_context = {
+        "phases": roadmap_res.get("phases", []),
+        "active_phase_id": next((phase.get("id") for phase in roadmap_res.get("phases", []) if phase.get("nodes")), None),
+    }
+    proof_projects = recommend_proof_projects(memory_context, roadmap_context, market_context)
+    portfolio_assessment = assess_portfolio(memory_context, [], proof_projects, market_context)
+    roadmap_res["proof_projects"] = proof_projects
+    roadmap_res["portfolio_assessment"] = portfolio_assessment
 
     # 3. Create brief entry
     brief_id = str(uuid.uuid4())
@@ -116,7 +150,7 @@ def generate_brief(user_id: str, db: Session = Depends(get_db)):
     }
 
     for node in recs_to_add:
-        skill_name = NODE_SKILL_MAP.get(node["id"], node["id"].replace("node-", "").capitalize())
+        skill_name = node.get("skill_name") or NODE_SKILL_MAP.get(node["id"]) or node["label"]
         
         # Determine projected delta impact: locked nodes have higher learning impact
         impact = 4.0 if node.get("status") == "locked" else 2.5
@@ -204,6 +238,22 @@ def complete_recommendation(rec_id: str, data: RecommendationComplete, db: Sessi
         db.add(new_skill)
 
     db.commit()
+    log_journey_event(
+        db=db,
+        user_id=rec.user_id,
+        event_type="milestone_verified",
+        summary=f"Verified proof of work for {rec.skill}.",
+        evidence={
+            "recommendation_id": rec.id,
+            "evidence_type": data.evidence_type,
+            "evidence_url": data.evidence_url,
+        },
+        impact={
+            "skill": rec.skill,
+            "evidence_weight": EVIDENCE_WEIGHTS.get(data.evidence_type, 0.4),
+            "proficiency_increased": True,
+        },
+    )
 
     brief = db.query(WeeklyBrief).filter(WeeklyBrief.id == rec.brief_id).first()
     db.refresh(brief)

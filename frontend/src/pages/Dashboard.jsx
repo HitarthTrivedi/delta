@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, Award, TrendingUp, Calendar as CalendarIcon, 
   CheckCircle, Lock, ShieldAlert, Cpu, 
-  ExternalLink, Github, Sparkles, BookOpen, AlertCircle, RefreshCw 
+  ExternalLink, Github, Sparkles, BookOpen, AlertCircle, RefreshCw, Network
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import GlassPanel from '../components/ui/GlassPanel';
-import { usersAPI, briefsAPI, calendarAPI, dossierAPI } from '../lib/api';
+import { usersAPI, briefsAPI, calendarAPI, dossierAPI, careerOSAPI } from '../lib/api';
 import { toast } from 'sonner';
 
 export default function Dashboard() {
@@ -15,7 +15,9 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [brief, setBrief] = useState(null);
   const [events, setEvents] = useState([]);
+  const [sourceStatuses, setSourceStatuses] = useState([]);
   const [dossier, setDossier] = useState(null);
+  const [careerContext, setCareerContext] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // Roadmap Interaction
@@ -23,35 +25,116 @@ export default function Dashboard() {
   const [githubUrl, setGithubUrl] = useState('');
   const [verifying, setVerifying] = useState(false);
 
-  const loadData = async () => {
+  // Weekly Brief Interactive HUD States
+  const [checkedActions, setCheckedActions] = useState({});
+  const [resolverAnswers, setResolverAnswers] = useState({});
+  const [submittedAnswers, setSubmittedAnswers] = useState({});
+
+  // Web Audio Synth Chime
+  const playBeep = useCallback((freq = 800, type = 'sine', duration = 0.08) => {
     try {
-      const statsRes = await usersAPI.getStats(userId);
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.type = type;
+      oscillator.frequency.value = freq;
+      gainNode.gain.setValueAtTime(0.04, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+      console.warn('Web Audio API not supported or blocked:', e);
+    }
+  }, []);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [statsRes, briefRes, calendarRes, sourceRes, dossierRes, contextRes] = await Promise.all([
+        usersAPI.getStats(userId),
+        briefsAPI.getLatest(userId),
+        calendarAPI.getEvents(userId),
+        calendarAPI.getSources(),
+        dossierAPI.getWeekly(userId),
+        careerOSAPI.getContext(userId),
+      ]);
       setStats(statsRes);
-
-      const briefRes = await briefsAPI.getLatest(userId);
       setBrief(briefRes);
-
-      // Fetch calendar and dossier endpoints
-      const calendarRes = await calendarAPI.getEvents(userId);
       setEvents(calendarRes);
-
-      const dossierRes = await dossierAPI.getWeekly(userId);
+      setSourceStatuses(sourceRes);
       setDossier(dossierRes);
+      setCareerContext(contextRes);
     } catch (err) {
       console.error(err);
       toast.error('Unable to fetch live SQLite data. Reverting to sandbox state.');
     }
-  };
+  }, [userId]);
+
+  const toggleAction = useCallback(async (idx) => {
+    playBeep(900, 'triangle', 0.1);
+    const newChecked = !checkedActions[idx];
+    setCheckedActions(prev => ({
+      ...prev,
+      [idx]: newChecked
+    }));
+    
+    try {
+      const actionText = brief.actions[idx];
+      await careerOSAPI.logJourneyEvent(userId, {
+        event_type: 'task_completed',
+        summary: `${newChecked ? 'Completed' : 'Reopened'} action item: "${actionText}"`,
+        evidence: { action: actionText, index: idx, completed: newChecked },
+        impact: { progress_updated: true }
+      });
+      await loadData();
+      toast.success(newChecked ? 'Action item completed!' : 'Action item reopened!');
+    } catch (e) {
+      console.error(e);
+    }
+  }, [userId, checkedActions, brief, playBeep, loadData]);
+
+  const submitAnswer = useCallback(async (idx, qText) => {
+    const answer = resolverAnswers[idx];
+    if (!answer || !answer.trim()) return;
+    
+    playBeep(1200, 'sine', 0.2);
+    setSubmittedAnswers(prev => ({
+      ...prev,
+      [idx]: true
+    }));
+    toast.success('Response ingested into Career Profile Memory!');
+    
+    try {
+      await careerOSAPI.logJourneyEvent(userId, {
+        event_type: 'user_reflection',
+        summary: `Resolved uncertainty question: "${qText}" with answer: "${answer.trim()}"`,
+        evidence: { question: qText, answer: answer.trim() },
+        impact: { memory_uncertainty_reduced: true }
+      });
+      await loadData();
+    } catch (e) {
+      console.error(e);
+    }
+  }, [userId, resolverAnswers, playBeep, loadData]);
+
 
   useEffect(() => {
     loadData();
-  }, [userId]);
+  }, [loadData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    try {
+      const refreshedContext = await careerOSAPI.runWeeklyCycle(userId);
+      setCareerContext(refreshedContext);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      await loadData();
+    }
     setRefreshing(false);
-    toast.success('SQLite Database Engine Re-indexed!');
+    toast.success('Career OS weekly cycle refreshed!');
   };
 
   const submitMilestone = async (recId, skillName) => {
@@ -84,7 +167,7 @@ export default function Dashboard() {
     }
   };
 
-  if (!stats || !brief || !dossier) {
+  if (!stats || !brief || !dossier || !careerContext) {
     return (
       <div className="pt-24 px-6 min-h-screen mesh-gradient-1 bg-grid-pattern flex flex-col justify-center items-center text-slate-400 font-mono">
         <Cpu className="animate-spin text-primary-400 mb-4" size={32} />
@@ -95,7 +178,21 @@ export default function Dashboard() {
   }
 
   // Calculate circular dial path
-  const scorePercent = Math.min(Math.max(stats.delta_score || 0, 0), 100);
+  const roadmap = careerContext.roadmap || {};
+  const memory = careerContext.memory || {};
+  const market = careerContext.market || {};
+  const journey = careerContext.journey_until_today || [];
+  const proofProjects = careerContext.proof_projects || brief.proof_projects || [];
+  const portfolio = careerContext.portfolio_assessment || brief.portfolio_assessment || {};
+  const opportunitySignals = careerContext.opportunity_signals || market.raw_data?.opportunity_signals || {};
+  const repeatedOpportunitySkills = opportunitySignals.repeated_skills || [];
+  const phases = roadmap.phases?.length ? roadmap.phases : brief.phases || [];
+  const activePhase = phases.find(phase => phase.id === roadmap.active_phase_id);
+  const targetRole = memory.ambitions?.target_role || market.target_role || 'Career-ready professional';
+  const hoursPerWeek = memory.constraints?.hours_per_week || stats.hours_per_week || 10;
+  const alignmentPercentage = Math.round((stats.role_alignment || 0) * 100);
+  const deltaScore = Math.round(brief.delta_score_end ?? brief.delta_score_start ?? 0);
+  const scorePercent = Math.min(Math.max(deltaScore || 0, 0), 100);
   const radius = 50;
   const strokeWidth = 8;
   const circumference = 2 * Math.PI * radius;
@@ -122,18 +219,18 @@ export default function Dashboard() {
             </button>
           </div>
           <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">
-            Target Focus: <span className="text-primary-400 font-bold">{stats.target_role || 'CS Engineering'}</span> // Bengaluru & Pune Sprints
+            Target Focus: <span className="text-primary-400 font-bold">{targetRole}</span> // Career OS Synced
           </p>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="p-3 bg-slate-900/60 border border-white/5 rounded-xl text-center min-w-[100px]">
             <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">Study Pacing</p>
-            <p className="text-xs font-bold text-emerald-400">{stats.hours_per_week}h / Week</p>
+            <p className="text-xs font-bold text-emerald-400">{hoursPerWeek}h / Week</p>
           </div>
           <div className="p-3 bg-slate-900/60 border border-white/5 rounded-xl text-center min-w-[100px]">
             <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">Alignment Index</p>
-            <p className="text-xs font-bold text-primary-400">{stats.alignment_percentage}%</p>
+            <p className="text-xs font-bold text-primary-400">{alignmentPercentage}%</p>
           </div>
           <div className="p-3 bg-slate-900/60 border border-white/5 rounded-xl text-center min-w-[100px]">
             <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">Evidence Density</p>
@@ -176,7 +273,7 @@ export default function Dashboard() {
               </svg>
               {/* Inner score overlay */}
               <div className="absolute text-center">
-                <p className="text-4xl font-black text-white tracking-tight">{stats.delta_score}</p>
+                <p className="text-4xl font-black text-white tracking-tight">{deltaScore}</p>
                 <p className="text-[8px] text-slate-500 uppercase tracking-widest">Growth Rating</p>
               </div>
             </div>
@@ -218,10 +315,226 @@ export default function Dashboard() {
             </div>
           </GlassPanel>
 
+          <GlassPanel className="p-6 relative overflow-hidden border-cyan-500/10 space-y-4">
+            <h2 className="text-[10px] font-bold uppercase text-cyan-400 tracking-widest mb-2 flex items-center gap-1.5">
+              <Sparkles size={12} /> Career Memory Vault
+            </h2>
+
+            <div>
+              <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Learning Style</p>
+              <p className="text-xs font-bold text-white uppercase">{memory.preferences?.learning_style || 'unknown'}</p>
+            </div>
+
+            <div>
+              <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Known Gaps</p>
+              <p className="text-[9px] text-slate-300 uppercase leading-normal">
+                {(memory.capabilities?.gaps_identified || []).slice(0, 4).join(', ') || 'No gaps indexed yet'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Confidence</p>
+              <p className="text-xs font-bold text-cyan-400">{Math.round((memory.confidence_score || 0) * 100)}%</p>
+            </div>
+          </GlassPanel>
+
         </div>
 
         {/* Center Panel: Zoomable 3-Phase Roadmap Visualizer */}
         <div className="lg:col-span-6 space-y-6">
+          
+          {/* Weekly Career Brief HUD */}
+          <GlassPanel className="p-6 border-white/5 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-primary-400 via-indigo-500 to-cyan-400" />
+            
+            {/* Header with Glowing Status Badge */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary-400 animate-ping" />
+                <h2 className="text-xs font-black uppercase text-white tracking-widest">
+                  Weekly Career OS Dossier
+                </h2>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[8px] text-slate-500 uppercase tracking-widest">
+                  Status //
+                </span>
+                {(() => {
+                  const status = brief.track_status || 'on_track';
+                  if (status === 'ahead') {
+                    return (
+                      <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded uppercase tracking-wider animate-pulse flex items-center gap-1 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                        <Zap size={10} className="animate-bounce" /> Ahead of Target
+                      </span>
+                    );
+                  } else if (status === 'drifting') {
+                    return (
+                      <span className="text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 shadow-[0_0_8px_rgba(245,158,11,0.2)]">
+                        <AlertCircle size={10} /> Drifting Pace
+                      </span>
+                    );
+                  } else if (status === 'blocked') {
+                    return (
+                      <span className="text-[9px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.2)]">
+                        <ShieldAlert size={10} /> Action Blocked
+                      </span>
+                    );
+                  } else {
+                    return (
+                      <span className="text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
+                        <Zap size={10} className="fill-cyan-400/20" /> On Track
+                      </span>
+                    );
+                  }
+                })()}
+              </div>
+            </div>
+
+            {/* Inner Dashboard Layout: Split Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-white/5 pb-6">
+              
+              {/* Left Column: Adaptive Pulses (Market vs Personal) */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h3 className="text-[9px] font-bold uppercase text-primary-400 tracking-wider flex items-center gap-1">
+                    <TrendingUp size={11} /> What Changed in the World
+                  </h3>
+                  <div className="space-y-2">
+                    {(brief.market_changes || []).map((change, idx) => (
+                      <div key={idx} className="flex gap-2 items-start bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 shadow-[0_0_4px_rgba(34,211,238,0.5)] flex-shrink-0" />
+                        <p className="text-[8px] text-slate-300 leading-normal uppercase">{change}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-[9px] font-bold uppercase text-cyan-400 tracking-wider flex items-center gap-1">
+                    <Sparkles size={11} /> What Changed in You
+                  </h3>
+                  <div className="space-y-2">
+                    {(brief.personal_changes || []).map((change, idx) => (
+                      <div key={idx} className="flex gap-2 items-start bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary-400 mt-1 shadow-[0_0_4px_rgba(236,72,153,0.5)] flex-shrink-0" />
+                        <p className="text-[8px] text-slate-300 leading-normal uppercase">{change}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Weekly Action Items */}
+              <div className="space-y-3">
+                <h3 className="text-[9px] font-bold uppercase text-slate-300 tracking-wider flex items-center gap-1">
+                  <CheckCircle size={11} className="text-emerald-400" /> Weekly Pacing Checklist
+                </h3>
+                <p className="text-[7px] text-slate-500 uppercase leading-normal">
+                  Toggle completed actions below to verify your sprint velocity.
+                </p>
+                
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {(brief.actions || []).map((action, idx) => {
+                    const isChecked = !!checkedActions[idx];
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => toggleAction(idx)}
+                        className={`w-full p-2.5 rounded-lg border text-left flex items-start gap-2.5 transition-all uppercase ${
+                          isChecked 
+                            ? 'bg-emerald-500/5 border-emerald-500/20 text-slate-400 line-through' 
+                            : 'bg-slate-950/50 border-white/5 text-slate-300 hover:border-white/10'
+                        }`}
+                      >
+                        <div className={`w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center mt-0.5 ${
+                          isChecked 
+                            ? 'bg-emerald-500 border-emerald-500 text-slate-950' 
+                            : 'border-slate-700'
+                        }`}>
+                          {isChecked && <span className="text-[9px] font-black">✓</span>}
+                        </div>
+                        <span className="text-[8px] leading-normal">{action}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Bottom Row: Opportunities and Uncertainty Resolver */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 items-start">
+              
+              {/* Opportunities Panel */}
+              <div className="space-y-2">
+                <h3 className="text-[9px] font-bold uppercase text-slate-300 tracking-wider flex items-center gap-1">
+                  <Award size={11} className="text-violet-400" /> Active Sprints & Deadlines
+                </h3>
+                <div className="space-y-2">
+                  {(brief.opportunities || []).map((opp, idx) => (
+                    <div key={idx} className="p-2.5 rounded-lg bg-slate-950/30 border border-white/5 flex justify-between items-center gap-4">
+                      <p className="text-[8px] text-slate-300 uppercase leading-tight">{opp}</p>
+                      <span className="text-[7px] bg-violet-500/10 text-violet-400 border border-violet-500/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0">
+                        Match
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Uncertainty Resolver Panel */}
+              <div className="space-y-2">
+                <h3 className="text-[9px] font-bold uppercase text-primary-400 tracking-wider flex items-center gap-1">
+                  <Sparkles size={11} /> uncertainty_resolvers
+                </h3>
+                <p className="text-[7px] text-slate-500 uppercase leading-normal">
+                  Answer the AI engine's questions to reduce career profile ambiguity.
+                </p>
+
+                <div className="space-y-3">
+                  {(brief.questions_for_user || []).map((question, idx) => {
+                    const isSubmitted = !!submittedAnswers[idx];
+                    return (
+                      <div key={idx} className="p-3 bg-slate-950/40 border border-white/5 rounded-lg space-y-2">
+                        <p className="text-[8px] text-slate-300 leading-normal uppercase">{question}</p>
+                        
+                        {isSubmitted ? (
+                          <div className="text-[8px] text-emerald-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                            ✓ Synced in Vault
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              placeholder="Type answer to update OS memory..."
+                              value={resolverAnswers[idx] || ''}
+                              onChange={(e) => setResolverAnswers(prev => ({ ...prev, [idx]: e.target.value }))}
+                              className="flex-1 bg-slate-900 border border-white/5 rounded px-2 py-1 text-[8px] text-white focus:outline-none focus:border-primary-500 font-mono"
+                            />
+                            <button
+                              onClick={() => submitAnswer(idx, question)}
+                              className="bg-primary-500 hover:bg-primary-600 text-white font-bold text-[8px] uppercase tracking-wider px-2 py-1 rounded transition-colors"
+                            >
+                              Sync
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {!(brief.questions_for_user || []).length && (
+                    <div className="text-[8px] uppercase text-slate-500 leading-normal p-2.5 bg-slate-950/20 border border-white/5 rounded-lg">
+                      All uncertainties cleared. System models running at full accuracy.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+          </GlassPanel>
+
           <GlassPanel className="p-6 border-white/5 relative overflow-hidden min-h-[500px]">
             <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/5 rounded-full blur-[140px] pointer-events-none" />
             
@@ -230,13 +543,13 @@ export default function Dashboard() {
                 <Cpu size={12} /> Interactive Zoomable Roadmap
               </h2>
               <span className="text-[8px] bg-primary-500/10 text-primary-400 border border-primary-500/20 px-2 py-0.5 rounded uppercase tracking-wider">
-                3 Chronological Phases
+                {activePhase?.name || 'Central Roadmap'}
               </span>
             </div>
 
             {/* Dynamic Phase Cards */}
             <div className="space-y-6">
-              {brief.phases?.map((phase, pIdx) => (
+              {phases.map((phase, pIdx) => (
                 <div key={phase.id} className="p-4 rounded-xl bg-slate-950/40 border border-white/5 space-y-3 relative">
                   <div className="absolute top-4 right-4 text-[8px] font-mono text-slate-500 uppercase">
                     Phase {pIdx + 1}
@@ -396,6 +709,22 @@ export default function Dashboard() {
               )}
             </AnimatePresence>
           </GlassPanel>
+
+          <GlassPanel className="p-6 border-white/5 relative overflow-hidden">
+            <h2 className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-1.5">
+              <Github size={12} /> Proof Project Engine
+            </h2>
+
+            <div className="space-y-3">
+              {proofProjects.slice(0, 3).map((project) => (
+                <div key={project.id} className="p-3 rounded-lg bg-slate-950/60 border border-white/5">
+                  <p className="text-[9px] text-primary-400 font-bold uppercase tracking-wider">{project.title}</p>
+                  <p className="text-[8px] text-slate-400 uppercase leading-normal mt-1">{project.resume_headline}</p>
+                  <p className="text-[7px] text-slate-500 uppercase leading-normal mt-2">{project.demo_expectations}</p>
+                </div>
+              ))}
+            </div>
+          </GlassPanel>
         </div>
 
         {/* Right Panel: Upcoming Sprints and Opportunities */}
@@ -424,6 +753,84 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          </GlassPanel>
+
+          <GlassPanel className="p-6 border-white/5 relative overflow-hidden">
+            <h2 className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-1.5">
+              <Network size={12} /> Opportunity Signals
+            </h2>
+
+            <div className="space-y-3">
+              {repeatedOpportunitySkills.slice(0, 5).map((item) => (
+                <div key={item.skill} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-white/5">
+                  <span className="text-[8px] text-slate-300 uppercase tracking-wider">{item.skill}</span>
+                  <span className="text-[8px] text-primary-400 font-bold">{item.count}x</span>
+                </div>
+              ))}
+              {!repeatedOpportunitySkills.length && (
+                <p className="text-[8px] text-slate-500 uppercase leading-normal">
+                  Adapter signals will appear after the next Career OS refresh.
+                </p>
+              )}
+            </div>
+          </GlassPanel>
+
+          <GlassPanel className="p-6 border-white/5 relative overflow-hidden">
+            <h2 className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-1.5">
+              <Cpu size={12} /> Source Modes
+            </h2>
+
+            <div className="space-y-2">
+              {sourceStatuses.map((source) => (
+                <div key={source.source} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-white/5">
+                  <div>
+                    <p className="text-[8px] text-slate-300 uppercase tracking-wider">{source.source}</p>
+                    <p className="text-[7px] text-slate-500 uppercase">{source.supported_modes?.join(' / ')}</p>
+                  </div>
+                  <span className={`text-[7px] border px-1.5 py-0.5 rounded uppercase font-bold ${
+                    source.mode === 'mock'
+                      ? 'text-yellow-400 border-yellow-500/20 bg-yellow-500/10'
+                      : 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10'
+                  }`}>
+                    {source.mode}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </GlassPanel>
+
+          <GlassPanel className="p-6 border-white/5 relative overflow-hidden">
+            <h2 className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-1.5">
+              <TrendingUp size={12} /> Journey Until Today
+            </h2>
+
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-slate-950/60 border border-white/5">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-[8px] text-cyan-400 font-bold uppercase tracking-wider">Portfolio Assessment</span>
+                  <span className="text-[7px] text-slate-500 uppercase">{portfolio.readiness || 'unknown'}</span>
+                </div>
+                <p className="text-[8px] text-slate-300 uppercase leading-normal">
+                  Missing proof: {(portfolio.missing_market_proof || []).slice(0, 3).join(', ') || 'none indexed'}
+                </p>
+              </div>
+
+              {journey.slice(0, 5).map((event) => (
+                <div key={event.id} className="p-3 rounded-lg bg-slate-950/60 border border-white/5">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[8px] text-primary-400 font-bold uppercase tracking-wider">{event.event_type.replaceAll('_', ' ')}</span>
+                    <span className="text-[7px] text-slate-500 uppercase">{event.event_date}</span>
+                  </div>
+                  <p className="text-[8px] text-slate-300 uppercase leading-normal">{event.summary}</p>
+                </div>
+              ))}
+
+              {!journey.length && (
+                <div className="p-3 rounded-lg bg-slate-950/60 border border-white/5 text-[8px] uppercase text-slate-500 leading-normal">
+                  No journey events indexed yet. Complete onboarding or verify a milestone to begin the log.
+                </div>
+              )}
             </div>
           </GlassPanel>
         </div>

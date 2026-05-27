@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
-  timeout: 30000,
+  timeout: 120000,
 });
 
 // ── Users API ──
@@ -34,6 +34,8 @@ export const briefsAPI = {
 export const chatAPI = {
   send: (data) => api.post('/chat/message', data).then(r => r.data),
   getHistory: (userId) => api.get(`/chat/history/${userId}`).then(r => r.data),
+  startOnboarding: (data) => api.post('/chat/onboarding/start', data).then(r => r.data),
+  finalizeOnboarding: (data) => api.post('/chat/onboarding/finalize', data).then(r => r.data),
 };
 
 // ── Resume API ──
@@ -46,11 +48,30 @@ export const resumeAPI = {
 // ── Calendar API ──
 export const calendarAPI = {
   getEvents: (userId) => api.get(`/calendar/events?user_id=${userId}`).then(r => r.data),
+  getSources: () => api.get('/calendar/sources').then(r => r.data),
 };
 
 // ── Dossier API ──
 export const dossierAPI = {
   getWeekly: (userId) => api.get(`/dossier/weekly/${userId}`).then(r => r.data),
+};
+
+export const careerOSAPI = {
+  getDomainPacks: () => api.get('/career-os/domain-packs').then(r => r.data),
+  getDomainPack: (domainId) => api.get(`/career-os/domain-packs/${domainId}`).then(r => r.data),
+  getContext: (userId) => api.get(`/career-os/user/${userId}/context`).then(r => r.data),
+  initialize: (userId, data) => api.post(`/career-os/user/${userId}/initialize`, data).then(r => r.data),
+  runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`).then(r => r.data),
+  logJourneyEvent: (userId, data) => api.post(`/career-os/user/${userId}/journey`, data).then(r => r.data),
+};
+
+// ── Ingestion API ──
+export const ingestionAPI = {
+  start: (userId, journeyType) => api.post('/ingestion/start', { user_id: userId, journey_type: journeyType }).then(r => r.data),
+  submitAnswer: (userId, sessionId, answer) => api.post('/ingestion/answer', { user_id: userId, session_id: sessionId, answer }).then(r => r.data),
+  getState: (userId) => api.get(`/ingestion/state/${userId}`).then(r => r.data),
+  bridge: (userId, rawText, source) => api.post('/ingestion/bridge', { user_id: userId, raw_text: rawText, source }).then(r => r.data),
+  forceComplete: (userId) => api.post(`/ingestion/complete/${userId}`).then(r => r.data),
 };
 
 export default api;

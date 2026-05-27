@@ -25,6 +25,7 @@ class UserCreate(BaseModel):
     learning_style: Optional[str] = None
 
 class UserUpdate(BaseModel):
+    email: Optional[str] = None
     name: Optional[str] = None
     current_role: Optional[str] = None
     target_role: Optional[str] = None

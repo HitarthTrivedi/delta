@@ -30,7 +30,7 @@ def create_skill(data: SkillCreate, db: Session = Depends(get_db)):
         category=data.category,
         proficiency=data.proficiency,
         evidence_type=data.evidence_type,
-        evidence_weight=EVIDENCE_WEIGHTS.get(data.evidence_type, 0.4),
+        evidence_weight=data.evidence_weight if data.evidence_weight is not None else EVIDENCE_WEIGHTS.get(data.evidence_type, 0.4),
         evidence_url=data.evidence_url,
     )
     db.add(skill)

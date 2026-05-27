@@ -9,6 +9,7 @@ class SkillCreate(BaseModel):
     proficiency: int = 1
     evidence_type: str = "claimed"
     evidence_url: Optional[str] = None
+    evidence_weight: Optional[float] = None
 
 class SkillUpdate(BaseModel):
     name: Optional[str] = None
@@ -16,6 +17,7 @@ class SkillUpdate(BaseModel):
     proficiency: Optional[int] = None
     evidence_type: Optional[str] = None
     evidence_url: Optional[str] = None
+    evidence_weight: Optional[float] = None
 
 class SkillVerify(BaseModel):
     evidence_type: str
