@@ -7,16 +7,21 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     CareerMemoryProfile,
+    IngestionSession,
     JourneyEvent,
     MarketSnapshot,
     PersonalizationProfile,
     RoadmapState,
+    SemanticNodeModel,
     SkillNode,
+    TensionNodeModel,
     User,
 )
 from app.services.brief_generator import generate_weekly_brief
 from app.services.domain_packs import infer_domain_pack
 from app.services.market_pulse import get_market_snapshot
+from app.services.memory_graph import MemoryGraph
+from app.services.memory_consolidation import consolidate_user_memory
 from app.services.opportunity_adapters import collect_opportunities, summarize_opportunity_signals
 from app.services.portfolio_engine import assess_portfolio
 from app.services.project_engine import recommend_proof_projects
@@ -369,12 +374,14 @@ def initialize_career_os_for_user(
     serialized_memory = serialize_memory(memory)
     serialized_market = serialize_market(market)
     serialized_roadmap = serialize_roadmap(roadmap)
+    semantic_memory = serialize_semantic_memory(db, user_id)
     serialized_event = serialize_journey_event(event)
     projects = recommend_proof_projects(serialized_memory, serialized_roadmap, serialized_market)
     portfolio = assess_portfolio(serialized_memory, [serialized_event], projects, serialized_market)
 
     return {
         "memory": serialized_memory,
+        "semantic_memory": semantic_memory,
         "market": serialized_market,
         "roadmap": serialized_roadmap,
         "proof_projects": projects,
@@ -388,6 +395,7 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     if not user:
         raise ValueError("User not found")
 
+    consolidation_report = consolidate_user_memory(db, user_id)
     memory = refresh_career_memory_from_user_state(db, user)
     pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
@@ -421,13 +429,43 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         db=db,
         user_id=user_id,
         event_type="weekly_cycle_completed",
-        summary="Weekly Career OS cycle refreshed market pulse, roadmap, proof projects, and portfolio assessment.",
-        evidence={"market_snapshot_id": market.id, "roadmap_id": roadmap.id},
-        impact={"market_refreshed": True, "roadmap_replanned": True},
+        summary="Weekly Career OS cycle refreshed market pulse, consolidated memory, roadmap, proof projects, and portfolio assessment.",
+        evidence={
+            "market_snapshot_id": market.id,
+            "roadmap_id": roadmap.id,
+            "memory_consolidation": consolidation_report,
+        },
+        impact={
+            "market_refreshed": True,
+            "roadmap_replanned": True,
+            "memory_consolidated": True,
+        },
     )
     context = compile_career_context(db, user_id)
     context["weekly_cycle_event"] = serialize_journey_event(event)
+    context["memory_consolidation"] = consolidation_report
     context["memory"] = serialize_memory(memory)
+    context["semantic_memory"] = serialize_semantic_memory(db, user_id)
+    return context
+
+
+def run_memory_consolidation_cycle(db: Session, user_id: str) -> dict:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise ValueError("User not found")
+
+    report = consolidate_user_memory(db, user_id)
+    event = log_journey_event(
+        db=db,
+        user_id=user_id,
+        event_type="memory_consolidated",
+        summary="Semantic memory sleep cycle applied temporal decay and merged duplicate graph nodes.",
+        evidence={"memory_consolidation": report},
+        impact={"memory_consolidated": True},
+    )
+    context = compile_career_context(db, user_id)
+    context["memory_consolidation"] = report
+    context["memory_consolidation_event"] = serialize_journey_event(event)
     return context
 
 
@@ -446,6 +484,7 @@ def compile_career_context(db: Session, user_id: str) -> dict:
     serialized_memory = serialize_memory(memory)
     serialized_market = serialize_market(latest_market)
     serialized_roadmap = serialize_roadmap(roadmap)
+    semantic_memory = serialize_semantic_memory(db, user_id)
     serialized_journey = [serialize_journey_event(event) for event in journey]
     projects = recommend_proof_projects(serialized_memory, serialized_roadmap, serialized_market)
     portfolio = assess_portfolio(serialized_memory, serialized_journey, projects, serialized_market)
@@ -466,6 +505,7 @@ def compile_career_context(db: Session, user_id: str) -> dict:
     return {
         "user_id": user_id,
         "memory": serialized_memory,
+        "semantic_memory": semantic_memory,
         "market": serialized_market,
         "roadmap": serialized_roadmap,
         "journey_until_today": serialized_journey,
@@ -474,6 +514,81 @@ def compile_career_context(db: Session, user_id: str) -> dict:
         "opportunities": opportunities,
         "opportunity_signals": opportunity_signals,
         "next_questions": next_questions,
+    }
+
+
+def serialize_semantic_memory(db: Session, user_id: str) -> dict:
+    """Expose the graph memory layer as first-class Career OS context."""
+    graph = MemoryGraph.load_from_db(db, user_id)
+    summary = graph.to_summary()
+    frame = graph.get_frame()
+
+    active_tensions = db.query(TensionNodeModel).filter(
+        TensionNodeModel.user_id == user_id,
+        TensionNodeModel.status.in_(["active", "challenged"]),
+    ).order_by(TensionNodeModel.severity.desc(), TensionNodeModel.created_at.desc()).limit(8).all()
+
+    latest_session = db.query(IngestionSession).filter(
+        IngestionSession.user_id == user_id
+    ).order_by(IngestionSession.created_at.desc()).first()
+
+    recent_nodes = db.query(SemanticNodeModel).filter(
+        SemanticNodeModel.user_id == user_id,
+        SemanticNodeModel.node_type != "user",
+    ).order_by(
+        SemanticNodeModel.last_accessed.desc(),
+        SemanticNodeModel.created_at.desc(),
+    ).limit(12).all()
+
+    dimensions = frame.get("dimensions", {})
+    total_nodes = max(summary.get("total_nodes", 0), 1)
+    dimension_balance = {
+        dimension: round((count / total_nodes) * 100)
+        for dimension, count in dimensions.items()
+    }
+
+    return {
+        "summary": summary,
+        "dimensions": dimensions,
+        "dimension_balance": dimension_balance,
+        "active_tensions": [
+            {
+                "id": tension.id,
+                "type": tension.tension_type,
+                "claim": tension.user_claim,
+                "market_reality": tension.market_reality,
+                "severity": tension.severity,
+                "challenge_question": tension.challenge_question,
+                "status": tension.status,
+                "created_at": tension.created_at.isoformat() if tension.created_at else None,
+            }
+            for tension in active_tensions
+        ],
+        "recent_nodes": [
+            {
+                "id": node.id,
+                "type": node.node_type,
+                "label": node.label,
+                "dimension": node.dimension,
+                "source": node.source,
+                "confidence": node.confidence,
+                "activation_weight": node.activation_weight,
+            }
+            for node in recent_nodes
+        ],
+        "latest_ingestion_session": {
+            "id": latest_session.id,
+            "status": latest_session.status,
+            "journey_type": latest_session.journey_type,
+            "current_round": latest_session.current_round,
+            "confidence_score": latest_session.confidence_score,
+            "gaps_total": latest_session.gaps_total,
+            "gaps_filled": latest_session.gaps_filled,
+            "tensions_total": latest_session.tensions_total,
+            "tensions_resolved": latest_session.tensions_resolved,
+            "created_at": latest_session.created_at.isoformat() if latest_session.created_at else None,
+            "completed_at": latest_session.completed_at.isoformat() if latest_session.completed_at else None,
+        } if latest_session else None,
     }
 
 

@@ -57,11 +57,13 @@ export const dossierAPI = {
 };
 
 export const careerOSAPI = {
+  getSystemStatus: () => api.get('/career-os/system-status').then(r => r.data),
   getDomainPacks: () => api.get('/career-os/domain-packs').then(r => r.data),
   getDomainPack: (domainId) => api.get(`/career-os/domain-packs/${domainId}`).then(r => r.data),
   getContext: (userId) => api.get(`/career-os/user/${userId}/context`).then(r => r.data),
   initialize: (userId, data) => api.post(`/career-os/user/${userId}/initialize`, data).then(r => r.data),
   runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`).then(r => r.data),
+  consolidateMemory: (userId) => api.post(`/career-os/user/${userId}/consolidate-memory`).then(r => r.data),
   logJourneyEvent: (userId, data) => api.post(`/career-os/user/${userId}/journey`, data).then(r => r.data),
 };
 

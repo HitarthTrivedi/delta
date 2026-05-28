@@ -18,7 +18,9 @@ export default function Dashboard() {
   const [sourceStatuses, setSourceStatuses] = useState([]);
   const [dossier, setDossier] = useState(null);
   const [careerContext, setCareerContext] = useState(null);
+  const [systemStatus, setSystemStatus] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [consolidating, setConsolidating] = useState(false);
 
   // Roadmap Interaction
   const [selectedNode, setSelectedNode] = useState(null);
@@ -51,13 +53,14 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      const [statsRes, briefRes, calendarRes, sourceRes, dossierRes, contextRes] = await Promise.all([
+      const [statsRes, briefRes, calendarRes, sourceRes, dossierRes, contextRes, statusRes] = await Promise.all([
         usersAPI.getStats(userId),
         briefsAPI.getLatest(userId),
         calendarAPI.getEvents(userId),
         calendarAPI.getSources(),
         dossierAPI.getWeekly(userId),
         careerOSAPI.getContext(userId),
+        careerOSAPI.getSystemStatus(),
       ]);
       setStats(statsRes);
       setBrief(briefRes);
@@ -65,6 +68,7 @@ export default function Dashboard() {
       setSourceStatuses(sourceRes);
       setDossier(dossierRes);
       setCareerContext(contextRes);
+      setSystemStatus(statusRes);
     } catch (err) {
       console.error(err);
       toast.error('Unable to fetch live SQLite data. Reverting to sandbox state.');
@@ -137,6 +141,22 @@ export default function Dashboard() {
     toast.success('Career OS weekly cycle refreshed!');
   };
 
+  const handleConsolidateMemory = async () => {
+    setConsolidating(true);
+    try {
+      const context = await careerOSAPI.consolidateMemory(userId);
+      setCareerContext(context);
+      await loadData();
+      const report = context.memory_consolidation || {};
+      toast.success(`Memory consolidated. Merged ${report.merged_nodes || 0} duplicate nodes.`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Memory consolidation failed.');
+    } finally {
+      setConsolidating(false);
+    }
+  };
+
   const submitMilestone = async (recId, skillName) => {
     if (!githubUrl.trim() || !githubUrl.includes('github.com/')) {
       toast.error('Invalid repository path! Must be a valid github.com link.');
@@ -180,6 +200,12 @@ export default function Dashboard() {
   // Calculate circular dial path
   const roadmap = careerContext.roadmap || {};
   const memory = careerContext.memory || {};
+  const semanticMemory = careerContext.semantic_memory || {};
+  const semanticSummary = semanticMemory.summary || {};
+  const semanticSession = semanticMemory.latest_ingestion_session || {};
+  const semanticTensions = semanticMemory.active_tensions || [];
+  const semanticNodes = semanticMemory.recent_nodes || [];
+  const dimensionBalance = semanticMemory.dimension_balance || {};
   const market = careerContext.market || {};
   const journey = careerContext.journey_until_today || [];
   const proofProjects = careerContext.proof_projects || brief.proof_projects || [];
@@ -193,6 +219,7 @@ export default function Dashboard() {
   const alignmentPercentage = Math.round((stats.role_alignment || 0) * 100);
   const deltaScore = Math.round(brief.delta_score_end ?? brief.delta_score_start ?? 0);
   const scorePercent = Math.min(Math.max(deltaScore || 0, 0), 100);
+  const modules = systemStatus?.modules || {};
   const radius = 50;
   const strokeWidth = 8;
   const circumference = 2 * Math.PI * radius;
@@ -235,6 +262,10 @@ export default function Dashboard() {
           <div className="p-3 bg-slate-900/60 border border-white/5 rounded-xl text-center min-w-[100px]">
             <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">Evidence Density</p>
             <p className="text-xs font-bold text-cyan-400">{stats.evidence_density}</p>
+          </div>
+          <div className="p-3 bg-slate-900/60 border border-white/5 rounded-xl text-center min-w-[100px]">
+            <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">OS Status</p>
+            <p className="text-xs font-bold text-emerald-400">{systemStatus?.status || 'syncing'}</p>
           </div>
         </div>
       </div>
@@ -336,6 +367,87 @@ export default function Dashboard() {
               <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Confidence</p>
               <p className="text-xs font-bold text-cyan-400">{Math.round((memory.confidence_score || 0) * 100)}%</p>
             </div>
+          </GlassPanel>
+
+          <GlassPanel className="p-6 relative overflow-hidden border-indigo-500/10 space-y-4">
+            <h2 className="text-[10px] font-bold uppercase text-indigo-400 tracking-widest mb-2 flex items-center gap-1.5">
+              <Network size={12} /> Semantic GraphRAG Core
+            </h2>
+            <button
+              onClick={handleConsolidateMemory}
+              disabled={consolidating}
+              className="absolute top-5 right-5 p-1.5 rounded bg-white/5 border border-white/5 text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+              title="Run memory consolidation"
+            >
+              <RefreshCw size={11} className={consolidating ? 'animate-spin' : ''} />
+            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-lg bg-slate-950/60 border border-white/5">
+                <p className="text-[8px] text-slate-500 uppercase tracking-wider">Vertices</p>
+                <p className="text-sm font-black text-white">{semanticSummary.total_nodes || 0}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-950/60 border border-white/5">
+                <p className="text-[8px] text-slate-500 uppercase tracking-wider">Edges</p>
+                <p className="text-sm font-black text-indigo-400">{semanticSummary.total_edges || 0}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {['cognitive', 'emotional', 'temporal', 'social'].map((dimension) => (
+                <div key={dimension}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[8px] text-slate-500 uppercase tracking-wider">{dimension}</span>
+                    <span className="text-[8px] text-slate-400">{dimensionBalance[dimension] || 0}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-slate-950 border border-white/5 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400"
+                      style={{ width: `${Math.min(dimensionBalance[dimension] || 0, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-white/5">
+              <p className="text-[8px] text-slate-500 uppercase tracking-wider mb-1">Latest Ingestion</p>
+              <p className="text-[8px] text-slate-300 uppercase leading-normal">
+                {semanticSession.status
+                  ? `${semanticSession.status} // round ${semanticSession.current_round || 0} // ${Math.round((semanticSession.confidence_score || 0) * 100)}% confidence`
+                  : 'No semantic ingestion session indexed yet'}
+              </p>
+            </div>
+
+            {semanticNodes.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[8px] text-slate-500 uppercase tracking-wider">Recent Nodes</p>
+                {semanticNodes.slice(0, 4).map((node) => (
+                  <div key={node.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-950/60 border border-white/5">
+                    <span className="text-[8px] text-slate-300 uppercase tracking-wider truncate">{node.label}</span>
+                    <span className="text-[7px] text-indigo-400 uppercase">{node.type}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </GlassPanel>
+
+          <GlassPanel className="p-6 relative overflow-hidden border-emerald-500/10 space-y-3">
+            <h2 className="text-[10px] font-bold uppercase text-emerald-400 tracking-widest mb-2 flex items-center gap-1.5">
+              <Cpu size={12} /> Core Modules
+            </h2>
+            {Object.entries(modules).map(([name, module]) => (
+              <div key={name} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-950/60 border border-white/5">
+                <span className="text-[8px] text-slate-300 uppercase tracking-wider">{name.replaceAll('_', ' ')}</span>
+                <span className={`text-[7px] border px-1.5 py-0.5 rounded uppercase font-bold ${
+                  module.ready
+                    ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/10'
+                    : 'text-rose-400 border-rose-500/20 bg-rose-500/10'
+                }`}>
+                  {module.ready ? 'ready' : 'offline'}
+                </span>
+              </div>
+            ))}
           </GlassPanel>
 
         </div>
@@ -771,6 +883,36 @@ export default function Dashboard() {
               {!repeatedOpportunitySkills.length && (
                 <p className="text-[8px] text-slate-500 uppercase leading-normal">
                   Adapter signals will appear after the next Career OS refresh.
+                </p>
+              )}
+            </div>
+          </GlassPanel>
+
+          <GlassPanel className="p-6 border-white/5 relative overflow-hidden">
+            <h2 className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-1.5">
+              <ShieldAlert size={12} /> Active Tensions
+            </h2>
+
+            <div className="space-y-3">
+              {semanticTensions.slice(0, 4).map((tension) => (
+                <div key={tension.id} className="p-3 rounded-lg bg-rose-950/20 border border-rose-500/10 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[8px] text-rose-300 font-bold uppercase tracking-wider">{tension.type?.replaceAll('_', ' ')}</span>
+                    <span className="text-[7px] text-rose-200 border border-rose-500/20 px-1.5 py-0.5 rounded uppercase">
+                      {Math.round((tension.severity || 0) * 100)}%
+                    </span>
+                  </div>
+                  <p className="text-[8px] text-slate-300 uppercase leading-normal">
+                    {tension.challenge_question || tension.claim}
+                  </p>
+                  <p className="text-[7px] text-slate-500 uppercase leading-normal">
+                    Market: {tension.market_reality}
+                  </p>
+                </div>
+              ))}
+              {!semanticTensions.length && (
+                <p className="text-[8px] text-slate-500 uppercase leading-normal">
+                  No active contradictions detected. New tensions will appear when market signals challenge the user's assumptions.
                 </p>
               )}
             </div>

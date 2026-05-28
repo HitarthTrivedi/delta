@@ -3,10 +3,21 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models import (
+    CareerMemoryProfile,
+    IngestionSession,
+    JourneyEvent,
+    MarketSnapshot,
+    RoadmapState,
+    SemanticNodeModel,
+    TensionNodeModel,
+    User,
+)
 from app.services.central_engine import (
     compile_career_context,
     initialize_career_os_for_user,
     log_journey_event,
+    run_memory_consolidation_cycle,
     run_weekly_career_cycle,
     serialize_journey_event,
 )
@@ -30,6 +41,42 @@ class CareerOSInitializeRequest(BaseModel):
 @router.get("/domain-packs")
 def get_domain_packs():
     return list_domain_packs()
+
+
+@router.get("/system-status")
+def get_system_status(db: Session = Depends(get_db)):
+    active_tensions = db.query(TensionNodeModel).filter(
+        TensionNodeModel.status.in_(["active", "challenged"])
+    ).count()
+    return {
+        "status": "operational",
+        "users": db.query(User).count(),
+        "modules": {
+            "adaptive_ingestion": {
+                "ready": True,
+                "sessions": db.query(IngestionSession).count(),
+            },
+            "semantic_memory": {
+                "ready": True,
+                "nodes": db.query(SemanticNodeModel).count(),
+                "active_tensions": active_tensions,
+            },
+            "career_os": {
+                "ready": True,
+                "memory_profiles": db.query(CareerMemoryProfile).count(),
+                "roadmaps": db.query(RoadmapState).count(),
+                "journey_events": db.query(JourneyEvent).count(),
+            },
+            "market_pulse": {
+                "ready": True,
+                "snapshots": db.query(MarketSnapshot).count(),
+            },
+            "opportunity_engine": {
+                "ready": True,
+                "domain_packs": len(list_domain_packs()),
+            },
+        },
+    }
 
 
 @router.get("/domain-packs/{domain_id}")
@@ -75,5 +122,13 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
 def run_weekly_cycle(user_id: str, db: Session = Depends(get_db)):
     try:
         return run_weekly_career_cycle(db, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/user/{user_id}/consolidate-memory")
+def run_memory_consolidation(user_id: str, db: Session = Depends(get_db)):
+    try:
+        return run_memory_consolidation_cycle(db, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

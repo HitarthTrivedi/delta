@@ -605,45 +605,62 @@ class MemoryGraph:
     # ── Persistence ───────────────────────────────────────────────────────
 
     def save_to_db(self, db: Session):
-        """Persist the entire graph to SQLite via SemanticNodeModel/SemanticEdgeModel."""
+        """Persist the graph to SQLite via upserts instead of full rewrites."""
         from app.models.semantic_memory import SemanticNodeModel, SemanticEdgeModel
 
-        # Delete existing graph for this user
-        db.query(SemanticEdgeModel).filter(SemanticEdgeModel.user_id == self.user_id).delete()
-        db.query(SemanticNodeModel).filter(SemanticNodeModel.user_id == self.user_id).delete()
+        existing_nodes = {
+            node.id: node
+            for node in db.query(SemanticNodeModel).filter(
+                SemanticNodeModel.user_id == self.user_id
+            ).all()
+        }
+        existing_edges = {
+            edge.id: edge
+            for edge in db.query(SemanticEdgeModel).filter(
+                SemanticEdgeModel.user_id == self.user_id
+            ).all()
+        }
 
-        # Insert nodes
+        current_node_ids = set(self._nodes.keys())
+        current_edge_ids = set(self._edges.keys())
+
+        for stale_edge_id, stale_edge in existing_edges.items():
+            if stale_edge_id not in current_edge_ids:
+                db.delete(stale_edge)
+        for stale_node_id, stale_node in existing_nodes.items():
+            if stale_node_id not in current_node_ids:
+                db.delete(stale_node)
+
+        # Upsert nodes
         for node in self._nodes.values():
-            db_node = SemanticNodeModel(
-                id=node.id,
-                user_id=self.user_id,
-                node_type=node.node_type,
-                label=node.label,
-                properties=json.dumps(node.properties),
-                embedding=node.embedding.tobytes() if node.embedding is not None else None,
-                activation_weight=node.activation_weight,
-                dimension=node.dimension,
-                source=node.source,
-                confidence=node.confidence,
-                access_count=node.access_count,
-                created_at=node.created_at,
-                last_accessed=node.last_accessed,
-            )
-            db.add(db_node)
+            db_node = existing_nodes.get(node.id)
+            if not db_node:
+                db_node = SemanticNodeModel(id=node.id, user_id=self.user_id)
+                db.add(db_node)
+            db_node.node_type = node.node_type
+            db_node.label = node.label
+            db_node.properties = json.dumps(node.properties)
+            db_node.embedding = node.embedding.tobytes() if node.embedding is not None else None
+            db_node.activation_weight = node.activation_weight
+            db_node.dimension = node.dimension
+            db_node.source = node.source
+            db_node.confidence = node.confidence
+            db_node.access_count = node.access_count
+            db_node.created_at = node.created_at
+            db_node.last_accessed = node.last_accessed
 
-        # Insert edges
+        # Upsert edges
         for edge in self._edges.values():
-            db_edge = SemanticEdgeModel(
-                id=edge.id,
-                user_id=self.user_id,
-                source_id=edge.source_id,
-                target_id=edge.target_id,
-                relation_type=edge.relation_type,
-                properties=json.dumps(edge.properties),
-                weight=edge.weight,
-                created_at=edge.created_at,
-            )
-            db.add(db_edge)
+            db_edge = existing_edges.get(edge.id)
+            if not db_edge:
+                db_edge = SemanticEdgeModel(id=edge.id, user_id=self.user_id)
+                db.add(db_edge)
+            db_edge.source_id = edge.source_id
+            db_edge.target_id = edge.target_id
+            db_edge.relation_type = edge.relation_type
+            db_edge.properties = json.dumps(edge.properties)
+            db_edge.weight = edge.weight
+            db_edge.created_at = edge.created_at
 
         db.commit()
 
