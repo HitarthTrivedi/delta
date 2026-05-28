@@ -88,6 +88,7 @@ NODE_TYPES = {
     "user",          # The root user node
     "identity",      # Education, location, background
     "ambition",      # Goals, dream roles, target industries
+    "capability",    # Aggregated skill/proficiency baseline
     "skill",         # Individual skills with proficiency
     "constraint",    # Time, money, devices, college load
     "preference",    # Learning style, content type, tone
@@ -443,6 +444,17 @@ class MemoryGraph:
 
         return frame
 
+    def to_profile_frame(self) -> dict:
+        """
+        Convert graph-native nodes into the profile-frame shape used by the
+        Ideal Frame scorer, pitfall detector, and legacy CareerMemoryProfile.
+
+        Graph memory keeps many granular nodes. The rest of the Career OS often
+        needs one semantic map per domain, e.g. profile["capability"]["current_skills"].
+        This method is the bridge between those two representations.
+        """
+        return semantic_frame_to_profile_frame(self.get_frame())
+
     def get_gaps(self, ideal_frame: dict) -> list[dict]:
         """
         Compare the current user frame against an ideal Target State Frame.
@@ -730,7 +742,93 @@ class MemoryGraph:
             if edge.source_id in graph._nodes and edge.target_id in graph._nodes:
                 graph.add_edge(edge)
 
+        # Auto-heal any legacy duplicate nodes in DB and in memory
+        graph.deduplicate_legacy_nodes(db)
+
         return graph
+
+    def deduplicate_legacy_nodes(self, db: Session):
+        """
+        Deduplicates any legacy duplicate nodes (same type & case-insensitive label)
+        already present in the SQLite database, merging properties, and updating edges.
+        """
+        from app.models.semantic_memory import SemanticNodeModel, SemanticEdgeModel
+
+        # 1. Group nodes by (node_type, label.strip().lower())
+        node_groups = {}
+        for node in list(self._nodes.values()):
+            if node.node_type == "user":
+                continue
+            key = (node.node_type, node.label.strip().lower())
+            if key not in node_groups:
+                node_groups[key] = []
+            node_groups[key].append(node)
+
+        duplicates_removed = False
+
+        for (node_type, label), group in node_groups.items():
+            if len(group) <= 1:
+                continue
+
+            # Keep the first node (primary node)
+            primary = group[0]
+            duplicates = group[1:]
+
+            # Merge properties from duplicates into primary
+            for dup in duplicates:
+                if dup.properties:
+                    for k, v in dup.properties.items():
+                        if k not in primary.properties or (v and not primary.properties.get(k)):
+                            primary.properties[k] = v
+                        elif k == "proficiency":
+                            try:
+                                primary.properties[k] = max(int(primary.properties[k]), int(v))
+                            except Exception:
+                                primary.properties[k] = v
+                primary.confidence = max(primary.confidence, dup.confidence)
+
+                # Find all edges pointing to or coming from this duplicate and redirect them to primary
+                edges_to_redirect = [e for e in list(self._edges.values()) if e.source_id == dup.id or e.target_id == dup.id]
+                for edge in edges_to_redirect:
+                    if edge.source_id == dup.id:
+                        edge.source_id = primary.id
+                    if edge.target_id == dup.id:
+                        edge.target_id = primary.id
+
+                    # Check if an identical edge already exists in memory to avoid edge duplication
+                    other_edges = [e for e in self._edges.values() if e.id != edge.id]
+                    duplicate_edge = False
+                    for oe in other_edges:
+                        if oe.source_id == edge.source_id and oe.target_id == edge.target_id and oe.relation_type == edge.relation_type:
+                            duplicate_edge = True
+                            break
+
+                    if duplicate_edge:
+                        # Remove this edge from memory and DB
+                        if edge.id in self._edges:
+                            del self._edges[edge.id]
+                        db.query(SemanticEdgeModel).filter(SemanticEdgeModel.id == edge.id).delete()
+                    else:
+                        # Update DB edge references
+                        db_edge = db.query(SemanticEdgeModel).filter(SemanticEdgeModel.id == edge.id).first()
+                        if db_edge:
+                            db_edge.source_id = edge.source_id
+                            db_edge.target_id = edge.target_id
+
+                # Delete duplicate node from memory and DB
+                if dup.id in self._nodes:
+                    del self._nodes[dup.id]
+                db.query(SemanticNodeModel).filter(SemanticNodeModel.id == dup.id).delete()
+                duplicates_removed = True
+
+            # Update primary node in DB
+            db_node = db.query(SemanticNodeModel).filter(SemanticNodeModel.id == primary.id).first()
+            if db_node:
+                db_node.properties = json.dumps(primary.properties)
+                db_node.confidence = primary.confidence
+
+        if duplicates_removed:
+            db.commit()
 
     # ── Utility Methods ───────────────────────────────────────────────────
 
@@ -766,12 +864,55 @@ class MemoryGraph:
     ) -> tuple[SemanticNode, SemanticEdge]:
         """
         Convenience method to add an entity during ingestion and link it to the user root.
-        Returns (node, edge).
+        Returns (node, edge). Checks for existing nodes of the same type and label to avoid duplication.
         """
         relation = kwargs.get("relation_type", relation_to_user)
         root = self.get_user_root()
         if not root:
             raise ValueError("User root node not found. Call create_user_root_node() first.")
+
+        # Check for existing node with same node_type and label (case-insensitive)
+        existing_nodes = self.get_nodes_by_type(node_type)
+        existing_node = None
+        target_label = label.strip().lower()
+        for n in existing_nodes:
+            if n.label.strip().lower() == target_label:
+                existing_node = n
+                break
+
+        if existing_node:
+            # Update properties if needed
+            if properties:
+                for k, v in properties.items():
+                    if k not in existing_node.properties or (v and not existing_node.properties.get(k)):
+                        existing_node.properties[k] = v
+                    elif k == "proficiency":
+                        # Keep the higher proficiency
+                        try:
+                            existing_node.properties[k] = max(int(existing_node.properties[k]), int(v))
+                        except Exception:
+                            existing_node.properties[k] = v
+            # Update confidence if higher
+            existing_node.confidence = max(existing_node.confidence, confidence)
+            
+            # Check if edge already exists
+            existing_edges = self.get_edges_from(root.id)
+            edge = None
+            for e in existing_edges:
+                if e.target_id == existing_node.id and e.relation_type == relation:
+                    edge = e
+                    break
+            
+            if not edge:
+                edge = SemanticEdge(
+                    id=str(uuid.uuid4()),
+                    source_id=root.id,
+                    target_id=existing_node.id,
+                    relation_type=relation,
+                )
+                self.add_edge(edge)
+            
+            return existing_node, edge
 
         node = SemanticNode(
             id=str(uuid.uuid4()),
@@ -896,3 +1037,71 @@ class MemoryGraph:
         summary["ambitions"] = summary.get("ambition", {}).get("labels", [])
 
         return summary
+
+
+def semantic_frame_to_profile_frame(frame: dict) -> dict:
+    """Normalize a graph frame into {identity, ambition, capability, ...} maps."""
+    nodes_by_type = frame.get("nodes_by_type", {})
+
+    def nodes(node_type: str) -> list[dict]:
+        return nodes_by_type.get(node_type, []) or []
+
+    def merge_properties(node_type: str) -> dict:
+        merged = {}
+        labels = []
+        for node in nodes(node_type):
+            label = node.get("label")
+            if label:
+                labels.append(label)
+            props = node.get("properties") or {}
+            if isinstance(props, dict):
+                for key, value in props.items():
+                    if value not in (None, "", [], {}):
+                        merged.setdefault(key, value)
+        if labels:
+            merged.setdefault("labels", labels)
+        return merged
+
+    skill_nodes = nodes("skill") + nodes("capability")
+    skill_names = [node.get("label") for node in skill_nodes if node.get("label")]
+    skill_depth = {}
+    for node in skill_nodes:
+        label = node.get("label")
+        props = node.get("properties") or {}
+        if not label:
+            continue
+        proficiency = props.get("proficiency") or props.get("level")
+        details = props.get("details") or props.get("detail")
+        if proficiency:
+            skill_depth[label] = f"Proficiency level {proficiency}/10"
+        elif details:
+            skill_depth[label] = details
+
+    ambition = merge_properties("ambition")
+    ambition_labels = ambition.get("labels", [])
+    ambition.setdefault("long_term_goals", ambition_labels)
+    ambition.setdefault("dream_roles", ambition_labels)
+
+    capability = merge_properties("capability")
+    if skill_names:
+        capability.setdefault("current_skills", skill_names)
+    if skill_depth:
+        capability.setdefault("skill_depth", skill_depth)
+    gap_labels = [node.get("label") for node in nodes("gap") if node.get("label")]
+    if gap_labels:
+        capability.setdefault("identified_gaps", gap_labels)
+
+    evidence = merge_properties("evidence")
+    evidence_labels = evidence.get("labels", [])
+    if evidence_labels:
+        evidence.setdefault("projects", evidence_labels)
+
+    return {
+        "identity": merge_properties("identity"),
+        "ambition": ambition,
+        "capability": capability,
+        "constraint": merge_properties("constraint"),
+        "preference": merge_properties("preference"),
+        "motivation": merge_properties("motivation"),
+        "evidence": evidence,
+    }

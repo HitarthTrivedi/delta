@@ -1,20 +1,20 @@
-"""Opportunity adapters normalize contests, hackathons, jobs, and domain events.
-
-The adapters are mock-backed today and intentionally shaped like real fetchers.
-When credentials or public feeds are available, each adapter can replace its
-`fetch` method without changing calendar, market pulse, or Career OS consumers.
-"""
+"""Opportunity adapters normalize contests, hackathons, jobs, and domain events."""
 import datetime
 import os
+import re
 import time
+from html import unescape
 
 from app.services.domain_packs import infer_domain_pack
+
+ALLOW_MOCKS = os.getenv("DELTA_ALLOW_MOCKS", "").lower() in {"1", "true", "yes", "on"}
 
 
 class OpportunityAdapter:
     source = "generic"
-    supports = ("mock",)
-    live_notes = "Mock-backed adapter. API/scrape implementation can be added without changing consumers."
+    default_mode = "api"
+    supports = ("api",)
+    live_notes = "Uses public live sources where available."
 
     def fetch(self, user_skills: list[str], target_role: str | None, days_ahead: int) -> list[dict]:
         raise NotImplementedError
@@ -22,7 +22,7 @@ class OpportunityAdapter:
     @property
     def mode(self) -> str:
         key = f"{self.source.upper()}_SOURCE_MODE".replace(" ", "_")
-        configured = os.getenv(key) or os.getenv("OPPORTUNITY_SOURCE_MODE", "mock")
+        configured = os.getenv(key) or os.getenv("OPPORTUNITY_SOURCE_MODE", self.default_mode)
         return configured.lower()
 
     def status(self) -> dict:
@@ -32,7 +32,7 @@ class OpportunityAdapter:
         if mode == "mock":
             fallback = "mock"
         elif mode not in self.supports:
-            fallback = "mock"
+            fallback = "none"
         return {
             "source": self.source,
             "mode": mode,
@@ -45,9 +45,9 @@ class OpportunityAdapter:
 
     def _source_status(self) -> str:
         if self.mode == "mock":
-            return "mock_adapter_ready_for_live_fetch"
+            return "mock_enabled_by_DELTA_ALLOW_MOCKS"
         if self.mode not in self.supports:
-            return f"unsupported_mode_{self.mode}_using_mock"
+            return f"unsupported_mode_{self.mode}"
         return f"{self.mode}_mode_ready"
 
     def _future_date(self, days: int, hour: int = 10, minute: int = 0) -> str:
@@ -57,72 +57,78 @@ class OpportunityAdapter:
 
 class LeetCodeAdapter(OpportunityAdapter):
     source = "LeetCode"
-    supports = ("mock", "scrape")
-    live_notes = "LeetCode has public contest pages; scrape mode can parse scheduled contests later."
+    default_mode = "api"
+    supports = ("api",)
+    live_notes = "Uses LeetCode's public GraphQL upcoming-contest payload."
 
     def fetch(self, user_skills, target_role, days_ahead):
-        today = datetime.datetime.now()
+        return self._fetch_live_contests(days_ahead)
+
+    def _fetch_live_contests(self, days_ahead):
+        try:
+            import requests
+
+            response = requests.post(
+                "https://leetcode.com/graphql",
+                json={
+                    "query": """
+                    query upcomingContests {
+                      contestUpcomingContests {
+                        title
+                        titleSlug
+                        startTime
+                        duration
+                      }
+                    }
+                    """
+                },
+                headers={
+                    "Content-Type": "application/json",
+                    "Referer": "https://leetcode.com/contest/",
+                    "User-Agent": "DeltaCareerOS/1.0",
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            contests = response.json().get("data", {}).get("contestUpcomingContests", [])
+        except Exception:
+            return []
+
+        now = int(time.time())
+        max_start = now + (days_ahead * 24 * 60 * 60)
         events = []
-        for day in range(days_ahead):
-            target = today + datetime.timedelta(days=day)
-            if target.weekday() == 6:
-                events.append(_event(
-                    source=self.source,
-                    title=f"LeetCode Weekly Contest {380 + day}",
-                    opportunity_type="competitive_programming",
-                    start_date=target.replace(hour=8, minute=0, second=0, microsecond=0).isoformat(),
-                    end_date=target.replace(hour=9, minute=30, second=0, microsecond=0).isoformat(),
-                    url="https://leetcode.com/contest/",
-                    skills=["Data Structures", "Algorithms", "Python", "C++"],
-                    reward="Global CP ranking and contest proof",
-                    description="Weekly algorithm benchmark for interview speed and problem solving.",
-                ))
-            if target.weekday() == 5 and target.day % 2 == 0:
-                events.append(_event(
-                    source=self.source,
-                    title=f"LeetCode Biweekly Contest {120 + day}",
-                    opportunity_type="competitive_programming",
-                    start_date=target.replace(hour=20, minute=0, second=0, microsecond=0).isoformat(),
-                    end_date=target.replace(hour=21, minute=30, second=0, microsecond=0).isoformat(),
-                    url="https://leetcode.com/contest/",
-                    skills=["Algorithms", "Data Structures", "Java", "Python"],
-                    reward="Global CP rating increase",
-                    description="Biweekly coding contest useful for public consistency proof.",
-                ))
+        for contest in contests:
+            start = contest.get("startTime")
+            duration = contest.get("duration") or 5400
+            if not start or start > max_start:
+                continue
+            start_dt = datetime.datetime.fromtimestamp(start)
+            end_dt = datetime.datetime.fromtimestamp(start + duration)
+            slug = contest.get("titleSlug") or ""
+            events.append(_event(
+                source=self.source,
+                title=contest.get("title") or "LeetCode Contest",
+                opportunity_type="competitive_programming",
+                start_date=start_dt.isoformat(),
+                end_date=end_dt.isoformat(),
+                url=f"https://leetcode.com/contest/{slug}/" if slug else "https://leetcode.com/contest/",
+                skills=["Algorithms", "Data Structures", "Python", "C++"],
+                reward="Live contest ranking and interview-speed proof",
+                description="Upcoming LeetCode contest fetched from LeetCode's public contest data.",
+                source_status="live_leetcode_graphql",
+                external_id=slug,
+            ))
         return events
 
 
 class CodeforcesAdapter(OpportunityAdapter):
     source = "Codeforces"
-    supports = ("mock", "api")
+    default_mode = "api"
+    supports = ("api",)
     live_notes = "Codeforces exposes public contest APIs; api mode can be wired without credentials."
 
     def fetch(self, user_skills, target_role, days_ahead):
-        if self.mode == "api":
-            live_events = self._fetch_live_contests(days_ahead)
-            if live_events:
-                return live_events
-        return self._mock_contests(days_ahead)
-
-    def _mock_contests(self, days_ahead):
-        events = []
-        for idx, days in enumerate([3, 8, 12, 17, 22, 28]):
-            if days > days_ahead:
-                continue
-            div_num = 2 if idx % 2 == 0 else 3
-            events.append(_event(
-                source=self.source,
-                title=f"Codeforces Round {950 + idx} (Div. {div_num})",
-                opportunity_type="competitive_programming",
-                start_date=self._future_date(days, 20, 5),
-                end_date=self._future_date(days, 22, 5),
-                url="https://codeforces.com/contests",
-                skills=["Algorithms", "Number Theory", "Dynamic Programming", "C++"],
-                reward="Specialist/Expert rating proof",
-                description="Mathematical competitive programming contest with strong public signal.",
-                difficulty="Hard" if div_num == 2 else "Medium",
-            ))
-        return events
+        return self._fetch_live_contests(days_ahead)
 
     def _fetch_live_contests(self, days_ahead):
         try:
@@ -172,120 +178,110 @@ class CodeforcesAdapter(OpportunityAdapter):
 
 class KaggleAdapter(OpportunityAdapter):
     source = "Kaggle"
-    supports = ("mock", "api")
-    live_notes = "Kaggle API can replace mock challenges when credentials are configured."
+    default_mode = "scrape"
+    supports = ("scrape",)
+    live_notes = "Scrapes Kaggle competition listing links when public HTML is available."
 
     def fetch(self, user_skills, target_role, days_ahead):
         domain = infer_domain_pack(target_role)
-        events = [
-            _event(
-                source=self.source,
-                title="Kaggle Tabular Playground Sprint",
-                opportunity_type="ml_sprint",
-                start_date=self._future_date(1, 0, 0),
-                end_date=self._future_date(min(15, days_ahead), 23, 59),
-                url="https://www.kaggle.com/competitions",
-                skills=["Python", "SQL", "Pandas", "Scikit-Learn", "Statistics"],
-                reward="Kaggle ranking, notebook proof, model evaluation signal",
-                description="Monthly ML sprint for data modeling and public notebook proof.",
-            )
-        ]
-        if domain["id"] in ("cs_ai", "data", "research"):
-            events.append(_event(
-                source=self.source,
-                title="Kaggle AI Agent Optimization Challenge",
-                opportunity_type="ml_sprint",
-                start_date=self._future_date(10, 10, 0),
-                end_date=self._future_date(min(29, days_ahead), 23, 59),
-                url="https://www.kaggle.com/competitions",
-                skills=["LLMs", "Vector Databases", "Python", "RAG", "Evaluation"],
-                reward="Global AI ranking and agent-building proof",
-                description="Agent optimization challenge focused on retrieval, evaluation, and automation.",
-                difficulty="Hard",
-            ))
-        return events
+        return _scrape_listing_events(
+            source=self.source,
+            listing_url="https://www.kaggle.com/competitions",
+            link_pattern=r'href="(/competitions/[^"#?]+)"',
+            opportunity_type="ml_sprint",
+            skills=domain["skill_taxonomy"][:5],
+            reward="Kaggle notebook, model score, and public ranking proof",
+            description="Live Kaggle competition discovered from the public competitions page.",
+            days_ahead=days_ahead,
+        )
 
 
 class UnstopAdapter(OpportunityAdapter):
     source = "Unstop"
-    supports = ("mock", "scrape")
+    default_mode = "scrape"
+    supports = ("scrape",)
     live_notes = "Unstop does not provide a simple public API; scrape mode should respect robots and rate limits."
 
     def fetch(self, user_skills, target_role, days_ahead):
         domain = infer_domain_pack(target_role)
-        events = [
-            _event(
-                source=self.source,
-                title=f"{domain['label']} National Challenge",
-                opportunity_type="hackathon",
-                start_date=self._future_date(5, 10, 0),
-                end_date=self._future_date(12, 18, 0),
-                url="https://unstop.com/",
-                skills=domain["skill_taxonomy"][:5],
-                reward="Cash prize, public leaderboard, internship signal",
-                description=f"Domain challenge aligned to {domain['label']} proof and recruiter visibility.",
-                difficulty="Hard",
-            ),
-            _event(
-                source=self.source,
-                title=f"{domain['label']} Case Sprint",
-                opportunity_type="case_competition",
-                start_date=self._future_date(18, 9, 0),
-                end_date=self._future_date(24, 21, 0),
-                url="https://unstop.com/",
-                skills=domain["skill_taxonomy"][1:6] or domain["skill_taxonomy"][:5],
-                reward="Case deck, finalist proof, interview talking point",
-                description="Short domain case sprint for structured thinking and portfolio evidence.",
-                difficulty="Medium",
-            ),
-        ]
-        return events
+        return _scrape_listing_events(
+            source=self.source,
+            listing_url="https://unstop.com/hackathons",
+            link_pattern=r'href="(https://unstop\.com/[^"#?]+|/[^"#?]+)"',
+            opportunity_type="hackathon",
+            skills=domain["skill_taxonomy"][:5],
+            reward="Leaderboard, prize, and public participation proof",
+            description=f"Live Unstop opportunity aligned to {domain['label']}.",
+            days_ahead=days_ahead,
+        )
 
 
 class HackathonAdapter(OpportunityAdapter):
     source = "Hackathon"
-    supports = ("mock", "api", "scrape")
+    default_mode = "scrape"
+    supports = ("scrape",)
     live_notes = "Can aggregate Devpost, MLH, and curated hackathon feeds."
 
     def fetch(self, user_skills, target_role, days_ahead):
         domain = infer_domain_pack(target_role)
-        return [
-            _event(
-                source=self.source,
-                title=f"{domain['label']} Build Weekend",
-                opportunity_type="hackathon",
-                start_date=self._future_date(7, 18, 0),
-                end_date=self._future_date(9, 21, 0),
-                url="https://devpost.com/hackathons",
-                skills=domain["skill_taxonomy"][:4],
-                reward="MVP demo and public build log",
-                description="Weekend build sprint to turn one roadmap skill into visible proof.",
-                difficulty="Medium",
-            )
-        ]
+        return _scrape_listing_events(
+            source=self.source,
+            listing_url="https://devpost.com/hackathons",
+            link_pattern=r'href="(https://[^"]*devpost\.com/[^"#?]+)"',
+            opportunity_type="hackathon",
+            skills=domain["skill_taxonomy"][:4],
+            reward="MVP demo, team execution proof, and public submission page",
+            description="Live hackathon discovered from Devpost.",
+            days_ahead=days_ahead,
+        )
 
 
 class JobPostSignalAdapter(OpportunityAdapter):
     source = "JobPosts"
-    supports = ("mock", "api", "scrape")
+    default_mode = "api"
+    supports = ("api",)
     live_notes = "Can aggregate job APIs or scrape configured boards to extract repeated recruiter language."
 
     def fetch(self, user_skills, target_role, days_ahead):
+        try:
+            import requests
+
+            role = target_role or "software engineer"
+            response = requests.get(
+                "https://www.arbeitnow.com/api/job-board-api",
+                params={"search": role},
+                headers={"User-Agent": "DeltaCareerOS/1.0"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            jobs = response.json().get("data", [])
+        except Exception:
+            return []
+
         domain = infer_domain_pack(target_role)
-        return [
-            _event(
+        events = []
+        for job in jobs[:8]:
+            title = job.get("title") or "Live job signal"
+            url = job.get("url") or "https://www.arbeitnow.com/jobs"
+            skills = _infer_skills_from_text(
+                " ".join([title, job.get("description") or ""]),
+                domain["skill_taxonomy"][:10],
+            ) or domain["skill_taxonomy"][:5]
+            events.append(_event(
                 source=self.source,
-                title=f"{domain['label']} Internship Signal Review",
+                title=title,
                 opportunity_type="market_research",
                 start_date=self._future_date(2, 19, 0),
                 end_date=self._future_date(2, 20, 0),
-                url="https://www.linkedin.com/jobs/",
-                skills=domain["skill_taxonomy"][:6],
-                reward="Weekly role-fit notes and resume keyword updates",
-                description="Review current internships and extract repeated skills, tools, and proof expectations.",
+                url=url,
+                skills=skills,
+                reward="Live recruiter-language signal and resume keyword update",
+                description="Job-market signal fetched from Arbeitnow's public job board API.",
                 difficulty="Easy",
-            )
-        ]
+                source_status="live_arbeitnow_api",
+                external_id=str(job.get("slug") or job.get("url") or title),
+            ))
+        return events
 
 
 def collect_opportunities(
@@ -400,3 +396,58 @@ def _proof_value(event: dict) -> str:
     if event["type"] == "case_competition":
         return "Structured thinking and presentation proof"
     return "Build artifact, demo, and team execution proof"
+
+
+def _scrape_listing_events(
+    source: str,
+    listing_url: str,
+    link_pattern: str,
+    opportunity_type: str,
+    skills: list[str],
+    reward: str,
+    description: str,
+    days_ahead: int,
+) -> list[dict]:
+    try:
+        import requests
+
+        response = requests.get(
+            listing_url,
+            headers={"User-Agent": "DeltaCareerOS/1.0"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        html = response.text
+    except Exception:
+        return []
+
+    seen = set()
+    events = []
+    for idx, href in enumerate(re.findall(link_pattern, html)[:12]):
+        href = unescape(href)
+        if href.startswith("/"):
+            base = listing_url.split("/", 3)[:3]
+            href = "/".join(base) + href
+        slug = href.rstrip("/").split("/")[-1].replace("-", " ").replace("_", " ").title()
+        if not slug or href in seen:
+            continue
+        seen.add(href)
+        events.append(_event(
+            source=source,
+            title=slug,
+            opportunity_type=opportunity_type,
+            start_date=(datetime.datetime.now() + datetime.timedelta(days=min(idx + 1, days_ahead))).isoformat(),
+            end_date=(datetime.datetime.now() + datetime.timedelta(days=min(idx + 8, days_ahead))).isoformat(),
+            url=href,
+            skills=skills,
+            reward=reward,
+            description=description,
+            source_status=f"live_{source.lower()}_scrape",
+            external_id=href,
+        ))
+    return events
+
+
+def _infer_skills_from_text(text: str, candidate_skills: list[str]) -> list[str]:
+    text_lower = (text or "").lower()
+    return [skill for skill in candidate_skills if skill.lower() in text_lower][:6]

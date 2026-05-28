@@ -204,13 +204,13 @@ Return ONLY the question text."""
         graph.save_to_db(db)
 
         # 6. Pitfall Detection
-        user_frame = graph.get_frame()
-        active_pitfalls = self.pitfall_detector.detect_pitfalls(user_frame)
+        profile_frame = graph.to_profile_frame()
+        active_pitfalls = self.pitfall_detector.detect_pitfalls(profile_frame)
         ingestion_pitfalls = self.pitfall_detector.detect_during_ingestion(conversation, [c["content"] for c in conversation if c["role"] == "assistant"])
         active_pitfalls.extend(ingestion_pitfalls)
 
         # 7. Ingestion Gap & Confidence Assessment
-        analysis = compute_confidence_and_gaps(session.journey_type, user_frame)
+        analysis = compute_confidence_and_gaps(session.journey_type, profile_frame)
         
         session.confidence_score = analysis["confidence_score"]
         session.gaps_total = len(analysis["missing_fields"])
@@ -435,7 +435,7 @@ Rules:
             graph.save_to_db(db)
             
             # Return updated status
-            user_frame = graph.get_frame()
+            user_frame = graph.to_profile_frame()
             analysis = compute_confidence_and_gaps("general", user_frame)
             self._materialize_career_snapshot(db, user_id, graph, analysis["confidence_score"])
             db.commit()
@@ -507,7 +507,7 @@ Output ONLY the JSON list, no explanation."""
                     dimension=item.get("dimension", "cognitive"),
                     source="ingestion",
                     confidence=float(item.get("confidence", 0.7)),
-                    relation_to_user=item.get("relation_to_user", "HAS_SKILL")
+                    relation_to_user=item.get("relation_type") or item.get("relation_to_user", "HAS_SKILL")
                 )
         except Exception as e:
             logger.error(f"Failed to extract entities from answer: {e}")
@@ -528,7 +528,7 @@ Output ONLY the JSON list, no explanation."""
             )
             db.add(profile)
 
-        frame = graph.get_frame()
+        frame = graph.to_profile_frame()
         
         # Populate JSON columns
         profile.identity = json.dumps(frame.get("identity", {}))

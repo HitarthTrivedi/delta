@@ -146,6 +146,10 @@ def compute_confidence_and_gaps(journey_type: str, user_frame: Dict[str, Any]) -
         user_frame: Dict representing the user's populated cognitive profile fields.
                     Expected structure: {node_type: {field_name: value}}
     """
+    if "nodes_by_type" in user_frame:
+        from app.services.memory_graph import semantic_frame_to_profile_frame
+        user_frame = semantic_frame_to_profile_frame(user_frame)
+
     ideal = get_ideal_frame(journey_type)
     required = ideal["required_nodes"]
     

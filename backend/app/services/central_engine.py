@@ -324,17 +324,36 @@ def refresh_career_memory_from_user_state(
         
         # Load from structured/skills updates
         if structured:
+            node_type_map = {
+                "identity": "identity",
+                "ambitions": "ambition",
+                "capabilities": "capability",
+                "constraints": "constraint",
+                "preferences": "preference",
+                "behavior": "motivation",
+                "evidence": "evidence",
+            }
+            relation_map = {
+                "identity": "INFERRED_AS",
+                "ambitions": "STRIVES_FOR",
+                "capabilities": "HAS_SKILL",
+                "constraints": "CONSTRAINED_BY",
+                "preferences": "PREFERS",
+                "behavior": "MOTIVATED_BY",
+                "evidence": "EVIDENCED_BY",
+            }
             for node_type, details in payload.items():
-                if node_type in ["identity", "ambitions", "capabilities", "constraints", "preferences", "evidence"]:
+                graph_node_type = node_type_map.get(node_type)
+                if graph_node_type:
                     if isinstance(details, dict):
                         for k, v in details.items():
                             graph.add_entity_from_ingestion(
-                                node_type=node_type if node_type != "ambitions" else "ambition",
+                                node_type=graph_node_type,
                                 label=str(k),
                                 properties={"value": v, "source": "sync"},
                                 source="sync",
                                 confidence=0.7,
-                                relation_to_user="HAS_SKILL" if node_type == "capabilities" else "STRIVES_FOR" if node_type == "ambitions" else "CONSTRAINED_BY" if node_type == "constraints" else "PREFERS"
+                                relation_to_user=relation_map[node_type],
                             )
         graph.save_to_db(db)
     except Exception as graph_err:
