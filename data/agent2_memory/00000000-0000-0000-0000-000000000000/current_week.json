@@ -1,0 +1,32 @@
+{
+  "user_id": "00000000-0000-0000-0000-000000000000",
+  "week_number": 3,
+  "current_week_started_at": "2026-06-03 15:48:27.589496",
+  "phase_name": "Event-focused week",
+  "tasks": [
+    {
+      "id": "event-block-event-1",
+      "node_id": "active-event-block",
+      "type": "practice",
+      "title": "Exam-only study week",
+      "skill": "Schedule-aware planning",
+      "description": "Pause Delta projects and courses for this week. Study for the examination: list syllabus topics, revise weak areas, solve past questions, and keep a mistake log.",
+      "source": "Agent 2 upcoming event: Exam period",
+      "url": "",
+      "due_date": "2026-06-03",
+      "event_context": {
+        "title": "Exam period",
+        "kind": "exam",
+        "raw_text": "but you know i do have a examination of theory of computation on 7th of june , so i dont think i would be able to do much of the work",
+        "start_date": "2026-06-03",
+        "end_date": "2026-06-03",
+        "time": null,
+        "blocks_normal_work": true,
+        "impact": "Normal Delta coursework should pause or reduce during this event.",
+        "id": "event-1"
+      }
+    }
+  ],
+  "reason": "Career context compiled.",
+  "last_updated": "2026-06-03T16:09:54.991883Z"
+}

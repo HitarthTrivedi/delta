@@ -1,0 +1,16 @@
+{
+  "events": [
+    {
+      "title": "Exam period",
+      "kind": "exam",
+      "raw_text": "but you know i do have a examination of theory of computation on 7th of june , so i dont think i would be able to do much of the work",
+      "start_date": "2026-06-03",
+      "end_date": "2026-06-03",
+      "time": null,
+      "blocks_normal_work": true,
+      "impact": "Normal Delta coursework should pause or reduce during this event.",
+      "id": "event-1"
+    }
+  ],
+  "last_updated": "2026-06-03T16:09:46.909394Z"
+}

@@ -1,0 +1,323 @@
+{
+  "user_id": "00000000-0000-0000-0000-000000000000",
+  "source": "agent1_profile_and_career_context",
+  "profile": {
+    "name": "Hitarth",
+    "email": "hitartht318@gmail.com",
+    "target_role": "multi-agent systems and adversarial AI",
+    "major": "Computer Science",
+    "university": "SVIT, Vasad",
+    "study_year": "3rd Year, Pursuing",
+    "gpa": "9.2 / 10",
+    "past_experience": "Alpha.Kore and LazyCook",
+    "skills": [
+      "Python",
+      "JavaScript",
+      "Swift",
+      "Multi-Agent System Design",
+      "Adversarial AI Architecture",
+      "Agentic RAG",
+      "Long-Term Memory Systems",
+      "LLM Orchestration",
+      "Google Gemini API",
+      "Groq API",
+      "LLaMA 3.3 70B",
+      "Agent Routing",
+      "Task Decomposition",
+      "Quality Scoring Systems",
+      "Python Flask",
+      "REST APIs",
+      "Google Drive API",
+      "Spotify Web API",
+      "OAuth 2.0",
+      "PyPI Publishing",
+      "React",
+      "HTML5",
+      "CSS3",
+      "SwiftUI",
+      "AppKit",
+      "Selenium",
+      "undetected-chromedriver",
+      "IoT Sensor Integration",
+      "Computer Vision",
+      "macOS System APIs",
+      "SQLAlchemy",
+      "Git",
+      "Homebrew Distribution",
+      "matplotlib",
+      "pandas"
+    ],
+    "experience_level": "intermediate",
+    "target_industries": [
+      "Artificial Intelligence",
+      "Machine Learning",
+      "Software Engineering",
+      "IoT"
+    ],
+    "learning_style": "practical",
+    "preferred_content_types": [
+      "projects"
+    ],
+    "hours_per_week": 6,
+    "relocation": "maybe",
+    "extracurricular_interests": [
+      "Open Source Contribution",
+      "Team Leadership",
+      "AI Research",
+      "Automation"
+    ],
+    "planning_horizon_years": 4,
+    "phone_number": "+91 99985 55392",
+    "linkedin_url": "linkedin.com/in/hitarth-trivedi-ba1986300",
+    "github_url": "github.com/HitarthTrivedi",
+    "portfolio_url": "https://rezum-alphakore.vercel.app/profile/hitarth-trivedi-bb9dc563",
+    "career_goals": [
+      "Pursuing a master's degree"
+    ],
+    "resume_text": "HITARTH TRIVEDI  Vadodara, India | +91 99985 55392 | hitartht318@gmail.com  linkedin.com/in/hitarth - trivedi - ba1986300 | github.com/HitarthTrivedi |   https://rezum - alphakore.vercel.app/profile/hitarth -  trivedi - bb9dc563  PROFESSIONAL SUMMARY  AI/ML engineer specializing in multi - agent systems, adversarial AI architectures, and full - stack development. Founder of  Alpha.Kore   —   a 10 - member team that has shipped 11 projects including Python packages with 2,500+ downloads.  Experienced in RAG pipeline s, LLM orchestration, agentic memory systems, IoT integrations, and real - time computer  vision.  EDUCATION  Bachelor of Engineering   —   Computer Science | SVIT, Vasad  3rd Year, Pursuing | CGPA: 9.2 / 10  TECHNICAL SKILLS  Languages:   Python, JavaScript, Swift  AI & ML:   Multi - Agent System Design, Adversarial AI Architecture, Agentic RAG & Long - Term Memory Systems, LLM  Orchestration, Google Gemini API, Groq API (LLaMA 3.3 70B), Agent Routing & Task Decomposition, Quality Scoring  Systems  Backend & Web:   Python Flask, REST APIs, Google Drive API, Spotify Web API, OAuth 2.0, PyPI Publishing, React,  HTML5, CSS3, SwiftUI, AppKit  Systems & Tools:   Browser Automation (Selenium, undetected - chromedriver), IoT Sensor Integration, Computer  Vision, macOS System APIs, SQLAlchemy, Git, Homebrew Distribution, matplotlib, pandas  PROJECTS & APPLICATIONS  LazyCook   —   Multi - Agent AI Assistant | PyPI | 2,500+ Downloads  •   Architected a four - agent pipeline (Generator → Analyzer → Optimizer → Validator) on Gemini 2.5 Flash with a  weighted quality scoring engine (completeness 40%, accuracy 40%, length 20%)   —   responses below threshold  are automatically re - queued.  •   Built RAG - based document processing (.pdf, .docx, .txt, .md, .csv) with persistent cross - session context;  published on PyPI reaching 2,500+ downloads in 6 months   —   top 7% of Python contributors globally.  Agentic RAG Memory Engine   —   Extended Local LLM Context | Python  •   Engineered an agentic RAG system that extends the effective memory of local language models from ~33  conversations (5k - token context window) to 300+ conversations   —   a 9× improvement   —   by dynamically indexing,  compressing, and retrieving conversation histor y as semantic chunks.  •   Implemented keyword - indexed per - session storage with relevance - ranked retrieval, ensuring the most  contextually important past exchanges are injected at inference time with zero context overflow   —   enabling truly  persistent long - term memory for local LLMs.  3F1 (Three Faction Intelligence)   —   Triadic AI Debate Engine | Live at 3f1.in  •   Engineered a Neural Debate Architecture with three autonomous LLM agents   —   Analyst, Critic, and Synthesizer  —   engaging in structured adversarial debate to produce bias - reduced, cross - validated conclusions.  •   Integrated RAG to ground agent responses in retrieved context, reducing hallucination rates; deployed as a full -  s",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "last_updated": "2026-06-03T08:27:24.226152Z",
+    "onboarding_complete": true,
+    "confidence_score": 1.0
+  },
+  "identity": {
+    "name": "Hitarth",
+    "education_stage": "Founder of Alpha.Kore / Student",
+    "location": "unknown",
+    "language_comfort": "English",
+    "background_summary": "Self-healed profile context for guest user targeting multi-agent systems and adversarial AI.",
+    "self_awareness_level": "medium",
+    "name_legacy": "Hitarth",
+    "email": "hitartht318@gmail.com",
+    "current_role": "Founder of Alpha.Kore / Student"
+  },
+  "ambitions": {
+    "long_term_goals": [
+      "multi-agent systems and adversarial AI"
+    ],
+    "short_term_targets": [
+      "Master core APIs and build verified portfolio projects"
+    ],
+    "dream_roles": [
+      "multi-agent systems and adversarial AI"
+    ],
+    "preferred_industries": [
+      "Technology"
+    ],
+    "confidence_level": "medium",
+    "target_role": "multi-agent systems and adversarial AI",
+    "target_domain": "cs_ai",
+    "domain_label": "CS / AI Engineering",
+    "domain_pack": {
+      "id": "cs_ai",
+      "label": "CS / AI Engineering",
+      "target_roles": [
+        "AI Developer / Software Engineer",
+        "Backend Engineer",
+        "Fullstack Developer",
+        "AI Engineer"
+      ],
+      "skill_taxonomy": [
+        "Python",
+        "Data Structures",
+        "FastAPI",
+        "SQL",
+        "Docker",
+        "System Design",
+        "LLMs",
+        "RAG",
+        "Cloud"
+      ],
+      "market_sources": [
+        "job_posts",
+        "github_trends",
+        "hackathons",
+        "leetcode",
+        "codeforces",
+        "kaggle"
+      ],
+      "proof_types": [
+        "GitHub project",
+        "deployed demo",
+        "technical README",
+        "contest rank",
+        "certificate"
+      ],
+      "starter_projects": [
+        "Career intelligence API with weekly planning",
+        "RAG assistant with citations",
+        "Dockerized full-stack dashboard"
+      ],
+      "certifications": [
+        "AWS Cloud Practitioner",
+        "Docker Certified Associate",
+        "DeepLearning.AI LLM courses"
+      ],
+      "competitions": [
+        "Kaggle",
+        "Codeforces",
+        "LeetCode",
+        "Unstop Hackathons"
+      ],
+      "phases": [
+        "Programming foundations",
+        "Backend and data systems",
+        "AI/cloud production proof"
+      ],
+      "rubric": [
+        "Runs locally",
+        "Has tests",
+        "Shows architecture",
+        "Uses real data",
+        "Explains tradeoffs"
+      ]
+    },
+    "recommended_starting_phase": "Phase 1: Foundations"
+  },
+  "capabilities": {
+    "current_skills": [
+      "Python",
+      "React",
+      "FastAPI",
+      "SQL",
+      "Docker"
+    ],
+    "skill_depth": {
+      "Python": "Proficiency level 8/10",
+      "React": "Proficiency level 6/10",
+      "FastAPI": "Proficiency level 7/10",
+      "SQL": "Proficiency level 5/10",
+      "Docker": "Proficiency level 3/10"
+    },
+    "technical_baseline": "scripting-and-claimed",
+    "industry_readiness_score": 0.35,
+    "identified_gaps": [
+      "FastAPI",
+      "Docker",
+      "System Design"
+    ],
+    "domain_skill_taxonomy": [
+      "Python",
+      "Data Structures",
+      "FastAPI",
+      "SQL",
+      "Docker",
+      "System Design",
+      "LLMs",
+      "RAG",
+      "Cloud"
+    ],
+    "skills": [
+      {
+        "name": "Python",
+        "category": "core",
+        "proficiency": 8,
+        "evidence_type": "github",
+        "evidence_url": "https://github.com/guest/python-projects",
+        "evidence_weight": 0.85
+      },
+      {
+        "name": "React",
+        "category": "core",
+        "proficiency": 6,
+        "evidence_type": "resume",
+        "evidence_url": null,
+        "evidence_weight": 0.6
+      },
+      {
+        "name": "FastAPI",
+        "category": "core",
+        "proficiency": 7,
+        "evidence_type": "github",
+        "evidence_url": "https://github.com/guest/fastapi-app",
+        "evidence_weight": 0.85
+      },
+      {
+        "name": "SQL",
+        "category": "core",
+        "proficiency": 5,
+        "evidence_type": "claimed",
+        "evidence_url": null,
+        "evidence_weight": 0.4
+      },
+      {
+        "name": "Docker",
+        "category": "devops",
+        "proficiency": 3,
+        "evidence_type": "claimed",
+        "evidence_url": null,
+        "evidence_weight": 0.4
+      }
+    ]
+  },
+  "constraints": {
+    "time_limit": "6 hours per week",
+    "financial_limits": "none",
+    "device_access": "Standard Laptop",
+    "internet_access": "Standard Broadband",
+    "college_load": "medium",
+    "family_expectations": "none",
+    "hours_per_week": 6,
+    "known_limits": [
+      "6 hours/week time limit"
+    ]
+  },
+  "preferences": {
+    "learning_style": "practical",
+    "content_type": [
+      "hands-on projects"
+    ],
+    "project_taste": "Backend API systems",
+    "communication_tone": "encouraging",
+    "preferred_proof_types": [
+      "GitHub project",
+      "deployed demo",
+      "technical README",
+      "contest rank",
+      "certificate"
+    ]
+  },
+  "progress_summary": {
+    "weeks_completed": 2,
+    "total_tasks_completed": 4,
+    "total_tasks_skipped": 0,
+    "current_week_completed": 0,
+    "current_week_skipped": 0,
+    "current_week_reopened": 1,
+    "knowledge_gained": [
+      {
+        "skill": "Relational Databases & SQL Engine",
+        "completed_tasks": 3
+      },
+      {
+        "skill": "Adversarial AI, Multi-Agent Systems",
+        "completed_tasks": 2
+      },
+      {
+        "skill": "Advanced Data Querying",
+        "completed_tasks": 1
+      },
+      {
+        "skill": "Deep Learning with PyTorch",
+        "completed_tasks": 1
+      },
+      {
+        "skill": "Analytical Data Wrangling",
+        "completed_tasks": 1
+      },
+      {
+        "skill": "Core Skills Assessment",
+        "completed_tasks": 1
+      },
+      {
+        "skill": "SQL & Data Modeling for Agent Memory",
+        "completed_tasks": 1
+      },
+      {
+        "skill": "Docker for Isolated Agent Environments",
+        "completed_tasks": 1
+      }
+    ]
+  },
+  "last_updated": "2026-06-03T16:09:54.991400Z"
+}

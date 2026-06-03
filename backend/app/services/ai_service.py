@@ -102,6 +102,20 @@ def generate_json(prompt: str, temperature: float = 0.3) -> dict | list:
 def _mock_structured_response(prompt: str) -> str:
     prompt_lower = prompt.lower()
 
+    if "agent 2 weekly plan discussion" in prompt_lower or "you are agent 2 inside delta career os" in prompt_lower:
+        if "resume" in prompt_lower or "skills" in prompt_lower:
+            return (
+                "This week's work should become a proof signal, not just a learning note. "
+                "Skills you can show: evaluation design, reliability testing, adversarial testing, documentation, and project communication. "
+                "Resume format: Built a small proof project that tested an agent workflow with realistic prompts, documented failure cases, and added one improvement based on results."
+            )
+        if "asked something else" in prompt_lower or "misunderstood" in prompt_lower:
+            return "You are right. I misunderstood the intent. I will answer the question directly without changing this week's tasks."
+        return (
+            "For this week's task, focus on one small proof: define the goal, build or test it, record results, and write what improved. "
+            "If you want, ask me for exact steps or resume wording."
+        )
+
     # Onboarding opening
     if "intake agent" in prompt_lower or "opening question" in prompt_lower or "welcome them" in prompt_lower:
         return (

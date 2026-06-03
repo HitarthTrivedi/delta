@@ -317,6 +317,30 @@ def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User) ->
     ])
 
 
+def _event_block_actions(events: list[dict]) -> list[dict]:
+    event = events[0] if events else {}
+    kind = str(event.get("kind") or "").lower()
+    is_exam = kind == "exam" or "exam" in str(event.get("title", "")).lower()
+    title = "Exam-only study week" if is_exam else "Blocked-event light week"
+    description = (
+        "Pause Delta projects and courses for this week. Study for the examination: list syllabus topics, revise weak areas, solve past questions, and keep a mistake log."
+        if is_exam
+        else "Do not assign heavy Delta work this week. Keep only a light check-in or review task because the user has a blocked personal event."
+    )
+    return [{
+        "id": f"event-block-{event.get('id', 'active')}",
+        "node_id": "active-event-block",
+        "type": "practice",
+        "title": title,
+        "skill": "Schedule-aware planning",
+        "description": description,
+        "source": f"Agent 2 upcoming event: {event.get('title', 'blocked event')}",
+        "url": "",
+        "due_date": event.get("end_date") or event.get("date"),
+        "event_context": event,
+    }]
+
+
 def get_or_create_career_memory(db: Session, user: User) -> CareerMemoryProfile:
     memory = db.query(CareerMemoryProfile).filter(CareerMemoryProfile.user_id == user.id).first()
     if memory:
@@ -871,8 +895,7 @@ def compile_career_context(db: Session, user_id: str) -> dict:
     week_number = len(valid_cycles) + 1
     current_week_start = valid_cycles[-1].created_at if valid_cycles else (roadmap.created_at if roadmap else user.created_at)
     progress_summary = build_progress_summary(db, user_id, valid_cycles, current_week_start)
-
-    return {
+    context = {
         "user_id": user_id,
         "memory": serialized_memory,
         "semantic_memory": semantic_memory,
@@ -889,6 +912,13 @@ def compile_career_context(db: Session, user_id: str) -> dict:
         "current_week_started_at": current_week_start,
         "progress_summary": progress_summary,
     }
+    try:
+        from app.services.agent2_memory import sync_current_week, sync_user_context
+        sync_user_context(user_id, profile_data, context)
+        sync_current_week(user_id, context, reason="Career context compiled.")
+    except Exception:
+        pass
+    return context
 
 
 
@@ -997,6 +1027,11 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         profile = load_profile(user.id)
     except Exception:
         profile = {}
+    try:
+        from app.services.agent2_memory import active_blocking_events
+        blocking_events = active_blocking_events(user.id)
+    except Exception:
+        blocking_events = []
     if roadmap and not regenerate:
         weekly_focus = _as_json(roadmap.weekly_focus, {})
         actions = weekly_focus.get("primary_actions") or []
@@ -1004,7 +1039,14 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         low_level_start = any(str(action.get("title", "")).lower().startswith("start ") for action in actions)
         profile_says_advanced = _has_prior_profile_depth(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user)
         if has_stable_actions:
-            if profile_says_advanced and low_level_start:
+            if blocking_events:
+                weekly_focus["primary_actions"] = _event_block_actions(blocking_events)
+                weekly_focus["phase_name"] = "Event-focused week"
+                roadmap.weekly_focus = _dump(weekly_focus)
+                roadmap.last_replanned_reason = "Adjusted for active event in Agent 2 upcoming-events memory."
+                db.commit()
+                db.refresh(roadmap)
+            elif profile_says_advanced and low_level_start:
                 weekly_focus["primary_actions"] = _domain_proof_actions(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user)
                 weekly_focus["phase_name"] = "Profile-based proof sprint"
                 roadmap.weekly_focus = _dump(weekly_focus)
@@ -1031,6 +1073,9 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     if _has_prior_profile_depth(profile, skills, user):
         weekly_focus["phase_name"] = "Profile-based proof sprint"
         weekly_focus["primary_actions"] = _domain_proof_actions(profile, skills, user)
+    if blocking_events:
+        weekly_focus["phase_name"] = "Event-focused week"
+        weekly_focus["primary_actions"] = _event_block_actions(blocking_events)
     proof_requirements = _derive_proof_requirements(phases)
 
     if roadmap:

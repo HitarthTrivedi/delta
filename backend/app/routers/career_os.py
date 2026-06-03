@@ -22,6 +22,7 @@ from app.services.central_engine import (
     serialize_journey_event,
 )
 from app.services.domain_packs import get_domain_pack, list_domain_packs
+from app.services.agent2_memory import append_progress_event
 
 router = APIRouter(prefix="/api/career-os", tags=["career-os"])
 
@@ -115,7 +116,9 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
         evidence=payload.evidence,
         impact=payload.impact,
     )
-    return serialize_journey_event(event)
+    serialized = serialize_journey_event(event)
+    append_progress_event(user_id, serialized)
+    return serialized
 
 
 @router.post("/user/{user_id}/weekly-cycle")
