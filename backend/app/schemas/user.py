@@ -42,6 +42,8 @@ class UserResponse(BaseModel):
     target_role: Optional[str] = None
     hours_per_week: int = 10
     learning_style: Optional[str] = None
+    onboarding_complete: bool = False
+    onboarding_percentage: float = 0.0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

@@ -23,7 +23,7 @@ print("Gemini key length:", len(gemini_key))
 try:
     import google.generativeai as genai
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemma-4-31b-it")
     response = model.generate_content("Say hello")
     print("Gemini Success:", response.text)
 except Exception as e:

@@ -71,9 +71,13 @@ export const careerOSAPI = {
 export const ingestionAPI = {
   start: (userId, journeyType) => api.post('/ingestion/start', { user_id: userId, journey_type: journeyType }).then(r => r.data),
   submitAnswer: (userId, sessionId, answer) => api.post('/ingestion/answer', { user_id: userId, session_id: sessionId, answer }).then(r => r.data),
+  ingestResume: (userId, sessionId, resumeText) => api.post('/ingestion/resume', { user_id: userId, session_id: sessionId, resume_text: resumeText }).then(r => r.data),
   getState: (userId) => api.get(`/ingestion/state/${userId}`).then(r => r.data),
+  getProfile: (userId) => api.get(`/ingestion/profile/${userId}`).then(r => r.data),
+  updateProfile: (userId, updates) => api.put(`/ingestion/profile/${userId}`, updates).then(r => r.data),
   bridge: (userId, rawText, source) => api.post('/ingestion/bridge', { user_id: userId, raw_text: rawText, source }).then(r => r.data),
   forceComplete: (userId) => api.post(`/ingestion/complete/${userId}`).then(r => r.data),
+  resetProfile: (userId) => api.post(`/ingestion/reset/${userId}`).then(r => r.data),
 };
 
 export default api;

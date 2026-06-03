@@ -197,7 +197,7 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const refreshedContext = await careerOSAPI.runWeeklyCycle(userId);
+      const refreshedContext = await careerOSAPI.getContext(userId);
       setCareerContext(refreshedContext);
       await loadData();
       toast.success('Career OS refreshed.');

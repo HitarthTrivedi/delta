@@ -67,6 +67,7 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 # Relation types for semantic edges
 RELATION_TYPES = {
+    "HAS_IDENTITY",     # User → Identity
     "STRIVES_FOR",      # User → Ambition
     "HAS_SKILL",        # User → Skill
     "CONSTRAINED_BY",   # User → Constraint

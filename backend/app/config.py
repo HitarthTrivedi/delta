@@ -18,6 +18,7 @@ for p in [Path("."), Path(__file__).parent, Path(__file__).parent.parent, Path(_
 if not env_loaded:
     print("[WARN] No .env file loaded by parent-scanning search.")
 
+
 def parse_csv_env(name: str, default: list[str]) -> list[str]:
     raw_value = os.getenv(name)
     if not raw_value:
@@ -30,10 +31,19 @@ def parse_bool_env(name: str, default: bool = False) -> bool:
         return default
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
+def _database_url() -> str:
+    url = os.getenv("DATABASE_URL", "sqlite:///./delta.db")
+    if url.startswith("sqlite+aiosqlite://"):
+        print("[WARN] DATABASE_URL used async sqlite driver; converting to sync sqlite driver.")
+        return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    return url
+
+
 class Settings(BaseSettings):
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./delta.db")
+    DATABASE_URL: str = _database_url()
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    SERPER_API_KEY: str = os.getenv("SERPER_API_KEY", "")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     CORS_ORIGINS: list[str] = parse_csv_env(
         "CORS_ORIGINS",

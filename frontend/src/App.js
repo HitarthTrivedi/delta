@@ -9,10 +9,6 @@ import Header from "./components/Header";
 import Hero from "./components/Hero";
 import Features from "./components/Features";
 import HowItWorks from "./components/HowItWorks";
-import Benefits from "./components/Benefits";
-import Testimonials from "./components/Testimonials";
-import Pricing from "./components/Pricing";
-import FAQ from "./components/FAQ";
 import Footer from "./components/Footer";
 
 // UI Layout Components
@@ -32,6 +28,8 @@ import {
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import CareerChat from "./pages/CareerChat";
+import WeeklyPlan from "./pages/WeeklyPlan";
+import ProgressReport from "./pages/ProgressReport";
 
 // Core connection hooks
 import { useUserWithSkills } from "./hooks/useUser";
@@ -54,14 +52,13 @@ const LandingPage = () => {
       <Hero />
       <Features />
       <HowItWorks />
-      <Benefits />
-      <Testimonials />
-      <Pricing />
-      <FAQ />
       <Footer />
     </div>
   );
 };
+
+import { Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 
 // Layout wrapper to conditionally render Navbar depending on whether the user is on the Landing page
 function LayoutWrapper({ children }) {
@@ -69,7 +66,7 @@ function LayoutWrapper({ children }) {
   const userId = useAuthStore((state) => state.userId);
   const { data: user } = useUserWithSkills(userId);
 
-  const isLanding = location.pathname === "/" || location.pathname === "/onboarding";
+  const isLanding = location.pathname === "/";
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-primary-500/30 selection:text-white">
@@ -81,20 +78,58 @@ function LayoutWrapper({ children }) {
   );
 }
 
+// Protected Route Component to restrict access until onboarding is 100% complete
+function ProtectedRoute({ children }) {
+  const userId = useAuthStore((state) => state.userId);
+  const { data: user, isLoading } = useUserWithSkills(userId);
+
+  if (isLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#000',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        fontFamily: "'Inter', sans-serif"
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <Loader2 style={{ animation: 'spin 1s linear infinite', color: '#fff' }} size={24} />
+          <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem' }}>Loading profile status...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const isComplete = user?.onboarding_complete || (user?.onboarding_percentage && user.onboarding_percentage >= 100);
+
+  if (!isComplete) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  return children;
+}
+
 function AppContent() {
   return (
     <LayoutWrapper>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/chat" element={<CareerChat />} />
-        <Route path="/ledger" element={<Ledger />} />
-        <Route path="/briefs" element={<Briefs />} />
-        <Route path="/pulse" element={<Pulse />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/portfolio" element={<Portfolio />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route path="/intake" element={<Onboarding />} />
+        <Route path="/weekly-plan" element={<ProtectedRoute><WeeklyPlan /></ProtectedRoute>} />
+        <Route path="/roadmap" element={<ProtectedRoute><WeeklyPlan /></ProtectedRoute>} />
+        <Route path="/progress-report" element={<ProtectedRoute><ProgressReport /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><CareerChat /></ProtectedRoute>} />
+        <Route path="/ledger" element={<ProtectedRoute><Ledger /></ProtectedRoute>} />
+        <Route path="/briefs" element={<ProtectedRoute><Briefs /></ProtectedRoute>} />
+        <Route path="/pulse" element={<ProtectedRoute><Pulse /></ProtectedRoute>} />
+        <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+        <Route path="/portfolio" element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       </Routes>
     </LayoutWrapper>
   );

@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import datetime
 import json
+import re
 import uuid
 
 from app.database import get_db
-from app.models import JourneyEvent, PersonalizationProfile, SkillNode, User
+from app.models import JourneyEvent, PersonalizationProfile, RoadmapState, SkillNode, User
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -20,33 +21,754 @@ from app.services.central_engine import (
     log_journey_event,
 )
 from app.services.onboarding_pipeline import finalize_onboarding, start_onboarding
+from app.services.profile_store import profile_as_context_string, load_profile
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+WEEKDAY_INDEX = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
+
+MONTH_INDEX = {
+    "jan": 1, "january": 1,
+    "feb": 2, "february": 2,
+    "mar": 3, "march": 3,
+    "apr": 4, "april": 4,
+    "may": 5,
+    "jun": 6, "june": 6,
+    "jul": 7, "july": 7,
+    "aug": 8, "august": 8,
+    "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10,
+    "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
+}
+
+
+def _as_json(value, fallback):
+    if value is None:
+        return fallback
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return fallback
+
+
+def _action_source(action: dict) -> str:
+    source = action.get("source") or action.get("platform") or ""
+    url = action.get("url") or action.get("resource_url") or ""
+    if source and url:
+        return f"{source}: {url}"
+    return source or url or "No external source attached."
+
+
+def _split_skills(profile: dict) -> list[str]:
+    skills = profile.get("skills") or []
+    if isinstance(skills, str):
+        skills = [part.strip() for part in skills.split(",") if part.strip()]
+    return [str(skill).strip() for skill in skills if str(skill).strip()]
+
+
+def _domain_from_profile(profile: dict, user: User | None = None) -> str:
+    text = " ".join([
+        str(profile.get("target_role", "")),
+        str(profile.get("major", "")),
+        str(profile.get("past_experience", "")),
+        " ".join(_split_skills(profile)),
+        str(user.target_role if user else ""),
+    ]).lower()
+    domain_markers = [
+        ("ai_agents", ["multi-agent", "multi agent", "agentic rag", "adversarial ai", "llm orchestration", "agent routing", "alpha.kore"]),
+        ("commerce", ["commerce", "finance", "accounting", "business", "marketing", "economics", "audit", "tax", "sales"]),
+        ("mechanical", ["mechanical", "cad", "solidworks", "autocad", "thermodynamics", "manufacturing", "ansys"]),
+        ("electrical", ["electrical", "electronics", "circuit", "pcb", "arduino", "matlab", "power systems", "embedded", "iot"]),
+        ("arts", ["arts", "design", "fine arts", "illustration", "animation", "writing", "music", "film", "portfolio"]),
+    ]
+    scores = {domain: sum(1 for marker in markers if marker in text) for domain, markers in domain_markers}
+    best = max(scores, key=scores.get)
+    return best if scores[best] else "general"
+
+
+def _advanced_actions(profile: dict, user: User | None, difficulty: str = "tough") -> list[dict]:
+    domain = _domain_from_profile(profile, user)
+    project_context = profile.get("past_experience") or "your previous work"
+    if difficulty == "normal":
+        return [
+            {
+                "id": f"task-{domain}-audit",
+                "type": "project",
+                "title": "Audit one previous piece of work",
+                "skill": "Applied Review",
+                "description": f"Use {project_context}. Pick one existing project/work sample, list 3 strengths, 3 weak points, and one improvement you can finish this week.",
+                "source": "Your existing project/resume work",
+                "url": "",
+            },
+            {
+                "id": f"task-{domain}-proof-note",
+                "type": "project",
+                "title": "Write a proof note for one upgraded skill",
+                "skill": "Technical Communication",
+                "description": "Create a short note with goal, method, output, one mistake, and one improvement. Keep it easy enough for this week.",
+                "source": "Your existing portfolio/resume",
+                "url": "",
+            },
+        ]
+    templates = {
+        "ai_agents": [
+            {
+                "id": "task-agent-memory-eval",
+                "type": "project",
+                "title": "Build a memory-quality evaluation for your agent system",
+                "skill": "Long-Term Memory Systems",
+                "description": f"Use {project_context}. Create 8-10 test prompts and score whether the agent remembers, forgets, and retrieves correctly.",
+                "source": "Your existing Alpha.Kore / agentic systems work",
+                "url": "",
+            },
+            {
+                "id": "task-adversarial-agent-redteam",
+                "type": "project",
+                "title": "Red-team one agent workflow against prompt attacks",
+                "skill": "Adversarial AI Architecture",
+                "description": "Write 6 adversarial prompts, run them against one workflow, record failures, then add one guardrail or scoring rule.",
+                "source": "OWASP LLM risk style practice",
+                "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+            },
+        ],
+        "commerce": [
+            {
+                "id": "task-commerce-dashboard",
+                "type": "project",
+                "title": "Build a financial decision dashboard",
+                "skill": "Financial Analysis",
+                "description": f"Use {project_context}. Create a simple dashboard with revenue, cost, margin, and one recommendation.",
+                "source": "Your existing commerce/business context",
+                "url": "",
+            },
+            {
+                "id": "task-commerce-case-study",
+                "type": "project",
+                "title": "Write a business case study with numbers",
+                "skill": "Business Strategy",
+                "description": "Pick one company, show 3 data points, identify one problem, and write one recommendation with risk.",
+                "source": "Company reports / public business data",
+                "url": "",
+            },
+        ],
+        "mechanical": [
+            {
+                "id": "task-mech-cad-redesign",
+                "type": "project",
+                "title": "Redesign one mechanical part with trade-offs",
+                "skill": "Mechanical Design",
+                "description": f"Use {project_context}. Model/sketch one part, improve one constraint, and explain the trade-off.",
+                "source": "Your existing CAD/mechanical work",
+                "url": "",
+            },
+            {
+                "id": "task-mech-analysis-note",
+                "type": "project",
+                "title": "Create a mechanism analysis note",
+                "skill": "Mechanical Analysis",
+                "description": "Pick one mechanism, calculate one load/speed/thermal constraint, and explain the design choice.",
+                "source": "Engineering notes / CAD model",
+                "url": "",
+            },
+        ],
+        "electrical": [
+            {
+                "id": "task-electrical-sim",
+                "type": "project",
+                "title": "Simulate and explain one circuit",
+                "skill": "Circuit Analysis",
+                "description": f"Use {project_context}. Simulate one circuit, record behavior, and explain one limit or failure.",
+                "source": "Falstad Circuit Simulator",
+                "url": "https://www.falstad.com/circuit/",
+            },
+            {
+                "id": "task-electrical-test-plan",
+                "type": "project",
+                "title": "Write a test plan for one electrical system",
+                "skill": "Testing and Debugging",
+                "description": "List 6 tests, expected readings, likely faults, and how you would debug one failed test.",
+                "source": "Your existing electronics/IoT work",
+                "url": "",
+            },
+        ],
+        "arts": [
+            {
+                "id": "task-arts-case-study",
+                "type": "project",
+                "title": "Turn one artwork into a portfolio case study",
+                "skill": "Portfolio Development",
+                "description": f"Use {project_context}. Show goal, references, drafts, final piece, and what changed after critique.",
+                "source": "Your existing arts/design portfolio",
+                "url": "",
+            },
+            {
+                "id": "task-arts-style-study",
+                "type": "project",
+                "title": "Create a focused style study",
+                "skill": "Creative Direction",
+                "description": "Choose one style, make a small piece, then write 5 critique notes and 3 improvements.",
+                "source": "Portfolio/reference study",
+                "url": "",
+            },
+        ],
+    }
+    return templates.get(domain, [
+        {
+            "id": "task-general-proof",
+            "type": "project",
+            "title": "Upgrade one previous work sample",
+            "skill": "Applied Proof",
+            "description": f"Use {project_context}. Choose one previous work sample, make it stronger, and write what improved.",
+            "source": "Your existing resume/portfolio",
+            "url": "",
+        }
+    ])
+
+
+def _course_action(profile: dict, user: User | None = None, requested_topic: str = "") -> dict:
+    domain = _domain_from_profile(profile, user)
+    if domain == "ai_agents" and ("hugging" in requested_topic or "open source" in requested_topic):
+        return {
+            "id": "course-huggingface-agents",
+            "type": "course",
+            "title": "Complete one focused section of the Hugging Face Agents Course",
+            "skill": "AI Agents",
+            "description": "Do only one section this week. Notes required: what tool use is, how the agent decides actions, and one idea you can apply in Alpha.Kore.",
+            "source": "Hugging Face",
+            "url": "https://huggingface.co/learn/agents-course",
+            "duration": "1 week section",
+        }
+    course_map = {
+        "ai_agents": {
+        "id": "course-deeplearningai-langgraph",
+        "type": "course",
+        "title": "Complete DeepLearning.AI's AI Agents in LangGraph course",
+        "skill": "AI Agents / LangGraph",
+        "description": "Watch the course, then write a small comparison: what LangGraph gives you that your current agent routing does not.",
+        "source": "DeepLearning.AI",
+        "url": "https://www.deeplearning.ai/short-courses/ai-agents-in-langgraph/",
+        "duration": "1 week",
+        },
+        "commerce": {
+            "id": "course-khan-accounting-finance",
+            "type": "course",
+            "title": "Complete one focused Khan Academy finance/accounting unit",
+            "skill": "Finance / Accounting",
+            "description": "Do one unit this week and make a one-page summary with formulas, example, and business use.",
+            "source": "Khan Academy",
+            "url": "https://www.khanacademy.org/economics-finance-domain",
+            "duration": "1 week unit",
+        },
+        "mechanical": {
+            "id": "course-autodesk-fusion-learning",
+            "type": "course",
+            "title": "Complete one Autodesk Fusion learning module",
+            "skill": "CAD / Mechanical Design",
+            "description": "Do one module this week and submit one model/screenshot plus a note explaining design constraints.",
+            "source": "Autodesk",
+            "url": "https://www.autodesk.com/learn",
+            "duration": "1 week module",
+        },
+        "electrical": {
+            "id": "course-allaboutcircuits",
+            "type": "course",
+            "title": "Complete one All About Circuits textbook chapter",
+            "skill": "Circuit Fundamentals",
+            "description": "Read one chapter, solve 3 examples, and simulate one circuit from it.",
+            "source": "All About Circuits",
+            "url": "https://www.allaboutcircuits.com/textbook/",
+            "duration": "1 week chapter",
+        },
+        "arts": {
+            "id": "course-khan-art-history",
+            "type": "course",
+            "title": "Complete one Khan Academy art history unit",
+            "skill": "Visual Analysis",
+            "description": "Do one unit this week and write a short critique connecting the style to your own portfolio.",
+            "source": "Khan Academy",
+            "url": "https://www.khanacademy.org/humanities/art-history",
+            "duration": "1 week unit",
+        },
+        "general": {
+            "id": "course-coursera-learning-how-to-learn",
+            "type": "course",
+            "title": "Complete one section of Learning How to Learn",
+            "skill": "Learning Strategy",
+            "description": "Do one section and write a short plan for applying it to your current weekly work.",
+            "source": "Coursera",
+            "url": "https://www.coursera.org/learn/learning-how-to-learn",
+            "duration": "1 week section",
+        },
+    }
+    return course_map.get(domain, course_map["general"])
+
+
+def _latest_task_states(journey: list[dict], current_week_started_at=None) -> dict:
+    states = {}
+    for event in sorted(journey, key=lambda e: str(e.get("created_at") or "")):
+        if current_week_started_at and event.get("created_at") and str(event.get("created_at")) < str(current_week_started_at):
+            continue
+        event_type = event.get("event_type")
+        if event_type not in {"weekly_task_completed", "weekly_task_reopened", "weekly_task_skipped"}:
+            continue
+        evidence = event.get("evidence") or {}
+        task_id = str(evidence.get("id") or evidence.get("title") or event.get("id"))
+        states[task_id] = event_type
+    return states
+
+
+def _has_active_course(actions: list[dict], career_context: dict) -> dict | None:
+    states = _latest_task_states(
+        career_context.get("journey_until_today") or [],
+        career_context.get("current_week_started_at"),
+    )
+    for action in actions:
+        task_id = str(action.get("id") or action.get("title"))
+        if action.get("type") == "course" and states.get(task_id) not in {"weekly_task_completed", "weekly_task_skipped"}:
+            return action
+    return None
+
+
+def _save_weekly_actions(db: Session, roadmap: RoadmapState, actions: list[dict], phase_name: str):
+    weekly_focus = _as_json(roadmap.weekly_focus, {})
+    weekly_focus["phase_name"] = phase_name
+    weekly_focus["primary_actions"] = actions
+    roadmap.weekly_focus = json.dumps(weekly_focus)
+    db.commit()
+    db.refresh(roadmap)
+
+
+def _current_actions_from_roadmap(roadmap: RoadmapState | None) -> list[dict]:
+    if not roadmap:
+        return []
+    weekly_focus = _as_json(roadmap.weekly_focus, {})
+    actions = weekly_focus.get("primary_actions") or []
+    return actions if isinstance(actions, list) else []
+
+
+def _now_local() -> datetime.datetime:
+    return datetime.datetime.now().astimezone()
+
+
+def _today_local() -> datetime.date:
+    return _now_local().date()
+
+
+def _next_weekday(today: datetime.date, weekday: int, include_today: bool = False) -> datetime.date:
+    days = (weekday - today.weekday()) % 7
+    if days == 0 and not include_today:
+        days = 7
+    return today + datetime.timedelta(days=days)
+
+
+def _safe_date(year: int, month: int, day: int) -> datetime.date | None:
+    try:
+        return datetime.date(year, month, day)
+    except ValueError:
+        return None
+
+
+def _parse_date_reference(text: str, today: datetime.date | None = None) -> dict:
+    today = today or _today_local()
+    lowered = text.lower()
+    candidates: list[tuple[datetime.date, str]] = []
+    time_match = re.search(r"\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", lowered)
+    if time_match:
+        hour = int(time_match.group(1))
+        minute = int(time_match.group(2) or 0)
+        marker = time_match.group(3)
+        if marker == "pm" and hour != 12:
+            hour += 12
+        if marker == "am" and hour == 12:
+            hour = 0
+        mentioned_time = f"{hour:02d}:{minute:02d}"
+        mentioned_time_source = time_match.group(0)
+    else:
+        time24 = re.search(r"\b(?:at\s*)?([01]?\d|2[0-3]):([0-5]\d)\b", lowered)
+        mentioned_time = f"{int(time24.group(1)):02d}:{int(time24.group(2)):02d}" if time24 else None
+        mentioned_time_source = time24.group(0) if time24 else None
+
+    if re.search(r"\btoday\b", lowered):
+        candidates.append((today, "today"))
+    if re.search(r"\btomorrow\b", lowered):
+        candidates.append((today + datetime.timedelta(days=1), "tomorrow"))
+    if re.search(r"\bday after tomorrow\b", lowered):
+        candidates.append((today + datetime.timedelta(days=2), "day after tomorrow"))
+
+    relative = re.search(r"\b(?:in|after)\s+(\d{1,3})\s+(day|days|week|weeks|month|months)\b", lowered)
+    if relative:
+        amount = int(relative.group(1))
+        unit = relative.group(2)
+        if unit.startswith("day"):
+            delta_days = amount
+        elif unit.startswith("week"):
+            delta_days = amount * 7
+        else:
+            delta_days = amount * 30
+        candidates.append((today + datetime.timedelta(days=delta_days), relative.group(0)))
+
+    iso = re.search(r"\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b", lowered)
+    if iso:
+        parsed = _safe_date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
+        if parsed:
+            candidates.append((parsed, iso.group(0)))
+
+    slash = re.search(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](20\d{2}))?\b", lowered)
+    if slash and not iso:
+        day = int(slash.group(1))
+        month = int(slash.group(2))
+        year = int(slash.group(3) or today.year)
+        parsed = _safe_date(year, month, day)
+        if parsed and parsed < today and slash.group(3) is None:
+            parsed = _safe_date(year + 1, month, day)
+        if parsed:
+            candidates.append((parsed, slash.group(0)))
+
+    month_name = re.search(
+        r"\b(\d{1,2})(?:st|nd|rd|th)?\s+("
+        + "|".join(MONTH_INDEX.keys())
+        + r")\b|\b("
+        + "|".join(MONTH_INDEX.keys())
+        + r")\s+(\d{1,2})(?:st|nd|rd|th)?\b",
+        lowered,
+    )
+    if month_name:
+        if month_name.group(1):
+            day = int(month_name.group(1))
+            month = MONTH_INDEX[month_name.group(2)]
+            phrase = month_name.group(0)
+        else:
+            month = MONTH_INDEX[month_name.group(3)]
+            day = int(month_name.group(4))
+            phrase = month_name.group(0)
+        parsed = _safe_date(today.year, month, day)
+        if parsed and parsed < today:
+            parsed = _safe_date(today.year + 1, month, day)
+        if parsed:
+            candidates.append((parsed, phrase))
+
+    for weekday, weekday_index in WEEKDAY_INDEX.items():
+        if re.search(rf"\bnext\s+{weekday}\b", lowered):
+            candidates.append((_next_weekday(today, weekday_index, include_today=False), f"next {weekday}"))
+            break
+        if re.search(rf"\bthis\s+{weekday}\b", lowered):
+            candidates.append((_next_weekday(today, weekday_index, include_today=True), f"this {weekday}"))
+            break
+        if re.search(rf"\b{weekday}\b", lowered):
+            candidates.append((_next_weekday(today, weekday_index, include_today=False), weekday))
+            break
+
+    if not candidates:
+        return {
+            "today": today.isoformat(),
+            "today_label": today.strftime("%A, %d %B %Y"),
+            "mentioned_date": None,
+            "mentioned_date_label": None,
+            "days_until": None,
+            "source_text": None,
+            "mentioned_time": mentioned_time,
+            "mentioned_time_source": mentioned_time_source,
+        }
+
+    target, source_text = sorted(candidates, key=lambda item: abs((item[0] - today).days))[0]
+    return {
+        "today": today.isoformat(),
+        "today_label": today.strftime("%A, %d %B %Y"),
+        "mentioned_date": target.isoformat(),
+        "mentioned_date_label": target.strftime("%A, %d %B %Y"),
+        "days_until": (target - today).days,
+        "source_text": source_text,
+        "mentioned_time": mentioned_time,
+        "mentioned_time_source": mentioned_time_source,
+    }
+
+
+def _date_context_text(date_info: dict) -> str:
+    now = _now_local()
+    current_time = now.strftime("%H:%M %Z").strip()
+    if not date_info.get("mentioned_date"):
+        time_note = f" Current local time is {current_time}." if current_time else ""
+        return f"Today is {date_info['today_label']}.{time_note}"
+    days = date_info.get("days_until")
+    if days == 0:
+        distance = "today"
+    elif days == 1:
+        distance = "tomorrow"
+    elif days is not None and days > 1:
+        distance = f"in {days} days"
+    elif days is not None:
+        distance = f"{abs(days)} days ago"
+    else:
+        distance = "date mentioned"
+    time_suffix = f" at {date_info['mentioned_time']}" if date_info.get("mentioned_time") else ""
+    current_time_note = f" Current local time is {current_time}." if current_time else ""
+    return (
+        f"Today is {date_info['today_label']}. "
+        f"The user mentioned {date_info['source_text']} -> {date_info['mentioned_date_label']}{time_suffix} ({distance})."
+        f"{current_time_note}"
+    )
+
+
+def _agent2_intent(text: str) -> str:
+    lowered = text.lower().strip()
+    clean = lowered.strip(" .!?")
+    if clean in {"hi", "hello", "hey", "hii", "yo", "good morning", "good evening"}:
+        return "smalltalk"
+    if any(phrase in lowered for phrase in [
+        "exam", "test", "quiz", "paper", "mid sem", "midsem", "viva", "deadline",
+        "submission", "interview", "presentation", "practical", "travel", "sick",
+        "low energy", "busy",
+    ]):
+        return "constraint"
+    if "skip" in lowered:
+        return "skip"
+    if any(phrase in lowered for phrase in ["course", "certification", "lecture"]):
+        return "course"
+    if any(phrase in lowered for phrase in [
+        "ahead of what i have done", "too basic", "low level", "done these",
+        "resume", "covered before", "advanced", "not beginner", "tough", "harder",
+    ]):
+        return "advanced"
+    if any(phrase in lowered for phrase in ["normal", "easier", "moderate", "simpler", "too hard"]):
+        return "normal"
+    if any(phrase in lowered for phrase in [
+        "detail", "where should i start", "start from", "exactly should i do", "explain",
+        "how should i do", "what should i do", "break down", "steps",
+    ]):
+        return "explain"
+    return "chat"
+
+
+def _explain_action(action: dict | None) -> str:
+    action = action or {}
+    title = action.get("title") or action.get("skill") or "this week's first task"
+    description = action.get("description") or action.get("detail") or action.get("action") or "make one small proof and write what it proves"
+    source_text = _action_source(action)
+    return (
+        f"Start with: {title}.\n\n"
+        f"1. Create a small folder or GitHub repo for only this task.\n"
+        f"2. Add a README with the goal in 2-3 lines.\n"
+        f"3. Do the actual work: {description}\n"
+        f"4. Use this source if attached: {source_text}\n"
+        f"5. Add proof: screenshots, logs, notebook output, demo link, design notes, or a small results table.\n"
+        f"6. Finish with 5 lines: what worked, what failed, what you improved, what is still weak, and what you will do next."
+    )
+
+
+def _constraint_actions(profile: dict, user: User | None, text: str, date_info: dict | None = None) -> list[dict]:
+    domain = _domain_from_profile(profile, user)
+    exam_like = any(word in text.lower() for word in ["exam", "test", "quiz", "paper", "mid sem", "midsem", "viva", "practical"])
+    date_info = date_info or _parse_date_reference(text)
+    date_note = _date_context_text(date_info)
+    days_until = date_info.get("days_until")
+    if exam_like:
+        if days_until is not None and days_until > 14:
+            description = (
+                f"{date_note} Keep normal work light, but start exam prep now: list syllabus topics, mark weak areas, "
+                "and spend one short block on the weakest topic. Do not add a new course this week."
+            )
+        else:
+            description = (
+                f"{date_note} Pause projects and courses this week. Make a topic list from your syllabus, revise the weakest 2 topics, "
+                "solve past questions, and keep one mistake log."
+            )
+        return [{
+            "id": f"task-{domain}-exam-support",
+            "type": "practice",
+            "title": "Exam-first study block",
+            "skill": "Exam Preparation",
+            "description": description,
+            "source": "Your college syllabus and previous papers",
+            "url": "",
+            "due_date": date_info.get("mentioned_date"),
+        }]
+    return [{
+        "id": f"task-{domain}-light-week",
+        "type": "practice",
+        "title": "Light recovery week",
+        "skill": "Consistency",
+        "description": f"{date_note} Keep only one small maintenance task this week: 60-90 minutes of review, one note, and one check-in message to Agent 2.",
+        "source": "Delta pace adjustment",
+        "url": "",
+        "due_date": date_info.get("mentioned_date"),
+    }]
 
 
 @router.post("/message", response_model=ChatResponse)
 def chat_message(data: ChatRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == data.user_id).first()
     skills = db.query(SkillNode).filter(SkillNode.user_id == data.user_id).all()
-    try:
-        career_context = compile_career_context(db, data.user_id)
-    except Exception:
-        career_context = {}
-
+    roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == data.user_id).first()
     user_context = f"User: {user.name if user else 'Unknown'}, Target: {user.target_role if user else 'N/A'}"
+    is_weekly_agent = "Agent 2 weekly plan discussion" in data.message
+    user_update = data.message.split("User update:", 1)[-1].strip() if "User update:" in data.message else data.message
+    lowered_update = user_update.lower().strip(" .!?")
+    current_actions = _current_actions_from_roadmap(roadmap)
+    intent = _agent2_intent(user_update) if is_weekly_agent else "chat"
+    date_info = _parse_date_reference(user_update)
+    date_context = _date_context_text(date_info)
+
+    if is_weekly_agent and intent == "smalltalk":
+        response_text = "Hey, I am here. Ask me to explain this week's task, make it easier, make it tougher, replace it with one course, or skip a task."
+        return ChatResponse(response=response_text, context=user_context)
+
+    if is_weekly_agent and intent == "explain":
+        return ChatResponse(response=_explain_action(current_actions[0] if current_actions else None), context=user_context)
+
+    if is_weekly_agent and intent == "chat":
+        career_context = {
+            "roadmap": {"weekly_focus": {"primary_actions": current_actions}},
+            "journey_until_today": [],
+        }
+    else:
+        try:
+            career_context = compile_career_context(db, data.user_id)
+        except Exception:
+            career_context = {}
+
     skills_context = ", ".join([f"{s.name} ({s.proficiency}/10)" for s in skills]) if skills else "No skills yet"
+    profile_context = profile_as_context_string(data.user_id)
     context_json = json.dumps(career_context, default=str)[:8000]
 
     try:
         from app.services.ai_service import generate_response
 
-        prompt = f"""You are Delta, the central AI assistant inside a personalized Career OS.
+        lowered_update = user_update.lower()
+        if is_weekly_agent:
+            if intent == "skip" and roadmap and current_actions:
+                target = current_actions[0]
+                for action in current_actions:
+                    if action.get("title", "").lower() in lowered_update or action.get("skill", "").lower() in lowered_update:
+                        target = action
+                        break
+                log_journey_event(
+                    db=db,
+                    user_id=data.user_id,
+                    event_type="weekly_task_skipped",
+                    summary=f"Skipped Agent 2 task: {target.get('title')}",
+                    evidence=target,
+                    impact={"user_chose_to_skip": True, "source": "agent_2_chat"},
+                )
+                response_text = f"Skipped: {target.get('title')}. It will no longer block this week. If you want, I can replace it with a normal task, a tougher task, or one course."
+                return ChatResponse(response=response_text, context=user_context)
+
+            if intent == "course" and roadmap:
+                profile = load_profile(data.user_id)
+                active_course = _has_active_course(current_actions, career_context)
+                if active_course:
+                    response_text = (
+                        f"You already have one course active: {active_course.get('title')}. "
+                        f"Finish it or skip it before I add another course. Source: {_action_source(active_course)}"
+                    )
+                    return ChatResponse(response=response_text, context=user_context)
+                course = _course_action(profile, user, lowered_update)
+                _save_weekly_actions(db, roadmap, [course], "One-course weekly sprint")
+                response_text = (
+                    f"I replaced this week with one course only: {course['title']}. "
+                    f"Source: {_action_source(course)}. Do not add another course until this is completed or skipped."
+                )
+                log_journey_event(
+                    db=db,
+                    user_id=data.user_id,
+                    event_type="assistant_guidance",
+                    summary=f"Agent 2 assigned one course: {course['title']}",
+                    evidence={"message": data.message, "response_text": response_text, "updated_actions": [course]},
+                    impact={"weekly_tasks_updated": True, "active_course_guard": True},
+                )
+                return ChatResponse(response=response_text, context=user_context)
+
+            if intent in {"advanced", "normal"} and roadmap:
+                profile = load_profile(data.user_id)
+                updated_actions = _advanced_actions(profile, user, "normal" if intent == "normal" else "tough")
+                _save_weekly_actions(db, roadmap, updated_actions, "Normal profile proof sprint" if intent == "normal" else "Advanced profile proof sprint")
+                response_text = (
+                    "Updated this week immediately. I used your existing profile instead of beginner tasks. "
+                    f"New first task: {updated_actions[0]['title']}. Start by creating a GitHub folder, then follow the task description exactly."
+                )
+                log_journey_event(
+                    db=db,
+                    user_id=data.user_id,
+                    event_type="assistant_guidance",
+                    summary=f"Agent 2 advanced weekly tasks: {user_update[:120]}",
+                    evidence={"message": data.message, "response_text": response_text, "updated_actions": updated_actions},
+                    impact={"context_used": True, "weekly_tasks_updated": True},
+                )
+                return ChatResponse(response=response_text, context=user_context)
+
+            if intent == "constraint" and roadmap:
+                profile = load_profile(data.user_id)
+                updated_actions = _constraint_actions(profile, user, user_update, date_info)
+                _save_weekly_actions(db, roadmap, updated_actions, "Pace-adjusted week")
+                response_text = (
+                    f"I adjusted only this week for that constraint. {date_context} New task: {updated_actions[0]['title']}. "
+                    f"{updated_actions[0]['description']}"
+                )
+                log_journey_event(
+                    db=db,
+                    user_id=data.user_id,
+                    event_type="assistant_guidance",
+                    summary=f"Agent 2 adjusted weekly pace: {user_update[:120]}",
+                    evidence={"message": data.message, "response_text": response_text, "updated_actions": updated_actions},
+                    impact={"weekly_tasks_updated": True, "constraint_adjustment": True},
+                )
+                return ChatResponse(response=response_text, context=user_context)
+            
+            role_prompt = f"""You are Agent 2 inside Delta Career OS: the weekly roadmap strategist for any student domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
+Current date/time context: {date_context}
+Your job is to discuss only the current week. Adapt tasks based on pace, exams, deadlines, inactivity, health, blocked weeks, and completed work.
+When the user gives a date, day, or relative time, reason from the current date/time context. If an exam/deadline is close, reduce or pause normal tasks. If it is farther away, start light prep without destroying the whole week.
+If the user has exams for weeks or months, recommend pausing courses/projects and shifting to exam support.
+Never assign a long pre-made roadmap. Give one practical adjustment for this week and ask at most one follow-up question.
+The student profile/resume is the source of truth. If the profile says they already know a skill, do not assign beginner learning for it; assign a domain-appropriate harder proof, evaluation, portfolio piece, case study, design review, simulation, benchmark, red-team, audit, or extension task.
+Course rule: never assign more than one active course. If a course is already active, tell the user to complete or skip it first. Every course must include source and URL.
+Carryover rule: unfinished tasks stay assigned across weeks. Skipped tasks may be removed from blocking.
+
+CRITICAL: If the user requests changes to their tasks (like adding, deleting, modifying, or shifting focus to exams/prep), you MUST output the updated list of tasks at the very end of your response inside a JSON block wrapped in triple backticks, like this:
+```json
+{{
+  "updated_actions": [
+    {{
+      "id": "action-0",
+      "type": "course|project|practice",
+      "title": "Short title",
+      "skill": "Skill name",
+      "description": "Task description...",
+      "source": "Course/project source if any",
+      "url": "https://..."
+    }}
+  ]
+}}
+```
+Current tasks in the user's plan:
+{json.dumps(current_actions, indent=2)}
+
+Keep the conversation friendly, comforting, and supportively warm. Ask at most one follow-up question. Do not output JSON unless the user requested a task change."""
+        else:
+            role_prompt = """You are Delta, the central AI assistant inside a personalized Career OS.
 Use the user's Career Memory, Roadmap State, Market Pulse, Journey Log, Proof Projects, and Portfolio Assessment.
-Be honest, specific, and action-oriented. If the user is drifting, say it clearly but supportively.
+Be honest, specific, and action-oriented. If the user is drifting, say it clearly but supportively."""
+
+        prompt = f"""{role_prompt}
 
 The user is:
 {user_context}
 Skills: {skills_context}
+Profile / resume context:
+{profile_context}
+
+Date/time context:
+{date_context}
 
 Career OS Context JSON:
 {context_json}
@@ -54,16 +776,85 @@ Career OS Context JSON:
 User message: {data.message}
 
 Respond with a practical next step, mention relevant roadmap/project/market context when useful, and ask at most one follow-up question."""
-        response = generate_response(prompt)
+        response = generate_response(
+            prompt,
+            temperature=0.5 if is_weekly_agent else 0.7,
+            max_tokens=900 if is_weekly_agent and intent == "chat" else 10000,
+        )
+        cleaned_response = response.strip()
+        updated_actions = None
+
+        if is_weekly_agent and "```json" in response:
+            try:
+                parts = response.split("```json")
+                before_json = parts[0]
+                after_json_block = parts[1].split("```")
+                json_text = after_json_block[0].strip()
+                after_json = after_json_block[1] if len(after_json_block) > 1 else ""
+                
+                parsed_json = json.loads(json_text)
+                updated_actions = parsed_json.get("updated_actions")
+                
+                cleaned_response = (before_json.strip() + "\n" + after_json.strip()).strip()
+            except Exception as e:
+                print(f"Error parsing updated actions from LLM: {e}")
+        elif is_weekly_agent and (cleaned_response.startswith("{") or cleaned_response.startswith("[")):
+            try:
+                parsed_json = json.loads(cleaned_response)
+                updated_actions = parsed_json.get("updated_actions") or parsed_json.get("primary_actions")
+                cleaned_response = "I have updated your tasks for this week based on our conversation! Let me know if you need any other adjustments."
+            except Exception:
+                pass
+
+        if is_weekly_agent and updated_actions and roadmap:
+            try:
+                weekly_focus = _as_json(roadmap.weekly_focus, {})
+                sanitized_actions = []
+                for i, act in enumerate(updated_actions):
+                    sanitized_actions.append({
+                        "id": act.get("id") or f"action-{i}",
+                        "type": act.get("type") or "project",
+                        "title": act.get("title") or act.get("label") or act.get("skill") or f"Task {i+1}",
+                        "skill": act.get("skill") or "Skill",
+                        "description": act.get("description") or act.get("detail") or act.get("proof") or "Details...",
+                        "source": act.get("source") or act.get("platform") or "",
+                        "url": act.get("url") or act.get("resource_url") or "",
+                    })
+                weekly_focus["primary_actions"] = sanitized_actions
+                roadmap.weekly_focus = json.dumps(weekly_focus)
+                db.commit()
+                db.refresh(roadmap)
+            except Exception as db_err:
+                db.rollback()
+                print(f"Error updating roadmap actions in DB: {db_err}")
+
+        # Fallback to hardcoded default text if the LLM output was completely empty
+        if is_weekly_agent and not cleaned_response:
+            weekly_focus = (career_context.get("roadmap") or {}).get("weekly_focus", {})
+            actions = weekly_focus.get("primary_actions") or []
+            action = actions[0] if actions else {}
+            skill = action.get("skill") or "this week's roadmap skill"
+            if "sql" in data.message.lower() or "relational" in data.message.lower() or "sql" in skill.lower():
+                cleaned_response = (
+                    "This week, make SQL concrete. Build a tiny SQLite project for a student task tracker: "
+                    "tables for users, tasks, weekly_plans, and completions. Add 10 sample rows. Then write queries using "
+                    "SELECT, WHERE, JOIN, GROUP BY, ORDER BY, and one indexed lookup. Your proof is a GitHub folder with "
+                    "schema.sql, sample_data.sql, queries.sql, and a README explaining what each query proves."
+                )
+            else:
+                cleaned_response = (
+                    f"This week, focus on {skill}. Keep it to one proof task, finish it, then report whether the pace was easy, hard, or blocked."
+                )
+
         log_journey_event(
             db=db,
             user_id=data.user_id,
             event_type="assistant_guidance",
             summary=f"Delta answered career question: {data.message[:120]}",
-            evidence={"message": data.message},
+            evidence={"message": data.message, "response_text": cleaned_response},
             impact={"context_used": bool(career_context)},
         )
-        return ChatResponse(response=response, context=user_context)
+        return ChatResponse(response=cleaned_response, context=user_context)
     except Exception:
         next_project = (career_context.get("proof_projects") or [{}])[0]
         weekly_focus = (career_context.get("roadmap") or {}).get("weekly_focus", {})
@@ -82,13 +873,19 @@ def chat_history(user_id: str, db: Session = Depends(get_db)):
     events = db.query(JourneyEvent).filter(
         JourneyEvent.user_id == user_id,
         JourneyEvent.event_type == "assistant_guidance",
-    ).order_by(JourneyEvent.created_at.desc()).limit(6).all()
+    ).order_by(JourneyEvent.created_at.desc()).limit(10).all()
     messages = []
     for event in reversed(events):
         payload = json.loads(event.evidence or "{}")
-        if payload.get("message"):
-            messages.append({"role": "user", "content": payload["message"]})
-        messages.append({"role": "assistant", "content": event.summary})
+        user_msg = payload.get("message", "")
+        # Prefer stored response_text; fall back to summary only if it doesn't look like a meta-description
+        assistant_msg = payload.get("response_text") or (
+            event.summary if not event.summary.startswith("Delta answered career question:") else ""
+        )
+        if user_msg:
+            messages.append({"role": "user", "content": user_msg})
+        if assistant_msg:
+            messages.append({"role": "assistant", "content": assistant_msg})
     return {"messages": messages}
 
 

@@ -42,6 +42,281 @@ def _dump(value):
     return json.dumps(value, ensure_ascii=True)
 
 
+def _event_json(event: JourneyEvent, field: str, fallback):
+    return _as_json(getattr(event, field, None), fallback)
+
+
+def _valid_weekly_cycle_events(db: Session, user_id: str) -> list[JourneyEvent]:
+    """Only count explicit, validated week advances. Old refresh-created cycles are ignored."""
+    events = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user_id,
+        JourneyEvent.event_type == "weekly_cycle_completed"
+    ).order_by(JourneyEvent.created_at.asc()).all()
+    valid_events = []
+    for event in events:
+        impact = _event_json(event, "impact", {})
+        evidence = _event_json(event, "evidence", {})
+        if impact.get("advance_approved") is True or evidence.get("completed_task_count"):
+            valid_events.append(event)
+    return valid_events
+
+
+def _norm_skill(value: str) -> str:
+    return " ".join(str(value or "").lower().replace("&", " ").replace("/", " ").replace("-", " ").split())
+
+
+def _profile_skills(profile: dict) -> list[str]:
+    skills = profile.get("skills") or []
+    if isinstance(skills, str):
+        skills = [part.strip() for part in skills.split(",") if part.strip()]
+    return [str(skill).strip() for skill in skills if str(skill).strip()]
+
+
+def _sync_profile_skills_to_db(db: Session, user: User) -> list[SkillNode]:
+    skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
+    existing = {_norm_skill(skill.name): skill for skill in skills}
+    try:
+        from app.services.profile_store import load_profile
+        profile = load_profile(user.id)
+    except Exception:
+        profile = {}
+
+    profile_skills = _profile_skills(profile)
+    if not profile_skills:
+        return skills
+
+    experience = _norm_skill(profile.get("experience_level") or "")
+    base_proficiency = 6 if experience in {"intermediate", "advanced"} else 4
+    changed = False
+    for skill_name in profile_skills[:40]:
+        key = _norm_skill(skill_name)
+        if not key:
+            continue
+        existing_skill = existing.get(key)
+        if existing_skill:
+            if existing_skill.proficiency < base_proficiency:
+                existing_skill.proficiency = base_proficiency
+                existing_skill.evidence_type = existing_skill.evidence_type or "resume_profile"
+                existing_skill.evidence_weight = max(existing_skill.evidence_weight or 0, 0.65)
+                changed = True
+            continue
+        new_skill = SkillNode(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            name=skill_name,
+            category="resume",
+            proficiency=base_proficiency,
+            evidence_type="resume_profile",
+            evidence_weight=0.65,
+        )
+        db.add(new_skill)
+        skills.append(new_skill)
+        existing[key] = new_skill
+        changed = True
+
+    if changed:
+        db.commit()
+        skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
+    return skills
+
+
+def _profile_text(profile: dict, skills: list[SkillNode], user: User) -> str:
+    return " ".join([
+        str(profile.get("target_role", "")),
+        str(profile.get("major", "")),
+        str(profile.get("past_experience", "")),
+        " ".join(_profile_skills(profile)),
+        " ".join(skill.name for skill in skills),
+        str(user.target_role or ""),
+    ]).lower()
+
+
+def _profile_domain(profile: dict, skills: list[SkillNode], user: User) -> str:
+    text = _profile_text(profile, skills, user)
+    domains = [
+        ("ai_agents", ["multi-agent", "multi agent", "agentic rag", "adversarial ai", "llm orchestration", "long-term memory", "agent routing", "alpha.kore"]),
+        ("commerce", ["commerce", "finance", "accounting", "business", "marketing", "economics", "stock", "tax", "audit", "sales"]),
+        ("mechanical", ["mechanical", "cad", "solidworks", "autocad", "thermodynamics", "manufacturing", "robotics", "ansys"]),
+        ("electrical", ["electrical", "electronics", "circuit", "pcb", "arduino", "matlab", "power systems", "embedded", "iot"]),
+        ("arts", ["arts", "design", "fine arts", "illustration", "animation", "writing", "music", "film", "portfolio"]),
+    ]
+    scores = {
+        domain: sum(1 for marker in markers if marker in text)
+        for domain, markers in domains
+    }
+    best = max(scores, key=scores.get)
+    return best if scores[best] > 0 else "general"
+
+
+def _has_prior_profile_depth(profile: dict, skills: list[SkillNode], user: User) -> bool:
+    profile_text = " ".join([
+        str(profile.get("target_role", "")),
+        str(profile.get("experience_level", "")),
+        str(profile.get("past_experience", "")),
+        " ".join(_profile_skills(profile)),
+        " ".join(skill.name for skill in skills),
+        str(user.target_role or ""),
+    ]).lower()
+    return "intermediate" in profile_text or "advanced" in profile_text or len(_profile_skills(profile)) >= 5
+
+
+def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User) -> list[dict]:
+    domain = _profile_domain(profile, skills, user)
+    project_context = profile.get("past_experience") or "your existing work"
+    templates = {
+        "ai_agents": [
+            {
+            "id": "task-agent-memory-eval",
+            "node_id": "advanced-agent-memory",
+            "type": "project",
+            "title": "Build a memory-quality evaluation for your agent system",
+            "skill": "Long-Term Memory Systems",
+            "description": (
+                f"Use your {project_context} experience. Create a small eval with 8-10 test prompts that checks whether an agent remembers, forgets, and retrieves the right facts."
+            ),
+            "why_now": "You already know the basics; this proves reliability, not just usage.",
+            "source": "Your existing Alpha.Kore / agentic systems work",
+            "url": "",
+            "prior_exposure": True,
+            },
+            {
+            "id": "task-adversarial-agent-redteam",
+            "node_id": "advanced-adversarial-ai",
+            "type": "project",
+            "title": "Red-team one agent workflow against prompt attacks",
+            "skill": "Adversarial AI Architecture",
+            "description": (
+                "Write 6 adversarial prompts, run them against one agent workflow, record failures, then add one guardrail or scoring rule that improves behavior."
+            ),
+            "why_now": "This is beyond beginner ML and directly matches your adversarial AI goal.",
+            "source": "OWASP LLM risk style practice",
+            "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+            "prior_exposure": True,
+            },
+        ],
+        "commerce": [
+            {
+                "id": "task-commerce-dashboard",
+                "node_id": "commerce-analysis-proof",
+                "type": "project",
+                "title": "Build a financial decision dashboard from a real dataset",
+                "skill": "Financial Analysis",
+                "description": f"Use {project_context}. Create a spreadsheet or BI dashboard with revenue, cost, margin, and one recommendation backed by numbers.",
+                "source": "Your existing commerce/accounting context",
+                "url": "",
+                "prior_exposure": True,
+            },
+            {
+                "id": "task-commerce-case-study",
+                "node_id": "commerce-case-proof",
+                "type": "project",
+                "title": "Write a one-page business case study",
+                "skill": "Business Strategy",
+                "description": "Pick one company, identify a problem, show 3 data points, and write a clear recommendation with risks.",
+                "source": "Public annual reports / company filings",
+                "url": "",
+                "prior_exposure": True,
+            },
+        ],
+        "mechanical": [
+            {
+                "id": "task-mech-cad-redesign",
+                "node_id": "mechanical-cad-proof",
+                "type": "project",
+                "title": "Redesign one mechanical part with a trade-off note",
+                "skill": "CAD / Mechanical Design",
+                "description": f"Use {project_context}. Model or sketch one part, improve weight/strength/manufacturability, and explain the trade-off.",
+                "source": "Your existing mechanical/CAD work",
+                "url": "",
+                "prior_exposure": True,
+            },
+            {
+                "id": "task-mech-analysis",
+                "node_id": "mechanical-analysis-proof",
+                "type": "project",
+                "title": "Create a simple analysis report for a mechanism",
+                "skill": "Mechanical Analysis",
+                "description": "Pick a mechanism, calculate one load/speed/thermal constraint, and write what design choice follows from it.",
+                "source": "Engineering notes / CAD model",
+                "url": "",
+                "prior_exposure": True,
+            },
+        ],
+        "electrical": [
+            {
+                "id": "task-electrical-sim",
+                "node_id": "electrical-simulation-proof",
+                "type": "project",
+                "title": "Simulate and explain one circuit behavior",
+                "skill": "Circuit Analysis",
+                "description": f"Use {project_context}. Simulate one circuit, capture input/output behavior, and explain one failure or limit.",
+                "source": "Falstad / LTspice / existing lab work",
+                "url": "https://www.falstad.com/circuit/",
+                "prior_exposure": True,
+            },
+            {
+                "id": "task-electrical-test-plan",
+                "node_id": "electrical-test-proof",
+                "type": "project",
+                "title": "Write a test plan for one electrical/IoT system",
+                "skill": "Testing and Debugging",
+                "description": "List 6 tests, expected readings, possible faults, and how you would debug one failed test.",
+                "source": "Your existing electronics/IoT work",
+                "url": "",
+                "prior_exposure": True,
+            },
+        ],
+        "arts": [
+            {
+                "id": "task-arts-portfolio-case",
+                "node_id": "arts-portfolio-proof",
+                "type": "project",
+                "title": "Turn one artwork into a portfolio case study",
+                "skill": "Portfolio Development",
+                "description": f"Use {project_context}. Show goal, references, drafts, final piece, and what you changed after critique.",
+                "source": "Your existing arts/design work",
+                "url": "",
+                "prior_exposure": True,
+            },
+            {
+                "id": "task-arts-style-study",
+                "node_id": "arts-style-proof",
+                "type": "project",
+                "title": "Create a focused style study with critique notes",
+                "skill": "Creative Direction",
+                "description": "Choose one style, make a small piece, then write 5 critique notes and 3 improvements for the next version.",
+                "source": "Portfolio/reference study",
+                "url": "",
+                "prior_exposure": True,
+            },
+        ],
+    }
+    return templates.get(domain, [
+        {
+            "id": "task-domain-proof",
+            "node_id": "general-proof",
+            "type": "project",
+            "title": "Build one proof that is beyond your resume",
+            "skill": "Applied Proof",
+            "description": f"Use {project_context}. Pick one prior skill, make a stronger example, and write what is better than your old work.",
+            "source": "Your existing profile/resume work",
+            "url": "",
+            "prior_exposure": True,
+        },
+        {
+            "id": "task-domain-review",
+            "node_id": "general-review",
+            "type": "project",
+            "title": "Write a short improvement report on your previous work",
+            "skill": "Reflection and Upgrade",
+            "description": "Choose one old project/work sample, list 3 weaknesses, and implement or describe one concrete improvement.",
+            "source": "Your existing profile/resume work",
+            "url": "",
+            "prior_exposure": True,
+        },
+    ])
+
+
 def get_or_create_career_memory(db: Session, user: User) -> CareerMemoryProfile:
     memory = db.query(CareerMemoryProfile).filter(CareerMemoryProfile.user_id == user.id).first()
     if memory:
@@ -376,7 +651,7 @@ def initialize_career_os_for_user(
 
     memory = refresh_career_memory_from_user_state(db, user, structured)
     market = _get_or_create_market_snapshot(db, user)
-    roadmap = get_or_create_roadmap_state(db, user, market)
+    roadmap = get_or_create_roadmap_state(db, user, market, regenerate=True)
     event = log_journey_event(
         db=db,
         user_id=user_id,
@@ -414,7 +689,46 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     if not user:
         raise ValueError("User not found")
 
+
     consolidation_report = consolidate_user_memory(db, user_id)
+
+    roadmap_before = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+    valid_cycles = _valid_weekly_cycle_events(db, user_id)
+    current_week_start = valid_cycles[-1].created_at if valid_cycles else (roadmap_before.created_at if roadmap_before else user.created_at)
+    current_actions = []
+    if roadmap_before:
+        current_actions = (_as_json(roadmap_before.weekly_focus, {}) or {}).get("primary_actions") or []
+    expected_ids = {
+        str(action.get("id") or action.get("title"))
+        for action in current_actions
+        if action.get("id") or action.get("title")
+    }
+    task_events = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user_id,
+        JourneyEvent.event_type.in_(["weekly_task_completed", "weekly_task_reopened", "weekly_task_skipped"]),
+        JourneyEvent.created_at >= current_week_start
+    ).order_by(JourneyEvent.created_at.asc()).all()
+    latest_task_state = {}
+    for event in task_events:
+        evidence = _event_json(event, "evidence", {})
+        task_id = str(evidence.get("id") or evidence.get("title") or event.id)
+        latest_task_state[task_id] = event.event_type
+    accepted_ids = {
+        task_id
+        for task_id, event_type in latest_task_state.items()
+        if event_type in {"weekly_task_completed", "weekly_task_skipped"}
+    }
+
+    if expected_ids and not expected_ids.issubset(accepted_ids):
+        remaining = len(expected_ids - accepted_ids)
+        raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
+
+    elapsed_seconds = (datetime.datetime.utcnow() - current_week_start).total_seconds()
+    minimum_seconds = max(300, min(5400, len(expected_ids or accepted_ids or [1]) * 900))
+    if elapsed_seconds < minimum_seconds:
+        minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
+        raise ValueError(f"Delta needs a little more real work time before advancing. Try again in about {minutes} minute(s).")
+
     memory = refresh_career_memory_from_user_state(db, user)
     pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
@@ -443,22 +757,20 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     db.commit()
     db.refresh(market)
 
-    roadmap = get_or_create_roadmap_state(db, user, market)
+    roadmap = get_or_create_roadmap_state(db, user, market, regenerate=True)
     event = log_journey_event(
         db=db,
         user_id=user_id,
         event_type="weekly_cycle_completed",
-        summary="Weekly Career OS cycle refreshed market pulse, consolidated memory, roadmap, proof projects, and portfolio assessment.",
+        summary="Advanced to the next weekly plan after the current tasks were completed.",
         evidence={
             "market_snapshot_id": market.id,
             "roadmap_id": roadmap.id,
-            "memory_consolidation": consolidation_report,
+            "completed_task_count": len([event_type for event_type in latest_task_state.values() if event_type == "weekly_task_completed"]),
+            "skipped_task_count": len([event_type for event_type in latest_task_state.values() if event_type == "weekly_task_skipped"]),
+            "previous_week_started_at": current_week_start.isoformat() if current_week_start else None,
         },
-        impact={
-            "market_refreshed": True,
-            "roadmap_replanned": True,
-            "memory_consolidated": True,
-        },
+        impact={"market_refreshed": True, "roadmap_replanned": True, "advance_approved": True},
     )
     context = compile_career_context(db, user_id)
     context["weekly_cycle_event"] = serialize_journey_event(event)
@@ -493,12 +805,38 @@ def compile_career_context(db: Session, user_id: str) -> dict:
     if not user:
         raise ValueError("User not found")
 
+    # ── Hydrate user from profile_store JSON (real intake data) ──────────────
+    try:
+        from app.services.profile_store import load_profile
+        profile = load_profile(user_id)
+        if profile:
+            changed = False
+            if profile.get("name") and not user.name:
+                user.name = profile["name"]; changed = True
+            if profile.get("target_role") and not user.target_role:
+                user.target_role = profile["target_role"]; changed = True
+            if profile.get("hours_per_week") and not user.hours_per_week:
+                user.hours_per_week = int(profile["hours_per_week"]); changed = True
+            if profile.get("learning_style") and not user.learning_style:
+                user.learning_style = profile["learning_style"]; changed = True
+            if changed:
+                db.commit()
+                db.refresh(user)
+    except Exception as _ph_err:
+        pass
+
     memory = get_or_create_career_memory(db, user)
     latest_market = _get_or_create_market_snapshot(db, user)
-    roadmap = get_or_create_roadmap_state(db, user, latest_market)
+    roadmap = get_or_create_roadmap_state(db, user, latest_market, regenerate=False)
+    valid_cycles = _valid_weekly_cycle_events(db, user_id)
+    valid_cycle_ids = {event.id for event in valid_cycles}
     journey = db.query(JourneyEvent).filter(
         JourneyEvent.user_id == user_id
     ).order_by(JourneyEvent.created_at.desc()).limit(20).all()
+    journey = [
+        event for event in journey
+        if event.event_type != "weekly_cycle_completed" or event.id in valid_cycle_ids
+    ]
 
     serialized_memory = serialize_memory(memory)
     serialized_market = serialize_market(latest_market)
@@ -521,6 +859,19 @@ def compile_career_context(db: Session, user_id: str) -> dict:
     else:
         next_questions = open_questions_data
 
+    # ── Also attach raw profile so frontend can display intake completeness ──
+    profile_data = {}
+    try:
+        from app.services.profile_store import load_profile as _lp
+        profile_data = _lp(user_id)
+    except Exception:
+        pass
+
+    # ── Calculate active week number from validated completed cycles only ─────
+    week_number = len(valid_cycles) + 1
+    current_week_start = valid_cycles[-1].created_at if valid_cycles else (roadmap.created_at if roadmap else user.created_at)
+    progress_summary = build_progress_summary(db, user_id, valid_cycles, current_week_start)
+
     return {
         "user_id": user_id,
         "memory": serialized_memory,
@@ -533,7 +884,12 @@ def compile_career_context(db: Session, user_id: str) -> dict:
         "opportunities": opportunities,
         "opportunity_signals": opportunity_signals,
         "next_questions": next_questions,
+        "profile": profile_data,
+        "week_number": week_number,
+        "current_week_started_at": current_week_start,
+        "progress_summary": progress_summary,
     }
+
 
 
 def serialize_semantic_memory(db: Session, user_id: str) -> dict:
@@ -634,10 +990,32 @@ def log_journey_event(
     return event
 
 
-def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot) -> RoadmapState:
+def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False) -> RoadmapState:
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
-    skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
+    try:
+        from app.services.profile_store import load_profile
+        profile = load_profile(user.id)
+    except Exception:
+        profile = {}
+    if roadmap and not regenerate:
+        weekly_focus = _as_json(roadmap.weekly_focus, {})
+        actions = weekly_focus.get("primary_actions") or []
+        has_stable_actions = actions and all(action.get("id") and action.get("title") for action in actions)
+        low_level_start = any(str(action.get("title", "")).lower().startswith("start ") for action in actions)
+        profile_says_advanced = _has_prior_profile_depth(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user)
+        if has_stable_actions:
+            if profile_says_advanced and low_level_start:
+                weekly_focus["primary_actions"] = _domain_proof_actions(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user)
+                weekly_focus["phase_name"] = "Profile-based proof sprint"
+                roadmap.weekly_focus = _dump(weekly_focus)
+                roadmap.last_replanned_reason = "Adjusted away from beginner tasks using resume/profile experience."
+                db.commit()
+                db.refresh(roadmap)
+            return roadmap
+    skills = _sync_profile_skills_to_db(db, user)
+
     roadmap_payload = generate_weekly_brief(user, skills, market)
+
     phases = roadmap_payload.get("phases", [])
     active_phase = _select_active_phase(phases)
 
@@ -650,6 +1028,9 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot)
         "phase_name": active_phase.get("name") if active_phase else None,
         "primary_actions": _derive_weekly_actions(active_phase),
     }
+    if _has_prior_profile_depth(profile, skills, user):
+        weekly_focus["phase_name"] = "Profile-based proof sprint"
+        weekly_focus["primary_actions"] = _domain_proof_actions(profile, skills, user)
     proof_requirements = _derive_proof_requirements(phases)
 
     if roadmap:
@@ -768,6 +1149,50 @@ def serialize_journey_event(event: JourneyEvent) -> dict:
     }
 
 
+def build_progress_summary(db: Session, user_id: str, valid_cycles: list[JourneyEvent], current_week_start) -> dict:
+    events = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user_id,
+        JourneyEvent.event_type.in_(["weekly_task_completed", "weekly_task_reopened", "weekly_task_skipped"]),
+    ).order_by(JourneyEvent.created_at.asc()).all()
+
+    latest_lifetime = {}
+    latest_week = {}
+    learned_skills = {}
+    skipped_lifetime = 0
+
+    for event in events:
+        evidence = _as_json(event.evidence, {})
+        task_id = str(evidence.get("id") or evidence.get("node_id") or evidence.get("skill") or evidence.get("title") or event.id)
+        latest_lifetime[task_id] = event.event_type
+        if event.event_type == "weekly_task_skipped":
+            skipped_lifetime += 1
+        if event.event_type == "weekly_task_completed":
+            skill = evidence.get("skill") or evidence.get("title")
+            if skill:
+                learned_skills[str(skill)] = learned_skills.get(str(skill), 0) + 1
+        if current_week_start and event.created_at and event.created_at >= current_week_start:
+            latest_week[task_id] = event.event_type
+
+    total_completed = len([state for state in latest_lifetime.values() if state == "weekly_task_completed"])
+    total_skipped = len([state for state in latest_lifetime.values() if state == "weekly_task_skipped"])
+    current_week_completed = len([state for state in latest_week.values() if state == "weekly_task_completed"])
+    current_week_skipped = len([state for state in latest_week.values() if state == "weekly_task_skipped"])
+    current_week_reopened = len([state for state in latest_week.values() if state == "weekly_task_reopened"])
+
+    return {
+        "weeks_completed": len(valid_cycles),
+        "total_tasks_completed": total_completed,
+        "total_tasks_skipped": total_skipped,
+        "current_week_completed": current_week_completed,
+        "current_week_skipped": current_week_skipped,
+        "current_week_reopened": current_week_reopened,
+        "knowledge_gained": [
+            {"skill": skill, "completed_tasks": count}
+            for skill, count in sorted(learned_skills.items(), key=lambda item: item[1], reverse=True)[:8]
+        ],
+    }
+
+
 def _get_or_create_market_snapshot(db: Session, user: User) -> MarketSnapshot:
     market = db.query(MarketSnapshot).filter(
         MarketSnapshot.user_id == user.id
@@ -831,11 +1256,30 @@ def _derive_weekly_actions(active_phase: dict) -> list[dict]:
     actions = []
     for node in active_phase.get("nodes", [])[:3]:
         if node.get("status") != "mastered":
+            node_id = node.get("id") or node.get("skill_name") or node.get("label")
+            label = node.get("label") or node.get("skill_name") or "Current skill"
+            has_prior_exposure = node.get("status") == "in_progress"
+            if has_prior_exposure:
+                title = f"Upgrade your {label} proof"
+                description = (
+                    f"You already have some {label} background. Build something slightly stronger than your resume proof, "
+                    "write what changed, and keep the proof small enough for this week."
+                )
+            else:
+                title = f"Start {label} with one small proof"
+                description = f"Learn the minimum needed for {label}, then create one small proof instead of only watching content."
             actions.append({
-                "skill": node.get("label"),
-                "action": f"Complete one proof-building milestone for {node.get('label')}.",
+                "id": f"task-{node_id}",
+                "node_id": node_id,
+                "type": "project",
+                "title": title,
+                "skill": label,
+                "description": description,
                 "resource_url": node.get("resource_url"),
+                "source": "Official docs or roadmap resource",
+                "url": node.get("resource_url"),
                 "why_now": node.get("tech_twist"),
+                "prior_exposure": has_prior_exposure,
             })
     return actions
 

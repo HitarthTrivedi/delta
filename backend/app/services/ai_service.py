@@ -1,139 +1,173 @@
+"""
+AI Service — unified LLM client for all Delta agents.
+Uses google-genai SDK (new API style) with gemma-4-31b-it.
+Falls back gracefully if the key or model is unavailable.
+"""
+
 import os
 import json
 import re
+import logging
 
-def generate_response(prompt: str) -> str:
+logger = logging.getLogger("delta.ai_service")
+
+# ─── lazy-initialise the google-genai client ───────────────────────────────
+_genai_client = None
+
+def _get_client():
+    global _genai_client
+    if _genai_client is not None:
+        return _genai_client
+    try:
+        from google import genai
+        from app.config import settings
+        key = (settings.GEMINI_API_KEY or "").strip().strip('"').strip("'")
+        if key and not key.startswith("your_"):
+            _genai_client = genai.Client(api_key=key)
+            logger.info("google-genai client initialised")
+        else:
+            logger.warning("GEMINI_API_KEY not set — AI calls will use mock fallback")
+    except Exception as e:
+        logger.warning(f"Failed to init google-genai client: {e}")
+    return _genai_client
+
+
+MODEL = "gemma-4-31b-it"
+
+
+def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 10000) -> str:
     """
-    Generate response using the best available LLM provider.
-    Tries OpenAI first (highly available with valid key in environment),
-    falls back to Gemini, and then to a high-fidelity structured mock parser.
+    Send a prompt to gemma-4-31b-it and return the response text.
     """
-    from app.config import settings
-    openai_key = settings.OPENAI_API_KEY
-    if openai_key:
+    print(f"\n=================== [LLM REQUEST - {MODEL}] ===================")
+    print(f"Temp: {temperature} | Max Tokens: {max_tokens}")
+    print(f"Prompt preview (last 300 chars):\n...{prompt[-300:] if len(prompt) > 300 else prompt}")
+    print(f"===========================================================")
+    
+    client = _get_client()
+    if client:
         try:
-            import openai
-            client = openai.OpenAI(api_key=openai_key)
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config={
+                    "temperature": temperature,
+                    "max_output_tokens": max_tokens,
+                }
             )
-            content = response.choices[0].message.content
-            if content:
-                return content
+            text = response.text
+            if text:
+                print(f"\n=================== [LLM RESPONSE SUCCESS] ===================")
+                print(f"Length: {len(text)} chars | Model: {MODEL}")
+                print(f"Response preview:\n{text[:250]}...")
+                print(f"==============================================================")
+                return text.strip()
         except Exception as e:
-            print(f"OpenAI API error: {e}")
+            print(f"\n❌ [LLM RESPONSE ERROR] Model {MODEL} call failed: {e}")
+            import traceback
+            traceback.print_exc()
+            print(f"==============================================================")
 
-    # Fallback to Gemini
-    gemini_key = settings.GEMINI_API_KEY
-    if gemini_key:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            print(f"Gemini API error: {e}")
-
-    # Final robust fallback to a high-fidelity structured mock generator
+    logger.warning("API unavailable — using mock fallback")
     return _mock_structured_response(prompt)
 
 
-def _mock_structured_response(prompt: str) -> str:
+def generate_json(prompt: str, temperature: float = 0.3) -> dict | list:
     """
-    Fallback mock generator that parses prompt instructions to return 
-    highly realistic, schema-valid JSON or contextual text.
+    Generate a JSON response. Strips markdown fences and parses automatically.
     """
-    prompt_lower = prompt.lower()
+    raw = generate_response(prompt, temperature=temperature)
     
-    # 1. Onboarding start prompt
-    if "adaptive_questions" in prompt_lower and "market_demand_focus" in prompt_lower:
-        # Extract target role if possible
-        target_role = "AI Developer / Software Engineer"
-        match = re.search(r"target role:\s*([^\n\r]+)", prompt, re.IGNORECASE)
-        if match:
-            target_role = match.group(1).strip()
-            
+    # Strip markdown fences
+    clean_raw = raw
+    if "```json" in clean_raw:
+        clean_raw = clean_raw.split("```json")[1].split("```")[0]
+    elif "```" in clean_raw:
+        clean_raw = clean_raw.split("```")[1].split("```")[0]
+    clean_raw = clean_raw.strip()
+    
+    try:
+        parsed = json.loads(clean_raw)
+        print(f"\n✅ [JSON PARSER SUCCESS] Successfully parsed raw response into structure: {type(parsed)}")
+        return parsed
+    except Exception as e:
+        print(f"\n❌ [JSON PARSER ERROR] Failed to parse JSON: {e}")
+        print(f"Raw response content that failed parsing:\n{raw}")
+        print(f"==============================================================")
+        return {}
+
+
+# ─── Mock fallback (used when API key is missing / quota exceeded) ──────────
+
+def _mock_structured_response(prompt: str) -> str:
+    prompt_lower = prompt.lower()
+
+    # Onboarding opening
+    if "intake agent" in prompt_lower or "opening question" in prompt_lower or "welcome them" in prompt_lower:
+        return (
+            "Hi! I'm your Delta AI advisor. I'm here to build your personalized career roadmap. "
+            "Let's start simple — what's your name, and what field or role are you working toward?"
+        )
+
+    # Next question fallback (MUST come before profile extraction fallback to prevent false matches on 'extract' in prompt context)
+    if "missing fields:" in prompt_lower or "follow-up question" in prompt_lower or "intake advisor" in prompt_lower:
+        if "hours_per_week" in prompt_lower or "hours" in prompt_lower:
+            return "How many hours per week do you think you can dedicate to this learning path? I want to make sure the pace is just right for you!"
+        elif "planning_horizon" in prompt_lower:
+            return "What is your target timeline or planning horizon for these career goals? Are we looking at the next year, or a longer-term plan?"
+        elif "relocation" in prompt_lower:
+            return "Are you open to relocation, or do you prefer to look for remote and local opportunities?"
+        elif "study_year" in prompt_lower:
+            return "Could you tell me what year of study you are currently in, or if you've already graduated?"
+        elif "university" in prompt_lower or "college" in prompt_lower:
+            return "Which college or university do you attend? I'd love to know where you are studying!"
+        return "Could you tell me a little more about your target career timeline and how many hours you can dedicate each week?"
+
+    # Profile extraction
+    if "extract" in prompt_lower and ("name" in prompt_lower or "target_role" in prompt_lower):
+        return json.dumps({})
+
+    # Roadmap generation
+    if "roadmap" in prompt_lower and "phases" in prompt_lower:
         return json.dumps({
-            "ambition_summary": f"Targeting a world-class {target_role} path by addressing capabilities and building proof-backed projects.",
-            "adaptive_questions": [
-                f"What specific programming languages or tools have you built simple scripts or apps with so far?",
-                "How comfortable are you with backend components like databases, APIs, or Docker?",
-                "How many hours per week can you realistically commit to hands-on building (e.g. 10, 15, 20)?"
+            "phases": [
+                {
+                    "id": "phase_1",
+                    "name": "Foundation",
+                    "description": "Build your core fundamentals",
+                    "duration_weeks": 4,
+                    "nodes": [
+                        {"id": "n1", "label": "Core Skills Assessment", "status": "in_progress",
+                         "description": "Identify and document your current skill level"},
+                        {"id": "n2", "label": "First Project", "status": "locked",
+                         "description": "Build a small proof-of-concept project"}
+                    ]
+                }
             ],
-            "market_demand_focus": f"Recruiters hiring {target_role}s are filtering out simple clones. Delta recommends building Dockerized API endpoints."
-        }, indent=2)
+            "active_phase_id": "phase_1"
+        })
 
-    # 2. Onboarding finalize prompt
-    if "identity_context" in prompt_lower and "ambition_map" in prompt_lower:
-        # Generate complete 10-key blueprint structure
+    # Weekly brief
+    if "weekly" in prompt_lower and "brief" in prompt_lower:
         return json.dumps({
-            "identity_context": {
-                "name": "Guest User",
-                "education_stage": "BTech Student",
-                "location": "unknown",
-                "language_comfort": "English",
-                "background_summary": "Looking to transition into professional software development and build production engineering proof.",
-                "self_awareness_level": "medium"
-            },
-            "ambition_map": {
-                "long_term_goals": ["Build a successful career as an elite software developer"],
-                "short_term_targets": ["Master APIs and containerization basics"],
-                "dream_roles": ["Backend Developer", "AI Engineer"],
-                "preferred_industries": ["Technology", "AI Startups"],
-                "confidence_level": "medium"
-            },
-            "capability_map": {
-                "current_skills": ["Python", "JavaScript"],
-                "skill_depth": {
-                    "Python": "Basic syntax, lists, functions",
-                    "JavaScript": "Simple DOM scripts"
-                },
-                "technical_baseline": "scripting-only",
-                "industry_readiness_score": 0.35,
-                "identified_gaps": ["FastAPI", "SQL Databases", "Docker", "System Design"]
-            },
-            "constraint_map": {
-                "time_limit": "15 hours per week",
-                "financial_limits": "none",
-                "device_access": "Standard Laptop",
-                "internet_access": "High-speed broadband",
-                "college_load": "medium",
-                "family_expectations": "none"
-            },
-            "preference_map": {
-                "learning_style": "hands-on",
-                "content_type": ["hands-on projects", "interactive sandboxes"],
-                "project_taste": "Backend APIs and simple automation scripts",
-                "communication_tone": "encouraging"
-            },
-            "motivation_and_risk_map": {
-                "motivation_profile": "portfolio weight and job readiness",
-                "procrastination_patterns": ["drifting due to lack of immediate verification"],
-                "risk_flags": ["skill hoarding", "impatience with foundational setup"],
-                "decision_habits": ["methodical, prefers step-by-step confirmation"]
-            },
-            "evidence_map": {
-                "projects": [],
-                "certificates": [],
-                "github_presence": "needs creation",
-                "resumes": [],
-                "contests_and_hackathons": [],
-                "writing_and_portfolio": []
-            },
-            "open_questions": [
-                "Which specific SQL database have you used, if any?",
-                "What is your target timeline for finding your first internship?"
-            ],
-            "market_search_prompt": "FastAPI Docker Backend entry level jobs recruiter expectations",
-            "follow_up_question_strategy": "First probe github repository structure, then verify docker deployment comfort in week 2"
-        }, indent=2)
+            "delta_score_start": 20,
+            "delta_score_end": 22,
+            "track_status": "on_track",
+            "actions": ["Complete one small project this week", "Review fundamentals"],
+            "market_changes": ["AI tools are increasingly expected in job descriptions"],
+            "personal_changes": ["You've shown consistent effort"],
+            "opportunities": ["Apply to entry-level roles matching your profile"],
+            "questions_for_user": ["What specific skill do you want to master first?"]
+        })
 
-    # 3. Standard chat message prompt
-    if "career os context json" in prompt_lower:
-        return "I see your target is to become an engineer! Based on your Career OS roadmap, your primary focus is containerization and backend API engineering. Try completing a Python FastAPI + Docker project first to lock in your score!"
+    # Encouragement / completion
+    if "inspiring" in prompt_lower or "onboarding wrap" in prompt_lower or "welcome them officially" in prompt_lower:
+        return (
+            "Welcome to Delta Career OS! Your profile has been compiled. "
+            "Your top immediate focus should be building your first proof project "
+            "and strengthening your core technical skills. "
+            "Head to your dashboard to see your personalized roadmap!"
+        )
 
-    # 4. Standard fallback text
-    return "I'm here to help with your career journey! Ask me about skills, market trends, or your learning path."
+    # Generic chat
+    return "I'm here to help with your career journey. Tell me more about your goals or current progress."

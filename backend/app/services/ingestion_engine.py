@@ -7,6 +7,8 @@ import json
 import logging
 import uuid
 import datetime
+import pathlib
+import re
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
@@ -37,6 +39,17 @@ class IngestionEngine:
         Initializes a new ingestion session, creates the user root node in the graph,
         and generates the opening onboarding question.
         """
+        # Reset guest profile so they can enter fresh details
+        from app.models.user import User
+        user_obj = db.query(User).filter(User.id == user_id).first()
+        if user_obj and user_id == "00000000-0000-0000-0000-000000000000":
+            user_obj.name = "Guest User"
+            user_obj.email = "guest@delta.dev"
+            user_obj.target_role = ""
+            user_obj.hours_per_week = 15
+            user_obj.learning_style = "practical"
+            db.commit()
+
         # Close any existing active sessions
         active_sessions = db.query(IngestionSession).filter(
             IngestionSession.user_id == user_id,
@@ -57,8 +70,6 @@ class IngestionEngine:
                 pass
             else:
                 # Retrieve actual user details from DB
-                from app.models.user import User
-                user_obj = db.query(User).filter(User.id == user_id).first()
                 name = user_obj.name if user_obj else "Student"
                 email = user_obj.email if user_obj else ""
                 graph.create_user_root_node(name, email)
@@ -67,14 +78,11 @@ class IngestionEngine:
         # Create new session record
         session_id = str(uuid.uuid4())
         
-        # Determine initial opening question based on journey type
-        opening_prompt = f"""You are the Strategist agent. The user is embarking on a {journey_type} career journey.
-Generate a warm, compelling, personalized opening question that invites them to share their current stage,
-major ambitions, and any background.
-Be encouraging, keep it under 50 words, and do NOT sound like a generic form. Ensure it is highly professional.
-Return ONLY the question text."""
-        
-        initial_question = generate_response(opening_prompt).strip().strip('"').strip("'")
+        initial_question = (
+            "Hi, I am Delta's intake advisor. Before the resume, give me a small introduction in your own words: "
+            "who you are, what you studied or worked on, why you are here, what goal or exam you are aiming for, "
+            "and any deadline, intake, family constraint, or weekly time limit I should know. After that, attach your resume if you have one."
+        )
         
         conversation = [
             {"role": "assistant", "content": initial_question, "dimension": "identity", "round": 0}
@@ -131,9 +139,60 @@ Return ONLY the question text."""
         # 2. Load the student's Semantic Memory Graph
         graph = MemoryGraph.load_from_db(db, user_id)
         
-        # 3. Fact Extraction: Extract entities and edges from answer via LLM
+        # 3. Fact Extraction: first capture common student facts deterministically,
+        # then let the LLM add richer resume/profile details.
+        profile_hints = self._extract_profile_hints(answer_content)
+        self._extract_heuristic_intake_to_graph(graph, answer_content, profile_hints)
         self._extract_entities_to_graph(graph, answer_content, session.journey_type)
         graph.save_to_db(db)
+
+        # 3b. User Profile Details Extraction: Update User table with extracted details if found
+        from app.models.user import User
+        user_obj = db.query(User).filter(User.id == user_id).first()
+        if user_obj:
+            self._apply_profile_hints(user_obj, profile_hints)
+            profile_prompt = f"""Analyze the user message: "{answer_content}"
+Identify if the user states their:
+- name
+- email
+- target_role (dream career/role, e.g. "AI Software Engineer")
+- learning_style (e.g. "practical", "theoretical", "competitive")
+- hours_per_week (a number)
+- place/location
+- college
+- current qualification/year
+- future goals
+- upcoming exams, deadlines, or blocked weeks
+
+Return a JSON object with any of these fields that were explicitly or implicitly stated. If none are present, return {{}}.
+Output ONLY valid JSON, nothing else."""
+            try:
+                profile_resp = generate_response(profile_prompt)
+                if "```json" in profile_resp:
+                    profile_resp = profile_resp.split("```json")[1].split("```")[0]
+                elif "```" in profile_resp:
+                    profile_resp = profile_resp.split("```")[1].split("```")[0]
+                
+                profile_data = json.loads(profile_resp.strip())
+                if isinstance(profile_data, dict):
+                    if "name" in profile_data and profile_data["name"] and not profile_hints.get("name"):
+                        user_obj.name = str(profile_data["name"])
+                    if "email" in profile_data and profile_data["email"]:
+                        user_obj.email = str(profile_data["email"])
+                    if "target_role" in profile_data and profile_data["target_role"]:
+                        user_obj.target_role = str(profile_data["target_role"])
+                    if "learning_style" in profile_data and profile_data["learning_style"]:
+                        user_obj.learning_style = str(profile_data["learning_style"])
+                    if "hours_per_week" in profile_data:
+                        try:
+                            user_obj.hours_per_week = int(profile_data["hours_per_week"])
+                        except Exception:
+                            pass
+                    db.commit()
+            except Exception as e:
+                logger.error(f"Failed to extract profile updates: {e}")
+            self._apply_profile_hints(user_obj, profile_hints)
+            db.commit()
 
         # 4. Fetch Market Context (live web search) for their stated career ambitions/roles
         dream_roles = [node.label for node in graph.get_nodes_by_type("ambition")]
@@ -222,9 +281,11 @@ Return ONLY the question text."""
         ).all()
         session.tensions_total = db.query(TensionNodeModel).filter(TensionNodeModel.user_id == user_id).count()
 
-        # Check if ingestion has reached completion
-        # Soft limit of 8 rounds or high confidence score with no missing critical gaps
-        is_complete = analysis["is_complete"] or (session.current_round >= 8 and session.confidence_score >= 0.65)
+        missing_intake_topics = self._missing_intake_topics(graph)
+
+        # Agent 1 hands off as soon as it has the core fields Agent 2 needs.
+        # It does not keep asking scripted questions just because optional ideal-frame gaps remain.
+        is_complete = (session.current_round >= 1 and not missing_intake_topics) or session.current_round >= 7
         
         if is_complete:
             session.status = "completed"
@@ -272,12 +333,12 @@ Keep it professional, highly structured, and under 250 words."""
             }
 
         # 8. Generate Next Question
-        next_question = None
-        dimension_focus = "cognitive"
+        next_question = self._agent1_next_question(session.current_round, conversation, missing_intake_topics)
+        dimension_focus = "temporal" if session.current_round in {4, 5} else "cognitive"
         
         # Priority A: Address active, unresolved tensions (Show as challenge cards)
         unresolved_tensions = [t for t in active_tensions if t.status == "active"]
-        if unresolved_tensions:
+        if not next_question and unresolved_tensions:
             # Pick highest severity active tension
             unresolved_tensions.sort(key=lambda x: x.severity, reverse=True)
             chosen_tension = unresolved_tensions[0]
@@ -365,6 +426,247 @@ Keep it professional, highly structured, and under 250 words."""
             "conversation": conversation
         }
 
+    def _missing_intake_topics(self, graph: MemoryGraph) -> List[str]:
+        nodes = graph.get_frame().get("nodes_by_type", {})
+
+        def labels(node_type: str) -> list[str]:
+            return [
+                str(node.get("label", "")).lower()
+                for node in nodes.get(node_type, [])
+            ]
+
+        identity_labels = labels("identity")
+        ambition_labels = labels("ambition")
+        skill_labels = labels("skill")
+        evidence_labels = labels("evidence")
+        constraint_labels = labels("constraint")
+        preference_labels = labels("preference")
+        all_constraints = " ".join(constraint_labels)
+
+        missing = []
+        if not identity_labels:
+            missing.append("education_identity")
+        if not ambition_labels:
+            missing.append("goal_timeline")
+        if not skill_labels and not evidence_labels:
+            missing.append("skills_evidence")
+        if not any(word in all_constraints for word in ["hour", "week", "time", "schedule", "availability"]):
+            missing.append("weekly_availability")
+        if not any(word in all_constraints for word in ["exam", "deadline", "blocked", "submission", "placement", "interview"]):
+            missing.append("upcoming_calendar")
+        if not preference_labels:
+            missing.append("learning_preferences")
+        return missing
+
+    def _agent1_next_question(self, round_number: int, conversation: List[Dict[str, Any]], missing_topics: List[str]) -> Optional[str]:
+        """Ask from missing evidence, not from a scripted sequence."""
+        if not missing_topics:
+            return None
+
+        topic_questions = {
+            "education_identity": "I could not confidently identify your college, degree/branch, and current year or semester. What are those details?",
+            "goal_timeline": "What exact outcome should Delta optimize for, and by when? For example placements, masters in Germany, a role, research, GATE, or startup.",
+            "skills_evidence": "Which skills, projects, internships, papers, certificates, GitHub links, or resume items are strongest proof of your current level?",
+            "weekly_availability": "How many hours can you realistically give each week, and on which days?",
+            "upcoming_calendar": "Are there exams, submissions, placement drives, interviews, or blocked weeks coming up in the next three months?",
+            "learning_preferences": "How do you learn best: videos, docs, books, coaching, strict deadlines, peer study, or hands-on projects?",
+        }
+        base_question = topic_questions.get(missing_topics[0])
+        if not base_question:
+            return None
+
+        recent_context = "\n".join(
+            f"{msg.get('role')}: {str(msg.get('content', ''))[:1200]}"
+            for msg in conversation[-5:]
+        )
+        latest_user = next((msg.get("content", "") for msg in reversed(conversation) if msg.get("role") == "user"), "")
+        resume_hint = "resume" in latest_user.lower() or len(latest_user) > 1800
+
+        prompt = f"""You are Agent 1 of Delta Career OS. You are an adaptive intake interviewer, not a static form.
+Your job is to ask exactly ONE next question that gathers information for Agent 2's weekly plan.
+
+CURRENT REQUIRED TOPIC:
+{base_question}
+
+MISSING TOPICS STILL NEEDED:
+{", ".join(missing_topics)}
+
+RECENT CONVERSATION / RESUME EXCERPT:
+{recent_context}
+
+Instructions:
+1. Ask only one question.
+2. If a resume or project evidence appears above, reference one concrete thing from it and ask the most important missing follow-up.
+3. If the required topic was already answered, ask a sharper question that fills the next missing detail for weekly planning.
+4. Keep it under 65 words.
+5. Do not list all intake fields again.
+6. Sound like a mentor, not a survey.
+
+Return only the question."""
+        try:
+            adaptive_question = generate_response(prompt).strip().strip('"').strip("'")
+            generic_failures = [
+                "ask me about skills",
+                "career journey",
+                "learning path",
+                "market trends",
+            ]
+            if adaptive_question and not any(text in adaptive_question.lower() for text in generic_failures):
+                if resume_hint and "resume" not in adaptive_question.lower() and "project" not in adaptive_question.lower():
+                    return f"I read the resume content. {adaptive_question}"
+                return adaptive_question
+        except Exception as exc:
+            logger.warning(f"Agent 1 adaptive question generation failed: {exc}")
+        return base_question
+
+    def _extract_profile_hints(self, answer: str) -> Dict[str, Any]:
+        """Extract boring-but-critical resume/profile facts without waiting on the LLM."""
+        text = answer.strip()
+        lines = [" ".join(line.strip().split()) for line in text.splitlines() if line.strip()]
+        lower = text.lower()
+        hints: Dict[str, Any] = {}
+
+        email_match = re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", text)
+        if email_match:
+            hints["email"] = email_match.group(0)
+
+        explicit_name = re.search(r"\b(?:my name is|i am|i'm|name\s*:)\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,3})", text)
+        if explicit_name:
+            hints["name"] = explicit_name.group(1).strip()
+        else:
+            blocked = {
+                "resume", "curriculum vitae", "cv", "education", "skills", "projects",
+                "experience", "github", "linkedin", "email", "phone", "contact",
+                "summary", "objective", "certifications", "achievements",
+            }
+            for line in lines[:8]:
+                line_lower = line.lower()
+                if any(word in line_lower for word in blocked):
+                    continue
+                if re.search(r"[@:/\\]|\d{3,}", line):
+                    continue
+                words = line.split()
+                if 2 <= len(words) <= 4 and all(re.match(r"^[A-Za-z][A-Za-z.'-]*$", word) for word in words):
+                    hints["name"] = line
+                    break
+
+        year_match = re.search(r"\b(1st|2nd|3rd|4th|first|second|third|fourth)\s+year[a-z]*\b", lower)
+        sem_match = re.search(r"\b(?:sem|semester)\s*([1-8])\b|\b([1-8])(?:st|nd|rd|th)?\s+sem\b", lower)
+        degree_match = re.search(r"\b(b\.?\s*tech|btech|bachelor|m\.?\s*tech|mtech|bca|mca|bsc|msc)\b", lower)
+        branch_match = re.search(r"\b(cse|computer science|information technology|it|ece|mechanical|civil|electrical|ai|data science)\b", lower)
+        college_match = re.search(r"\bat\s+([a-z0-9 .&'-]+?(?:college|university|institute|school|svit)(?:\s+college)?)\b", lower)
+        location_match = re.search(r"\b(?:from|location\s*:|based in)\s+([A-Za-z][A-Za-z .,'-]{2,40})", text)
+        hours_match = re.search(r"\b(\d{1,2})\s*(?:hours?|hrs?|h)\s*(?:/|per)?\s*(?:week|weekly)?\b", lower)
+
+        if year_match:
+            hints["year"] = f"{year_match.group(1)} year"
+        if sem_match:
+            hints["semester"] = sem_match.group(1) or sem_match.group(2)
+        if degree_match:
+            hints["degree"] = degree_match.group(1).replace(" ", "").upper()
+        if branch_match:
+            branch = branch_match.group(1)
+            hints["branch"] = "CSE" if branch in {"cse", "computer science"} else branch.upper()
+        if college_match:
+            hints["college"] = college_match.group(1).strip().upper()
+        if location_match:
+            hints["location"] = location_match.group(1).strip(" .,")
+        if hours_match:
+            hints["hours_per_week"] = int(hours_match.group(1))
+
+        role_patterns = [
+            (r"\b(?:want to become|become|targeting|goal is|dream role is)\s+(?:an?\s+)?([A-Za-z /+-]{3,60})", "target_role"),
+            (r"\b(?:masters?|ms)\s+(?:in|from|at)?\s*([A-Za-z /+-]{3,40})", "future_goal"),
+        ]
+        for pattern, key in role_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                hints[key] = match.group(1).strip(" .,\n")
+
+        return hints
+
+    def _apply_profile_hints(self, user_obj: Any, hints: Dict[str, Any]):
+        if not hints:
+            return
+        name = hints.get("name")
+        if name and (not user_obj.name or user_obj.name.lower() in {"guest user", "student", "unknown"}):
+            user_obj.name = name
+        if hints.get("email"):
+            user_obj.email = hints["email"]
+        if hints.get("target_role") and not user_obj.target_role:
+            user_obj.target_role = hints["target_role"]
+        elif hints.get("future_goal") and not user_obj.target_role:
+            user_obj.target_role = hints["future_goal"]
+        if hints.get("hours_per_week"):
+            user_obj.hours_per_week = int(hints["hours_per_week"])
+
+    def _extract_heuristic_intake_to_graph(self, graph: MemoryGraph, answer: str, profile_hints: Optional[Dict[str, Any]] = None):
+        """Capture obvious intake facts even when the LLM extractor misses them."""
+        text = answer.strip()
+        lower = text.lower()
+        profile_hints = profile_hints or self._extract_profile_hints(answer)
+
+        existing = {
+            (node.node_type, node.label.lower())
+            for node in graph.get_nodes_by_type("identity")
+            + graph.get_nodes_by_type("ambition")
+            + graph.get_nodes_by_type("skill")
+            + graph.get_nodes_by_type("constraint")
+            + graph.get_nodes_by_type("preference")
+            + graph.get_nodes_by_type("evidence")
+        }
+
+        def add(node_type: str, label: str, relation: str, dimension: str, confidence: float = 0.88):
+            clean_label = " ".join(str(label).split()).strip(" ,.;")
+            if not clean_label or (node_type, clean_label.lower()) in existing:
+                return
+            graph.add_entity_from_ingestion(
+                node_type=node_type,
+                label=clean_label,
+                properties={"details": text[:1200], "source": "heuristic_intake"},
+                relation_to_user=relation,
+                dimension=dimension,
+                source="heuristic_intake",
+                confidence=confidence,
+            )
+            existing.add((node_type, clean_label.lower()))
+
+        if profile_hints.get("name"):
+            add("identity", f"Name: {profile_hints['name']}", "HAS_IDENTITY", "social", 0.95)
+        if profile_hints.get("email"):
+            add("identity", f"Email: {profile_hints['email']}", "HAS_IDENTITY", "social", 0.95)
+        if profile_hints.get("location"):
+            add("identity", f"Location: {profile_hints['location']}", "HAS_IDENTITY", "social", 0.9)
+
+        if any(profile_hints.get(key) for key in ["year", "semester", "degree", "branch", "college"]):
+            parts = []
+            if profile_hints.get("year"):
+                parts.append(profile_hints["year"])
+            if profile_hints.get("degree"):
+                parts.append(profile_hints["degree"])
+            if profile_hints.get("branch"):
+                parts.append(profile_hints["branch"])
+            if profile_hints.get("college"):
+                parts.append(f"at {profile_hints['college']}")
+            if profile_hints.get("semester"):
+                parts.append(f"semester {profile_hints['semester']}")
+            add("identity", "Education: " + ", ".join(parts), "HAS_IDENTITY", "cognitive", 0.95)
+
+        if profile_hints.get("hours_per_week"):
+            add("constraint", f"{profile_hints['hours_per_week']} hours per week", "CONSTRAINED_BY", "temporal", 0.95)
+
+        if any(word in lower for word in ["exam", "exams", "deadline", "submission", "interview", "placement", "blocked"]):
+            add("constraint", f"Calendar constraint: {text[:160]}", "CONSTRAINED_BY", "temporal", 0.9)
+
+        if any(word in lower for word in ["masters", "germany", "placement", "startup", "gate", "research", "internship"]):
+            add("ambition", f"Goal: {text[:180]}", "STRIVES_FOR", "cognitive", 0.86)
+
+        if any(word in lower for word in ["project", "github", "internship", "certificate", "paper", "resume"]):
+            add("evidence", f"Evidence mentioned: {text[:180]}", "EVIDENCED_BY", "social", 0.82)
+
+        if any(word in lower for word in ["video", "docs", "book", "hands-on", "project-based", "coaching", "peer", "deadline"]):
+            add("preference", f"Learning preference: {text[:160]}", "PREFERS", "cognitive", 0.82)
+
     def ingest_personal_data(self, db: Session, user_id: str, raw_text: str, source: str = "linkedin") -> Dict[str, Any]:
         """
         The Personal Data Bridge. Parses raw text from resumes/LinkedIn, infers structural
@@ -377,6 +679,17 @@ Keep it professional, highly structured, and under 250 words."""
             name = user_obj.name if user_obj else "Student"
             graph.create_user_root_node(name, user_obj.email if user_obj else "")
             graph.save_to_db(db)
+
+        profile_hints = self._extract_profile_hints(raw_text)
+        self._extract_heuristic_intake_to_graph(graph, raw_text, profile_hints)
+        try:
+            from app.models.user import User
+            user_obj = db.query(User).filter(User.id == user_id).first()
+            if user_obj:
+                self._apply_profile_hints(user_obj, profile_hints)
+                db.commit()
+        except Exception as exc:
+            logger.warning(f"Could not apply profile hints during data bridge: {exc}")
 
         # Create structured entities via LLM
         prompt = f"""You are Delta Profile Intelligence, an expert CV parser and career persona extractor.
@@ -467,17 +780,18 @@ USER RESPONSE:
 "{answer}"
 
 Extract:
-1. Skills/Capabilities they mention possessing (HAS_SKILL relation).
-2. Ambitions/Dream roles/Goals they strive for (STRIVES_FOR relation).
-3. Constraints/Limitations (time, finances, hardware) they mention (CONSTRAINED_BY relation).
-4. Preferences (learning style, content type, communication) (PREFERS relation).
-5. Evidence (completed projects, courses, credentials) (EVIDENCED_BY relation).
-6. Motivations or fears (motivation, risk, fears) (FEARS or TRIGGERED_BY relation).
+1. Identity context: place/location, college, current qualification/year, language comfort, background (node_type identity, relation HAS_IDENTITY).
+2. Skills/Capabilities they mention possessing (node_type skill, relation HAS_SKILL).
+3. Ambitions/Dream roles/Goals they strive for, including masters abroad or long-range targets (node_type ambition, relation STRIVES_FOR).
+4. Constraints/Limitations: weekly hours, exams, deadlines, blocked weeks, finances, hardware, college load (node_type constraint, relation CONSTRAINED_BY).
+5. Preferences: learning style, content type, communication, project taste (node_type preference, relation PREFERS).
+6. Evidence: completed projects, courses, credentials, resume facts, GitHub, portfolio (node_type evidence, relation EVIDENCED_BY).
+7. Motivations or fears: family pressure, risk, confidence, reasons for the goal (node_type motivation, relation MOTIVATED_BY or FEARS).
 
 Return a strict JSON list of dictionaries:
 [
   {{
-    "node_type": "skill | ambition | constraint | preference | evidence | motivation",
+    "node_type": "identity | skill | ambition | constraint | preference | evidence | motivation",
     "label": "Short name of the entity",
     "dimension": "cognitive | emotional | temporal | social",
     "confidence": 0.8,
@@ -485,7 +799,7 @@ Return a strict JSON list of dictionaries:
        "details": "Paraphrased specific statement or evidence from response",
        "proficiency": 1-10 (optional, if skill)
     }},
-    "relation_type": "HAS_SKILL | STRIVES_FOR | CONSTRAINED_BY | PREFERS | EVIDENCED_BY"
+    "relation_type": "HAS_IDENTITY | HAS_SKILL | STRIVES_FOR | CONSTRAINED_BY | PREFERS | EVIDENCED_BY | MOTIVATED_BY | FEARS"
   }}
 ]
 
@@ -516,6 +830,7 @@ Output ONLY the JSON list, no explanation."""
         """
         Materializes the graph's contents into the legacy flat CareerMemoryProfile database table,
         acting as a bridge so downstream modules (Roadmap, Project Recommendation) still function.
+        Also writes a human-readable JSON profile file to disk for other agents to consume.
         """
         from app.models.career_os import CareerMemoryProfile
         
@@ -547,6 +862,38 @@ Output ONLY the JSON list, no explanation."""
         active_t_nodes = [t.id for t in graph.get_active_tensions()]
         profile.tension_nodes = json.dumps(active_t_nodes)
         profile.updated_at = datetime.datetime.utcnow()
+
+        # ── Write human-readable profile JSON file for other agents ──
+        try:
+            from app.models.user import User
+            user_obj = db.query(User).filter(User.id == user_id).first()
+            profile_export = {
+                "user_id": user_id,
+                "name": getattr(user_obj, 'name', 'Unknown') if user_obj else 'Unknown',
+                "email": getattr(user_obj, 'email', '') if user_obj else '',
+                "target_role": getattr(user_obj, 'target_role', '') if user_obj else '',
+                "hours_per_week": getattr(user_obj, 'hours_per_week', 10) if user_obj else 10,
+                "learning_style": getattr(user_obj, 'learning_style', 'practical') if user_obj else 'practical',
+                "confidence_score": score,
+                "last_updated": datetime.datetime.utcnow().isoformat() + 'Z',
+                "identity": frame.get("identity", {}),
+                "ambitions": frame.get("ambition", {}),
+                "capabilities": frame.get("capability", {}),
+                "constraints": frame.get("constraint", {}),
+                "preferences": frame.get("preference", {}),
+                "motivations": frame.get("motivation", {}),
+                "evidence": frame.get("evidence", {}),
+                "active_tensions": [t.id for t in graph.get_active_tensions()],
+            }
+            # Write to <project_root>/data/profiles/<user_id>.json
+            profiles_dir = pathlib.Path(__file__).resolve().parents[3] / "data" / "profiles"
+            profiles_dir.mkdir(parents=True, exist_ok=True)
+            profile_path = profiles_dir / f"{user_id}.json"
+            with open(profile_path, "w", encoding="utf-8") as f:
+                json.dump(profile_export, f, indent=2, ensure_ascii=False)
+            logger.info(f"Profile snapshot written to {profile_path}")
+        except Exception as e:
+            logger.warning(f"Could not write profile JSON file: {e}")
 
     def _infer_dimension(self, node_type: str) -> str:
         """Helper to map a node type to its corresponding cognitive dimension."""

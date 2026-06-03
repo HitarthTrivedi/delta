@@ -6,8 +6,9 @@ Abstracts web search behind a unified interface so downstream services
 search provider.
 
 Provider waterfall:
-    1. Tavily Search API (via official Python SDK)
-    2. High-fidelity mock that returns role-specific, realistic results
+    1. Serper Google Search API (if SERPER_API_KEY is set)
+    2. Tavily Search API (via official Python SDK)
+    3. High-fidelity mock that returns role-specific, realistic results
 
 The mock is *not* a stub — it produces carefully crafted, domain-aware results
 so the rest of the cognitive pipeline can be developed & tested without an API
@@ -60,9 +61,26 @@ class WebSearchService:
     # ------------------------------------------------------------------
 
     def __init__(self) -> None:
+        self._serper_api_key: str | None = None
         self._tavily_client: Any | None = None
         self._provider: str = "mock"  # will be upgraded if Tavily is available
-        self._init_tavily()
+        self._init_serper()
+        if self._provider != "serper":
+            self._init_tavily()
+
+    def _init_serper(self) -> None:
+        """Initialise Serper if configured. Uses requests directly, no SDK needed."""
+        try:
+            from app.config import settings
+            api_key = (settings.SERPER_API_KEY or "").strip()
+            if not api_key:
+                logger.info("SERPER_API_KEY not set — trying next search provider.")
+                return
+            self._serper_api_key = api_key
+            self._provider = "serper"
+            logger.info("Serper search provider initialised successfully.")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to initialise Serper provider: %s — trying next provider.", exc)
 
     def _init_tavily(self) -> None:
         """Attempt to initialise the Tavily client.  Fail silently."""
@@ -105,6 +123,16 @@ class WebSearchService:
             and *relevance_score*.
         """
         max_results = max(1, min(max_results, 20))
+
+        if self._serper_api_key is not None:
+            try:
+                return self._search_serper(query, max_results)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Serper search failed for query '%s': %s — trying next provider.",
+                    query,
+                    exc,
+                )
 
         if self._tavily_client is not None:
             try:
@@ -256,6 +284,37 @@ class WebSearchService:
             "source_count": len(results),
             "provider": self._provider,
         }
+
+    # ══════════════════════════════════════════════════════════════════
+    # Private — Serper provider
+    # ══════════════════════════════════════════════════════════════════
+
+    def _search_serper(self, query: str, max_results: int) -> list[SearchResult]:
+        """Execute a Google search via Serper and normalise organic results."""
+        import requests
+
+        response = requests.post(
+            "https://google.serper.dev/search",
+            headers={
+                "X-API-KEY": self._serper_api_key or "",
+                "Content-Type": "application/json",
+            },
+            json={"q": query, "num": max_results},
+            timeout=12,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        organic = payload.get("organic") or []
+
+        results: list[SearchResult] = []
+        for idx, item in enumerate(organic[:max_results]):
+            results.append({
+                "title": item.get("title", ""),
+                "url": item.get("link", ""),
+                "snippet": (item.get("snippet") or "")[:500],
+                "relevance_score": round(max(0.55, 0.98 - idx * 0.05), 3),
+            })
+        return results
 
     # ══════════════════════════════════════════════════════════════════
     # Private — Tavily provider

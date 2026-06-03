@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Menu, X, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -15,49 +15,83 @@ const Header = () => {
   }, []);
 
   const navItems = [
-    { label: 'Features', href: '#features' },
-    { label: 'How It Works', href: '#how-it-works' },
-    { label: 'Pricing', href: '#pricing' },
-    { label: 'FAQ', href: '#faq' }
+    { label: 'Agents', href: '#features' },
+    { label: 'Workflow', href: '#how-it-works' },
   ];
 
+  const headerStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    height: '3.75rem',
+    transition: 'all 0.3s ease',
+    background: isScrolled ? 'rgba(0,0,0,0.85)' : 'transparent',
+    backdropFilter: isScrolled ? 'blur(14px)' : 'none',
+    borderBottom: isScrolled ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
+  };
+
   return (
-    <header
-      className="header-nav"
-      style={{
-        boxShadow: isScrolled ? '0 4px 20px rgba(0, 0, 0, 0.3)' : 'none',
-        background: isScrolled ? 'rgba(3, 7, 18, 0.85)' : 'transparent',
-        backdropFilter: isScrolled ? 'blur(12px)' : 'none',
-        borderBottom: isScrolled ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid transparent',
-        transition: 'all 0.3s ease',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        height: '4.5rem'
-      }}
-    >
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 h-full flex items-center justify-between">
+    <header style={headerStyle}>
+      <div
+        style={{
+          maxWidth: 1120,
+          margin: '0 auto',
+          padding: '0 1.5rem',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         {/* Logo */}
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.href = '/'}>
-          <img
-            src="https://customer-assets.emergentagent.com/job_growth-tracker-152/artifacts/9e027d2s_delta_logo.png"
-            alt="Delta Logo"
-            className="h-9 w-auto object-contain"
-          />
-          <span className="font-mono text-lg font-bold text-white tracking-wider uppercase">
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+          onClick={() => window.location.href = '/'}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              background: '#fff',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <span style={{ color: '#000', fontWeight: 900, fontSize: 14, fontFamily: 'monospace' }}>Δ</span>
+          </div>
+          <span
+            style={{
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '1rem',
+              letterSpacing: 0,
+              fontFamily: "'Inter', sans-serif",
+            }}
+          >
             Delta
           </span>
         </div>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        {/* Desktop Nav */}
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 32 }} className="hidden md:flex">
           {navItems.map((item) => (
             <a
               key={item.label}
               href={item.href}
-              className="mono-text text-[11px] font-bold text-slate-300 hover:text-white uppercase tracking-widest transition-colors duration-200"
+              style={{
+                color: 'rgba(255,255,255,0.6)',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+                fontWeight: 450,
+                transition: 'color 0.2s',
+                fontFamily: "'Inter', sans-serif",
+              }}
+              onMouseEnter={e => e.target.style.color = '#fff'}
+              onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.6)'}
             >
               {item.label}
             </a>
@@ -65,25 +99,66 @@ const Header = () => {
         </nav>
 
         {/* Desktop CTA */}
-        <div className="hidden md:flex items-center gap-4">
-          <button className="btn-secondary px-5 py-2 text-[10px] uppercase font-bold tracking-widest rounded-full border border-white/5 hover:border-white/10 transition-colors">
-            Sign In
-          </button>
-          <button 
-            className="btn-primary px-5 py-2 text-[10px] uppercase font-bold tracking-widest rounded-full transition-all" 
-            onClick={() => window.location.href = '/onboarding'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }} className="hidden md:flex">
+          <button
+            onClick={() => window.location.href = '/progress-report'}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '0.875rem',
+              fontWeight: 450,
+              cursor: 'pointer',
+              padding: '6px 4px',
+              transition: 'color 0.2s',
+              fontFamily: "'Inter', sans-serif",
+            }}
+            onMouseEnter={e => e.target.style.color = '#fff'}
+            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.6)'}
           >
-            Get Started
+            Progress
+          </button>
+          <button
+            onClick={() => window.location.href = '/intake'}
+            id="header-get-started"
+            style={{
+              background: '#fff',
+              color: '#000',
+              border: 'none',
+              borderRadius: 999,
+              padding: '7px 18px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'background 0.2s',
+              fontFamily: "'Inter', sans-serif",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#e5e5e5'}
+            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+          >
+            Get Started <ArrowRight size={13} />
           </button>
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile burger */}
         <button
-          className="p-2 rounded-lg bg-slate-900/80 border border-white/5 text-slate-400 hover:text-slate-200 md:hidden transition-all"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          style={{
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 8,
+            color: '#fff',
+            padding: 8,
+            cursor: 'pointer',
+            display: 'none',
+          }}
+          className="md:hidden"
           aria-label="Toggle menu"
         >
-          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
       </div>
 
@@ -95,38 +170,60 @@ const Header = () => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             style={{
-              background: 'var(--bg-overlay)',
+              background: 'rgba(0,0,0,0.95)',
               backdropFilter: 'blur(16px)',
-              borderBottom: '1px solid var(--border-light)',
-              padding: '2rem 1.5rem',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              padding: '1.5rem',
               position: 'absolute',
-              top: '4.5rem',
+              top: '3.75rem',
               left: 0,
               right: 0,
-              zIndex: 49
+              zIndex: 49,
             }}
           >
-            <nav className="flex flex-col gap-5 mb-8">
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
               {navItems.map((item) => (
                 <a
                   key={item.label}
                   href={item.href}
-                  className="mono-text text-xs font-bold text-slate-300 hover:text-white uppercase tracking-widest py-1"
+                  style={{
+                    color: 'rgba(255,255,255,0.7)',
+                    textDecoration: 'none',
+                    fontSize: '0.95rem',
+                    fontWeight: 500,
+                  }}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {item.label}
                 </a>
               ))}
             </nav>
-            <div className="flex flex-col gap-3">
-              <button className="btn-secondary w-full py-3 text-[10px] uppercase font-bold tracking-widest rounded-full">
-                Sign In
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 8,
+                  color: 'rgba(255,255,255,0.7)',
+                  padding: '10px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  width: '100%',
+                }}
+              >
+                Login
               </button>
-              <button 
-                className="btn-primary w-full py-3 text-[10px] uppercase font-bold tracking-widest rounded-full" 
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  window.location.href = '/onboarding';
+              <button
+                onClick={() => { setIsMobileMenuOpen(false); window.location.href = '/intake'; }}
+                style={{
+                  background: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  color: '#000',
+                  padding: '10px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  width: '100%',
                 }}
               >
                 Get Started

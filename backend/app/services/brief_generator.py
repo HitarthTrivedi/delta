@@ -60,6 +60,8 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
 
     CURRICULUM INSTRUCTIONS:
     1. Sequenced Curriculum: Design exactly 3 chronological phases that move this student from their current baseline to job-ready capability for the target role: "{role}".
+       Treat resume/current skills as prior exposure. Do not assign beginner repeat tasks for skills they already listed.
+       If a skill is already present but not mastered, convert it into a harder proof/project/debugging/deployment milestone.
        - Phase 1: Focuses on core libraries, packages, basic analytical tools, or language syntax foundations.
        - Phase 2: Focuses on intermediate pipelines, workflows, databases, containerization, or core frameworks.
        - Phase 3: Focuses on advanced architectures, microservices, scaling, domain specializations, or deployment patterns.
@@ -76,7 +78,7 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
     4. Roadmap Status:
        - For each node, match its "skill_name" (case-insensitive) against the user's current skills.
        - Set its "status" to "mastered" if the user has >= 6 proficiency.
-       - Set its "status" to "in_progress" if the user has > 0 and < 6 proficiency.
+       - Set its "status" to "in_progress" if the user has > 0 and < 6 proficiency; this means prior exposure, not zero knowledge.
        - Set its "status" to "locked" otherwise.
        
     BRIEF COMPOSITION INSTRUCTIONS:
@@ -86,12 +88,52 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
     - "market_changes": 3 high-impact market changes, job-posting shifts, or hiring trends related to "{role}".
     - "personal_changes": 2-3 custom status messages reviewing user's weekly capability shifts.
     - "roadmap_updates": 2 custom calibration messages explaining why the roadmap prioritize these phases.
-    - "actions": 3-6 specific checklist action items for the current weekly sprint (derived from the first few non-mastered nodes).
+    - "actions": 2-3 specific checklist action items for the current weekly sprint.
+      These must be based on what the user has NOT already proven.
+      For skills already in the resume, ask for an advanced extension, production proof, GitHub proof, deployment, test suite, benchmark, or written reflection.
     - "opportunities": 3 mock or real platform contest events, sprints, hackathons, or learning challenges.
     - "questions_for_user": 2 deep reflection questions to help the AI resolve profile ambiguity.
 
     Output strictly as a valid, standard, parsable JSON object. Do not wrap in markdown tags like ```json or ```, do not include comments, and do not add trailing commas.
+    Your output MUST have the following top-level keys:
+    {{
+      "phases": [
+        {{
+          "id": "string",
+          "name": "string",
+          "description": "string",
+          "nodes": [
+            {{
+              "id": "string",
+              "label": "string",
+              "skill_name": "string",
+              "description": "string",
+              "tech_twist": "string",
+              "architect_warning": "string",
+              "certification": "string",
+              "resource_url": "string",
+              "status": "locked|in_progress|mastered"
+            }}
+          ]
+        }}
+      ],
+      "demanded_skills": ["string"],
+      "track_status": "ahead|on_track|drifting|blocked",
+      "market_changes": ["string"],
+      "personal_changes": ["string"],
+      "roadmap_updates": ["string"],
+      "actions": ["string"],
+      "opportunities": ["string"],
+      "questions_for_user": ["string"]
+    }}
+
+    Remember, the tone of all feedback, warning notes, and checklist items must be like a comforting, friendly, and comforting tutor who supports the student!
     """
+
+    print(f"\n=================== [ROADMAP GENERATOR START - {role}] ===================")
+    print(f"Skills context:\n{skills_list_str}")
+    print(f"Market context: {demanded}")
+    print(f"=========================================================================")
 
     try:
         response_text = generate_response(prompt).strip()
@@ -103,6 +145,20 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
             response_text = response_text.split("```")[1].split("```")[0]
             
         data = json.loads(response_text.strip())
+        
+        # Self-healing: if LLM nested under "curriculum" or "brief", flatten it to top-level!
+        if "curriculum" in data and isinstance(data["curriculum"], dict):
+            print("🔧 [ROADMAP AUTO-FLATTEN] Found nested 'curriculum' block — flattening...")
+            for k, v in data["curriculum"].items():
+                if k not in data:
+                    data[k] = v
+        if "brief" in data and isinstance(data["brief"], dict):
+            print("🔧 [ROADMAP AUTO-FLATTEN] Found nested 'brief' block — flattening...")
+            for k, v in data["brief"].items():
+                if k not in data:
+                    data[k] = v
+                    
+        print(f"✅ [ROADMAP PARSER] Successfully parsed keys: {list(data.keys())}")
         
         # Self-healing programmatical override of node statuses to guarantee perfect database parity
         for phase in data.get("phases", []):
@@ -116,10 +172,14 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
         if "user_skills" not in data:
             data["user_skills"] = list(user_skill_map.keys())
             
+        print(f"✅ [ROADMAP COMPILE SUCCESS]")
         return data
 
     except Exception as e:
-        print(f"[WARN] Dynamic roadmap generation failed: {e}. Reverting to static fallback compiler.")
+        print(f"❌ [ROADMAP COMPILE ERROR] Failed: {e}. Reverting to static fallback compiler.")
+        import traceback
+        traceback.print_exc()
+        print(f"=========================================================================")
         return _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded)
 
 def _get_node_status(skill_name: str, skill_map: dict) -> str:
