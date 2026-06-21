@@ -40,9 +40,22 @@ export const chatAPI = {
 
 // ── Resume API ──
 export const resumeAPI = {
-  upload: (formData) => api.post('/resume/upload', formData, {
+  // Get current resume or null
+  get: (userId) => api.get(`/resume/${userId}`).then(r => r.data),
+  // Generate resume from Delta profile
+  generate: (userId) => api.post(`/resume/${userId}/generate`).then(r => r.data),
+  // Upload existing PDF/DOCX
+  upload: (userId, formData) => api.post(`/resume/${userId}/upload`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then(r => r.data),
+  // Fetch bi-weekly suggestions
+  getSuggestions: (userId) => api.get(`/resume/${userId}/suggestions`).then(r => r.data),
+  // Apply accepted/rejected suggestions
+  applySuggestions: (userId, data) => api.post(`/resume/${userId}/apply-suggestions`, data).then(r => r.data),
+  // Download .docx binary (returns blob)
+  download: (userId) => api.get(`/resume/${userId}/download`, { responseType: 'blob' }).then(r => r.data),
+  // ATS optimize in-place
+  atsOptimize: (userId) => api.post(`/resume/${userId}/ats-optimize`).then(r => r.data),
 };
 
 // ── Calendar API ──

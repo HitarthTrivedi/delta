@@ -7,6 +7,7 @@ import {
   CheckCircle,
   Cpu,
   ExternalLink,
+  FileText,
   Github,
   Network,
   RefreshCw,
@@ -21,11 +22,13 @@ import { toast } from 'sonner';
 import GlassPanel from '../components/ui/GlassPanel';
 import { usersAPI, briefsAPI, calendarAPI, dossierAPI, careerOSAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import ResumeSection from './ResumeSection';
 
 const views = [
   { id: 'focus', label: 'Focus' },
   { id: 'roadmap', label: 'Roadmap' },
   { id: 'memory', label: 'Memory' },
+  { id: 'resume', label: 'Resume' },
 ];
 
 const emptyDossier = {
@@ -129,6 +132,7 @@ export default function Dashboard() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [githubUrl, setGithubUrl] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [resumeSuggestionsDue, setResumeSuggestionsDue] = useState(false);
 
   const fetchBrief = useCallback(async () => {
     try {
@@ -397,13 +401,16 @@ export default function Dashboard() {
               key={view.id}
               onClick={() => setActiveView(view.id)}
               className={cx(
-                'rounded-md border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors',
+                'relative rounded-md border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors',
                 activeView === view.id
                   ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
                   : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-white'
               )}
             >
               {view.label}
+              {view.id === 'resume' && resumeSuggestionsDue && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-2.5 w-2.5 rounded-full bg-cyan-400" />
+              )}
             </button>
           ))}
           <button
@@ -600,6 +607,16 @@ export default function Dashboard() {
                       </section>
                     ))}
                   </div>
+                </motion.div>
+              )}
+
+              {activeView === 'resume' && (
+                <motion.div key="resume" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                  <div className="mb-4 flex items-center gap-2">
+                    <FileText size={13} className="text-cyan-400" />
+                    <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-300">Resume</h2>
+                  </div>
+                  <ResumeSection />
                 </motion.div>
               )}
 

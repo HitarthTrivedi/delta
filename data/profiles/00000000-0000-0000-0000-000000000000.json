@@ -1,12 +1,19 @@
 {
-  "name": "Hitarth",
+  "personal_introduction": "",
+  "backstory": "Currently pursuing a Bachelor of Engineering in Computer Science at SVIT, Vasad (3rd Year) with a CGPA of 9.2/10, with a strong focus on AI/ML and autonomous systems.",
+  "transition_reason": null,
+  "name": "HITARTH TRIVEDI",
   "email": "hitartht318@gmail.com",
-  "target_role": "multi-agent systems and adversarial AI",
+  "target_role": "AI/ML Engineer",
+  "target_exam": "IELTS",
+  "target_attempt": "november 2026",
+  "exam_goal_detail": null,
+  "known_exam_dates": [],
   "major": "Computer Science",
   "university": "SVIT, Vasad",
-  "study_year": "3rd Year, Pursuing",
+  "study_year": "third year",
   "gpa": "9.2 / 10",
-  "past_experience": "Alpha.Kore and LazyCook",
+  "past_experience": "leading Alpha.Kore",
   "skills": [
     "Python",
     "JavaScript",
@@ -49,31 +56,76 @@
     "Artificial Intelligence",
     "Machine Learning",
     "Software Engineering",
-    "IoT"
+    "IoT",
+    "GOOGLE",
+    "META",
+    "NVIDIA"
   ],
   "learning_style": "practical",
   "preferred_content_types": [
     "projects"
   ],
   "hours_per_week": 6,
-  "relocation": "maybe",
+  "relocation": "yes",
   "extracurricular_interests": [
-    "Open Source Contribution",
-    "Team Leadership",
-    "AI Research",
-    "Automation"
+    "Open source development",
+    "Team leadership",
+    "AI research"
   ],
-  "planning_horizon_years": 4,
+  "planning_horizon_years": 2,
+  "planning_horizon_months": 18,
+  "inferred_planning_reason": "I am currently in my 3rd year of B.E. Computer Science at SVIT Vasad with a CGPA of 9.2. My immediate goal is to secure a high-quality AI/ML internship during my final year, strengthen my expertise in multi-agent systems and applied AI, and build a portfolio of production-grade AI projects. I am also preparing for IELTS in November 2026 and exploring opportunities for higher studies and global AI roles. The 18–24 month timeline reflects my plan to transition from a student developer to an industry-ready AI/ML Engineer through internships, research, open-source contributions, and advanced project development.",
   "phone_number": "+91 99985 55392",
-  "linkedin_url": "linkedin.com/in/hitarth-trivedi-ba1986300",
+  "linkedin_url": "linkedin.com/in/hitarth - trivedi - ba1986300",
   "github_url": "github.com/HitarthTrivedi",
-  "portfolio_url": "https://rezum-alphakore.vercel.app/profile/hitarth-trivedi-bb9dc563",
+  "portfolio_url": "https://rezum - alphakore.vercel.app/profile/hitarth - trivedi - bb9dc563",
   "career_goals": [
-    "Pursuing a master's degree"
+    "Specializing in multi-agent systems",
+    "Developing adversarial AI architectures",
+    "Full-stack AI development"
   ],
   "resume_text": "HITARTH TRIVEDI  Vadodara, India | +91 99985 55392 | hitartht318@gmail.com  linkedin.com/in/hitarth - trivedi - ba1986300 | github.com/HitarthTrivedi |   https://rezum - alphakore.vercel.app/profile/hitarth -  trivedi - bb9dc563  PROFESSIONAL SUMMARY  AI/ML engineer specializing in multi - agent systems, adversarial AI architectures, and full - stack development. Founder of  Alpha.Kore   —   a 10 - member team that has shipped 11 projects including Python packages with 2,500+ downloads.  Experienced in RAG pipeline s, LLM orchestration, agentic memory systems, IoT integrations, and real - time computer  vision.  EDUCATION  Bachelor of Engineering   —   Computer Science | SVIT, Vasad  3rd Year, Pursuing | CGPA: 9.2 / 10  TECHNICAL SKILLS  Languages:   Python, JavaScript, Swift  AI & ML:   Multi - Agent System Design, Adversarial AI Architecture, Agentic RAG & Long - Term Memory Systems, LLM  Orchestration, Google Gemini API, Groq API (LLaMA 3.3 70B), Agent Routing & Task Decomposition, Quality Scoring  Systems  Backend & Web:   Python Flask, REST APIs, Google Drive API, Spotify Web API, OAuth 2.0, PyPI Publishing, React,  HTML5, CSS3, SwiftUI, AppKit  Systems & Tools:   Browser Automation (Selenium, undetected - chromedriver), IoT Sensor Integration, Computer  Vision, macOS System APIs, SQLAlchemy, Git, Homebrew Distribution, matplotlib, pandas  PROJECTS & APPLICATIONS  LazyCook   —   Multi - Agent AI Assistant | PyPI | 2,500+ Downloads  •   Architected a four - agent pipeline (Generator → Analyzer → Optimizer → Validator) on Gemini 2.5 Flash with a  weighted quality scoring engine (completeness 40%, accuracy 40%, length 20%)   —   responses below threshold  are automatically re - queued.  •   Built RAG - based document processing (.pdf, .docx, .txt, .md, .csv) with persistent cross - session context;  published on PyPI reaching 2,500+ downloads in 6 months   —   top 7% of Python contributors globally.  Agentic RAG Memory Engine   —   Extended Local LLM Context | Python  •   Engineered an agentic RAG system that extends the effective memory of local language models from ~33  conversations (5k - token context window) to 300+ conversations   —   a 9× improvement   —   by dynamically indexing,  compressing, and retrieving conversation histor y as semantic chunks.  •   Implemented keyword - indexed per - session storage with relevance - ranked retrieval, ensuring the most  contextually important past exchanges are injected at inference time with zero context overflow   —   enabling truly  persistent long - term memory for local LLMs.  3F1 (Three Faction Intelligence)   —   Triadic AI Debate Engine | Live at 3f1.in  •   Engineered a Neural Debate Architecture with three autonomous LLM agents   —   Analyst, Critic, and Synthesizer  —   engaging in structured adversarial debate to produce bias - reduced, cross - validated conclusions.  •   Integrated RAG to ground agent responses in retrieved context, reducing hallucination rates; deployed as a full -  s",
   "user_id": "00000000-0000-0000-0000-000000000000",
-  "last_updated": "2026-06-03T08:27:24.226152Z",
+  "last_updated": "2026-06-20T16:27:08.733891Z",
+  "detected_goal_track": "UPSC",
+  "detected_goal_markers": [
+    "upsc",
+    "ias"
+  ],
+  "agent1_search_query": "UPSC next attempt exam date syllabus eligibility preparation timeline India",
+  "agent1_search_sources": [
+    {
+      "title": "Tech Layoffs and Hiring Freeze Analysis 2026",
+      "url": "https://www.layoffs.fyi/analysis-2026",
+      "snippet": "While large tech companies stabilized hiring, startups and mid-size companies are actively recruiting. AI and infrastructure roles saw the least impact from layoffs.",
+      "relevance_score": 0.98
+    },
+    {
+      "title": "Open Source Contribution: Career Impact Analysis",
+      "url": "https://www.opensource.guide/career-impact-2026",
+      "snippet": "Contributors to popular open-source projects receive 40% more recruiter outreach. Even small, consistent contributions signal collaboration ability and code quality awareness.",
+      "relevance_score": 0.93
+    },
+    {
+      "title": "GitHub Profile Optimisation for Job Seekers",
+      "url": "https://www.github.com/profile-optimization-guide-2026",
+      "snippet": "Pinned repos with clear READMEs, contribution graphs showing consistency, and open-source contributions demonstrate collaboration skills that recruiters value.",
+      "relevance_score": 0.88
+    },
+    {
+      "title": "Tech Salary Report 2026 — Levels.fyi",
+      "url": "https://www.levels.fyi/salary-report-2026",
+      "snippet": "Software engineer median compensation grew 8% globally. AI-related roles saw the highest growth at 22%. Remote roles from US companies continue to offer premium compensation.",
+      "relevance_score": 0.83
+    },
+    {
+      "title": "Building Technical Writing Skills for Engineers",
+      "url": "https://www.writethedocs.org/engineering-writing-2026",
+      "snippet": "Engineers who blog about their work, write clear documentation, and maintain ADRs (Architecture Decision Records) are promoted faster and hired more easily.",
+      "relevance_score": 0.78
+    }
+  ],
+  "roadmap_basis": "student_story + resume + constraints + inferred exam/goal timeline + search enrichment",
   "onboarding_complete": true,
-  "confidence_score": 1.0
+  "confidence_score": 1
 }

@@ -67,6 +67,7 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
             import traceback
             traceback.print_exc()
             print(f"==============================================================")
+            raise ValueError("The tasks are not being loaded right now. Can you please try again some time later?")
 
     logger.warning("API unavailable — using mock fallback")
     return _mock_structured_response(prompt)

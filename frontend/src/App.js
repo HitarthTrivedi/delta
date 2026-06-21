@@ -30,6 +30,7 @@ import Dashboard from "./pages/Dashboard";
 import CareerChat from "./pages/CareerChat";
 import WeeklyPlan from "./pages/WeeklyPlan";
 import ProgressReport from "./pages/ProgressReport";
+import ResumePage from "./pages/ResumePage";
 
 // Core connection hooks
 import { useUserWithSkills } from "./hooks/useUser";
@@ -122,6 +123,7 @@ function AppContent() {
         <Route path="/weekly-plan" element={<ProtectedRoute><WeeklyPlan /></ProtectedRoute>} />
         <Route path="/roadmap" element={<ProtectedRoute><WeeklyPlan /></ProtectedRoute>} />
         <Route path="/progress-report" element={<ProtectedRoute><ProgressReport /></ProtectedRoute>} />
+        <Route path="/resume" element={<ProtectedRoute><ResumePage /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/chat" element={<ProtectedRoute><CareerChat /></ProtectedRoute>} />
         <Route path="/ledger" element={<ProtectedRoute><Ledger /></ProtectedRoute>} />

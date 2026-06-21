@@ -8,6 +8,7 @@ const navItems = [
   { label: 'Part 1 Input', path: '/intake', icon: ClipboardList },
   { label: 'Part 2 Roadmap', path: '/roadmap', icon: Map },
   { label: 'Part 3 Progress', path: '/progress-report', icon: BarChart3 },
+  { label: 'Part 4 Resume', path: '/resume', icon: FileText },
 ];
 
 export default function Navbar({ user }) {

@@ -25,8 +25,61 @@ def parse_resume(content: bytes, filename: str) -> dict:
         "experience_years": _extract_experience_years(text),
         "education": _extract_education(text),
         "text_excerpt": text[:1200],
+        "raw_text": text,
         "status": "parsed" if text else "empty_or_unreadable",
     }
+
+
+def parse_resume_llm(text: str) -> dict:
+    """Uses LLM to structure raw resume text into complete resume profile schema."""
+    from app.services.ai_service import generate_json
+
+    prompt = f"""You are an expert resume parser. Extract the user's resume details from the raw text below and format them into a structured JSON object.
+
+Raw Resume Text:
+{text[:6000]}
+
+Return ONLY a JSON object with this exact structure:
+{{
+  "contact": {{
+    "name": "Extract full name",
+    "email": "Extract email address",
+    "role": "Current or target role title"
+  }},
+  "summary": "Professional summary statement if present, or generate a short 2-line summary based on the text",
+  "skills": ["Skill 1", "Skill 2", ...],
+  "experience": [
+    {{
+      "title": "Job Title",
+      "company": "Company Name",
+      "description": "Responsibilities and bullet points",
+      "date": "Employment duration (e.g., June 2022 - Present)"
+    }}
+  ],
+  "projects": [
+    {{
+      "title": "Project Title",
+      "description": "Project details",
+      "tech": ["Python", "FastAPI", ...],
+      "url": "GitHub or project link if present",
+      "date": "Completion date or duration"
+    }}
+  ],
+  "achievements": ["Key accomplishment 1", "Key accomplishment 2", ...],
+  "education": [
+    {{
+      "degree": "Degree (e.g. B.Tech Computer Science)",
+      "institution": "University / College Name",
+      "year": "Graduation year"
+    }}
+  ],
+  "certifications": ["Certification name 1", ...]
+}}
+"""
+    result = generate_json(prompt, temperature=0.1)
+    if isinstance(result, dict) and result.get("contact"):
+        return result
+    raise ValueError("LLM failed to return valid structured resume object")
 
 
 def _extract_text(content: bytes, filename: str) -> str:

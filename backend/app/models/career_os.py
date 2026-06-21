@@ -57,3 +57,25 @@ class RoadmapState(Base):
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     user = relationship("User")
+
+
+class ResumeProfile(Base):
+    """Stores the user's structured resume and metadata for bi-weekly suggestions."""
+    __tablename__ = "resume_profiles"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, unique=True)
+    # Raw full-text of the uploaded resume (if uploaded)
+    raw_text = Column(Text, nullable=True)
+    # JSON: { summary, skills, experience, projects, education, contact }
+    structured_data = Column(Text, nullable=True)
+    # ATS keyword match score 0.0–1.0
+    ats_score = Column(Float, default=0.0)
+    # Source: 'generated' | 'uploaded'
+    source = Column(String, default="generated")
+    # Timestamps for suggestion cadence
+    last_suggested_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User")

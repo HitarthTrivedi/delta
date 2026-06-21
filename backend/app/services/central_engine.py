@@ -160,7 +160,7 @@ def _has_prior_profile_depth(profile: dict, skills: list[SkillNode], user: User)
     return "intermediate" in profile_text or "advanced" in profile_text or len(_profile_skills(profile)) >= 5
 
 
-def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User) -> list[dict]:
+def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User, db: Session) -> list[dict]:
     domain = _profile_domain(profile, skills, user)
     project_context = profile.get("past_experience") or "your existing work"
     templates = {
@@ -291,30 +291,55 @@ def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User) ->
             },
         ],
     }
-    return templates.get(domain, [
-        {
-            "id": "task-domain-proof",
-            "node_id": "general-proof",
-            "type": "project",
-            "title": "Build one proof that is beyond your resume",
-            "skill": "Applied Proof",
-            "description": f"Use {project_context}. Pick one prior skill, make a stronger example, and write what is better than your old work.",
-            "source": "Your existing profile/resume work",
-            "url": "",
-            "prior_exposure": True,
-        },
-        {
-            "id": "task-domain-review",
-            "node_id": "general-review",
-            "type": "project",
-            "title": "Write a short improvement report on your previous work",
-            "skill": "Reflection and Upgrade",
-            "description": "Choose one old project/work sample, list 3 weaknesses, and implement or describe one concrete improvement.",
-            "source": "Your existing profile/resume work",
-            "url": "",
-            "prior_exposure": True,
-        },
-    ])
+
+    # Fetch completed/skipped tasks from journey events
+    completed_or_skipped = set()
+    try:
+        events = db.query(JourneyEvent).filter(
+            JourneyEvent.user_id == user.id,
+            JourneyEvent.event_type.in_(["weekly_task_completed", "weekly_task_skipped"])
+        ).all()
+        for e in events:
+            evidence = _as_json(e.evidence, {})
+            e_id = evidence.get("id") or evidence.get("title")
+            if e_id:
+                completed_or_skipped.add(str(e_id).strip().lower())
+    except Exception as exc:
+        print(f"Error querying task progress for proof sprint: {exc}")
+
+    domain_templates = templates.get(domain)
+    if domain_templates is None:
+        domain_templates = [
+            {
+                "id": "task-domain-proof",
+                "node_id": "general-proof",
+                "type": "project",
+                "title": "Build one proof that is beyond your resume",
+                "skill": "Applied Proof",
+                "description": f"Use {project_context}. Pick one prior skill, make a stronger example, and write what is better than your old work.",
+                "source": "Your existing profile/resume work",
+                "url": "",
+                "prior_exposure": True,
+            },
+            {
+                "id": "task-domain-review",
+                "node_id": "general-review",
+                "type": "project",
+                "title": "Write a short improvement report on your previous work",
+                "skill": "Reflection and Upgrade",
+                "description": "Choose one old project/work sample, list 3 weaknesses, and implement or describe one concrete improvement.",
+                "source": "Your existing profile/resume work",
+                "url": "",
+                "prior_exposure": True,
+            },
+        ]
+
+    filtered_actions = []
+    for action in domain_templates:
+        action_id = action.get("id") or action.get("title")
+        if str(action_id).strip().lower() not in completed_or_skipped:
+            filtered_actions.append(action)
+    return filtered_actions
 
 
 def _event_block_actions(events: list[dict]) -> list[dict]:
@@ -718,12 +743,21 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
 
     roadmap_before = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
     valid_cycles = _valid_weekly_cycle_events(db, user_id)
-    current_week_start = valid_cycles[-1].created_at if valid_cycles else (roadmap_before.created_at if roadmap_before else user.created_at)
+    if user.created_at:
+        now = datetime.datetime.utcnow()
+        elapsed_days = (now - user.created_at).days
+        week_number = max(1, (elapsed_days // 7) + 1)
+        current_week_start = user.created_at + datetime.timedelta(days=(week_number - 1) * 7)
+    else:
+        current_week_start = datetime.datetime.utcnow()
     current_actions = []
     if roadmap_before:
         current_actions = (_as_json(roadmap_before.weekly_focus, {}) or {}).get("primary_actions") or []
+    def _normalize(s: str) -> str:
+        return str(s).strip().lower()
+
     expected_ids = {
-        str(action.get("id") or action.get("title"))
+        _normalize(action.get("id") or action.get("title"))
         for action in current_actions
         if action.get("id") or action.get("title")
     }
@@ -735,7 +769,7 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     latest_task_state = {}
     for event in task_events:
         evidence = _event_json(event, "evidence", {})
-        task_id = str(evidence.get("id") or evidence.get("title") or event.id)
+        task_id = _normalize(evidence.get("id") or evidence.get("title") or str(event.id))
         latest_task_state[task_id] = event.event_type
     accepted_ids = {
         task_id
@@ -747,9 +781,11 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         remaining = len(expected_ids - accepted_ids)
         raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
 
+    import os as _os
+    dev_mode = _os.getenv("DEV_MODE", "false").lower() in {"true", "1", "yes"}
     elapsed_seconds = (datetime.datetime.utcnow() - current_week_start).total_seconds()
     minimum_seconds = max(300, min(5400, len(expected_ids or accepted_ids or [1]) * 900))
-    if elapsed_seconds < minimum_seconds:
+    if not dev_mode and elapsed_seconds < minimum_seconds:
         minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
         raise ValueError(f"Delta needs a little more real work time before advancing. Try again in about {minutes} minute(s).")
 
@@ -891,9 +927,16 @@ def compile_career_context(db: Session, user_id: str) -> dict:
     except Exception:
         pass
 
-    # ── Calculate active week number from validated completed cycles only ─────
-    week_number = len(valid_cycles) + 1
-    current_week_start = valid_cycles[-1].created_at if valid_cycles else (roadmap.created_at if roadmap else user.created_at)
+    # ── Calculate active week number and start time solely based on user start time ──
+    if user.created_at:
+        now = datetime.datetime.utcnow()
+        elapsed_days = (now - user.created_at).days
+        week_number = max(1, (elapsed_days // 7) + 1)
+        current_week_start = user.created_at + datetime.timedelta(days=(week_number - 1) * 7)
+    else:
+        week_number = 1
+        current_week_start = datetime.datetime.utcnow()
+
     progress_summary = build_progress_summary(db, user_id, valid_cycles, current_week_start)
     context = {
         "user_id": user_id,
@@ -1005,6 +1048,34 @@ def log_journey_event(
     evidence: dict | None = None,
     impact: dict | None = None,
 ) -> JourneyEvent:
+    # Update skill node proficiency based on task completion/reopen
+    if evidence:
+        skill_name = evidence.get("skill") or evidence.get("skill_name") or evidence.get("label")
+        if skill_name:
+            skill_node = db.query(SkillNode).filter(
+                SkillNode.user_id == user_id,
+                SkillNode.name.ilike(skill_name.strip())
+            ).first()
+            
+            if event_type == "weekly_task_completed":
+                if skill_node:
+                    skill_node.proficiency = min(10, (skill_node.proficiency or 0) + 2)
+                else:
+                    new_node = SkillNode(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        name=skill_name.strip(),
+                        proficiency=6,  # Mastered threshold is >= 6
+                        evidence_type="claimed",
+                        evidence_weight=0.5
+                    )
+                    db.add(new_node)
+                db.commit()
+            elif event_type == "weekly_task_reopened":
+                if skill_node:
+                    skill_node.proficiency = max(1, (skill_node.proficiency or 4) - 2)
+                    db.commit()
+
     event = JourneyEvent(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -1047,12 +1118,14 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                 db.commit()
                 db.refresh(roadmap)
             elif profile_says_advanced and low_level_start:
-                weekly_focus["primary_actions"] = _domain_proof_actions(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user)
-                weekly_focus["phase_name"] = "Profile-based proof sprint"
-                roadmap.weekly_focus = _dump(weekly_focus)
-                roadmap.last_replanned_reason = "Adjusted away from beginner tasks using resume/profile experience."
-                db.commit()
-                db.refresh(roadmap)
+                proof_actions = _domain_proof_actions(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user, db)
+                if proof_actions:
+                    weekly_focus["primary_actions"] = proof_actions
+                    weekly_focus["phase_name"] = "Profile-based proof sprint"
+                    roadmap.weekly_focus = _dump(weekly_focus)
+                    roadmap.last_replanned_reason = "Adjusted away from beginner tasks using resume/profile experience."
+                    db.commit()
+                    db.refresh(roadmap)
             return roadmap
     skills = _sync_profile_skills_to_db(db, user)
 
@@ -1071,8 +1144,10 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         "primary_actions": _derive_weekly_actions(active_phase),
     }
     if _has_prior_profile_depth(profile, skills, user):
-        weekly_focus["phase_name"] = "Profile-based proof sprint"
-        weekly_focus["primary_actions"] = _domain_proof_actions(profile, skills, user)
+        proof_actions = _domain_proof_actions(profile, skills, user, db)
+        if proof_actions:
+            weekly_focus["phase_name"] = "Profile-based proof sprint"
+            weekly_focus["primary_actions"] = proof_actions
     if blocking_events:
         weekly_focus["phase_name"] = "Event-focused week"
         weekly_focus["primary_actions"] = _event_block_actions(blocking_events)
