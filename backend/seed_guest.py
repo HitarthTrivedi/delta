@@ -133,7 +133,7 @@ def seed():
 
     db.commit()
     db.close()
-    print("✅ Guest user seeded successfully!")
+    print("[OK] Guest user seeded successfully!")
 
 if __name__ == "__main__":
     seed()

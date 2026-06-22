@@ -36,3 +36,7 @@ memory/
 test_reports/
 tests/
 test_result.md
+
+# Local User Data
+data/
+

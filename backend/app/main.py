@@ -1,15 +1,24 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.limiter import limiter
 from app.config import settings
 from app.database import engine, Base
 from app.models import *  # noqa: F401,F403 — ensures all models register with Base
 from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion
+
+# Global rate limiter imported from app.limiter (avoids circular imports)
 
 app = FastAPI(
     title="Delta 2.0 API",
     description="Career Intelligence Platform — AI-driven skill tracking & market alignment",
     version="2.0.0",
 )
+
+# Attach limiter to app state so decorators can find it
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS
 app.add_middleware(
@@ -32,11 +41,15 @@ app.include_router(career_os.router)
 app.include_router(ingestion.router)
 
 
-
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
     print("[OK] Delta 2.0 API started - tables synced")
+    try:
+        from seed_guest import seed
+        seed()
+    except Exception as e:
+        print(f"[WARN] Auto-seeding guest user failed: {e}")
 
 
 @app.get("/")

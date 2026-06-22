@@ -1,8 +1,19 @@
 import axios from 'axios';
+import { useAuthStore } from '../store/authStore';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
   timeout: 120000,
+});
+
+// Inject the authenticated user's ID as X-User-Id on every request.
+// The backend uses this header to enforce resource ownership (BOLA prevention).
+api.interceptors.request.use((config) => {
+  const userId = useAuthStore.getState().userId;
+  if (userId) {
+    config.headers['X-User-Id'] = userId;
+  }
+  return config;
 });
 
 // ── Users API ──

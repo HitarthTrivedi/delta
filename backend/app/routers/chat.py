@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 import datetime
 import json
@@ -33,6 +33,7 @@ from app.services.agent2_memory import (
     sync_user_context,
     upsert_upcoming_event,
 )
+from app.limiter import limiter
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -703,7 +704,8 @@ def _constraint_actions(profile: dict, user: User | None, text: str, date_info: 
 
 
 @router.post("/message", response_model=ChatResponse)
-def chat_message(data: ChatRequest, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == data.user_id).first()
     skills = db.query(SkillNode).filter(SkillNode.user_id == data.user_id).all()
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == data.user_id).first()

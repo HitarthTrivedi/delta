@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -22,7 +23,9 @@ from app.services.resume_service import (
     serialize_resume,
     suggestions_are_due,
 )
+from app.dependencies.auth import require_owner
 
+logger = logging.getLogger("delta.resume")
 router = APIRouter(prefix="/api/resume", tags=["resume"])
 
 
@@ -36,7 +39,7 @@ class ApplySuggestionsPayload(BaseModel):
 # ── GET /api/resume/{user_id} ─────────────────────────────────────────────────
 
 @router.get("/{user_id}")
-def get_resume(user_id: str, db: Session = Depends(get_db)):
+def get_resume(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Fetch the current structured resume for the user (or null if none exists)."""
     resume = get_or_create_resume_profile(user_id, db)
     if not resume:
@@ -51,7 +54,7 @@ def get_resume(user_id: str, db: Session = Depends(get_db)):
 # ── POST /api/resume/{user_id}/generate ──────────────────────────────────────
 
 @router.post("/{user_id}/generate")
-def generate_resume(user_id: str, db: Session = Depends(get_db)):
+def generate_resume(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Generate a structured resume from the user's Delta Career OS profile."""
     try:
         structured = build_resume_from_profile(user_id, db)
@@ -73,6 +76,7 @@ async def upload_resume(
     user_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
+    _: str = Depends(require_owner),
 ):
     """Upload an existing PDF or DOCX resume; parse, structure and store it."""
     content = await file.read()
@@ -88,7 +92,7 @@ async def upload_resume(
         else:
             raise ValueError("No readable text in the uploaded file")
     except Exception as exc:
-        print(f"LLM Resume Parsing failed ({exc}). Falling back to simple heuristic parsing.")
+        logger.warning("LLM Resume Parsing failed for user %s: %s. Falling back to heuristic parsing.", user_id, type(exc).__name__)
         # Minimal fallback structured dict from regex parsed signals
         structured = {
             "contact": {"name": "", "email": "", "role": ""},
@@ -122,7 +126,7 @@ async def upload_resume(
 # ── GET /api/resume/{user_id}/suggestions ────────────────────────────────────
 
 @router.get("/{user_id}/suggestions")
-def get_suggestions(user_id: str, db: Session = Depends(get_db)):
+def get_suggestions(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """
     Return bi-weekly resume update suggestions.
     Always returns a response; the frontend checks to_add/to_remove lengths.
@@ -153,6 +157,7 @@ def apply_resume_suggestions(
     user_id: str,
     payload: ApplySuggestionsPayload,
     db: Session = Depends(get_db),
+    _: str = Depends(require_owner),
 ):
     """Accept/reject suggestions, regenerate and persist the updated resume."""
     resume = get_or_create_resume_profile(user_id, db)
@@ -177,7 +182,7 @@ def apply_resume_suggestions(
 # ── GET /api/resume/{user_id}/download ───────────────────────────────────────
 
 @router.get("/{user_id}/download")
-def download_resume(user_id: str, db: Session = Depends(get_db)):
+def download_resume(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Return the resume as an ATS-friendly .docx file."""
     resume = get_or_create_resume_profile(user_id, db)
     if not resume or not resume.structured_data:
@@ -208,7 +213,7 @@ def download_resume(user_id: str, db: Session = Depends(get_db)):
 # ── POST /api/resume/{user_id}/ats-optimize ──────────────────────────────────
 
 @router.post("/{user_id}/ats-optimize")
-def ats_optimize(user_id: str, db: Session = Depends(get_db)):
+def ats_optimize(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Rewrite resume bullet points using market demand keywords (ATS mode)."""
     resume = get_or_create_resume_profile(user_id, db)
     if not resume or not resume.structured_data:

@@ -6,6 +6,7 @@ Uses IngestionEngineV2 which reads/writes from profile_store JSON files.
 from fastapi import APIRouter, Depends, HTTPException, Body
 import json
 import logging
+import re
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Any, Dict, Optional
@@ -15,8 +16,18 @@ logger = logging.getLogger("delta.ingestion_router")
 from app.database import get_db
 from app.services.ingestion_engine_v2 import engine
 from app.services.profile_store import load_profile, save_profile, profile_as_context_string
+from app.dependencies.auth import require_owner
 
 router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
+
+
+def _sanitize_text(raw: str, max_length: int = 8000) -> str:
+    """Strip null bytes, control characters and excessive length from user-supplied text."""
+    # Remove null bytes and non-printable control chars (keep newlines/tabs)
+    cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", raw or "")
+    # Collapse excessive whitespace runs
+    cleaned = re.sub(r"[ \t]{3,}", "  ", cleaned)
+    return cleaned[:max_length]
 
 
 class StartSessionRequest(BaseModel):
@@ -102,14 +113,15 @@ def bridge_personal_data(payload: BridgeRequest, db: Session = Depends(get_db)):
             # Auto-create a session for bridge use
             session = engine.start_session(db, payload.user_id)
 
-        result = engine.ingest_resume(db, payload.user_id, session.id, payload.raw_text)
+        sanitized_text = _sanitize_text(payload.raw_text)
+        result = engine.ingest_resume(db, payload.user_id, session.id, sanitized_text)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bridge failed: {str(e)}")
 
 
 @router.get("/state/{user_id}")
-def get_ingestion_state(user_id: str, db: Session = Depends(get_db)):
+def get_ingestion_state(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Get current ingestion state, profile completeness, and collected data."""
     try:
         return engine.get_state(db, user_id)
@@ -118,7 +130,7 @@ def get_ingestion_state(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/profile/{user_id}")
-def get_profile(user_id: str):
+def get_profile(user_id: str, _: str = Depends(require_owner)):
     """Get the full profile JSON for a user (read by all agents)."""
     profile = load_profile(user_id)
     if not profile:
@@ -127,7 +139,7 @@ def get_profile(user_id: str):
 
 
 @router.put("/profile/{user_id}")
-def update_profile(user_id: str, updates: Dict[str, Any] = Body(...)):
+def update_profile(user_id: str, updates: Dict[str, Any] = Body(...), _: str = Depends(require_owner)):
     """Manually update specific profile fields."""
     try:
         merged = save_profile(user_id, updates)
@@ -137,7 +149,7 @@ def update_profile(user_id: str, updates: Dict[str, Any] = Body(...)):
 
 
 @router.post("/complete/{user_id}")
-def force_complete_ingestion(user_id: str, db: Session = Depends(get_db)):
+def force_complete_ingestion(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Force-complete intake and save whatever has been collected."""
     try:
         result = engine.force_complete(db, user_id)
@@ -147,7 +159,7 @@ def force_complete_ingestion(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/reset/{user_id}")
-def reset_ingestion(user_id: str, db: Session = Depends(get_db)):
+def reset_ingestion(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """
     Fully reset a user's intake profile:
       1. Delete the profile JSON file from disk.

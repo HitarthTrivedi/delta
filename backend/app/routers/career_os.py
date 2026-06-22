@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.auth import require_owner
 from app.models import (
     CareerMemoryProfile,
     IngestionSession,
@@ -86,7 +87,7 @@ def get_domain_pack_by_id(domain_id: str):
 
 
 @router.get("/user/{user_id}/context")
-def get_career_context(user_id: str, db: Session = Depends(get_db)):
+def get_career_context(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return compile_career_context(db, user_id)
     except ValueError as exc:
@@ -94,7 +95,7 @@ def get_career_context(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/user/{user_id}/initialize")
-def initialize_career_os(user_id: str, payload: CareerOSInitializeRequest, db: Session = Depends(get_db)):
+def initialize_career_os(user_id: str, payload: CareerOSInitializeRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return initialize_career_os_for_user(
             db=db,
@@ -107,7 +108,7 @@ def initialize_career_os(user_id: str, payload: CareerOSInitializeRequest, db: S
 
 
 @router.post("/user/{user_id}/journey")
-def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session = Depends(get_db)):
+def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     event = log_journey_event(
         db=db,
         user_id=user_id,
@@ -122,7 +123,7 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
 
 
 @router.post("/user/{user_id}/weekly-cycle")
-def run_weekly_cycle(user_id: str, db: Session = Depends(get_db)):
+def run_weekly_cycle(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return run_weekly_career_cycle(db, user_id)
     except ValueError as exc:
@@ -130,7 +131,7 @@ def run_weekly_cycle(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/user/{user_id}/consolidate-memory")
-def run_memory_consolidation(user_id: str, db: Session = Depends(get_db)):
+def run_memory_consolidation(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return run_memory_consolidation_cycle(db, user_id)
     except ValueError as exc:

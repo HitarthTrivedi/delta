@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 import uuid, datetime, json
 from app.database import get_db
@@ -10,6 +10,8 @@ from app.services.central_engine import log_journey_event
 from app.services.delta_score import compute_delta_score
 from app.services.portfolio_engine import assess_portfolio
 from app.services.project_engine import recommend_proof_projects
+from app.dependencies.auth import require_owner
+from app.limiter import limiter
 
 router = APIRouter(prefix="/api/briefs", tags=["briefs"])
 
@@ -20,7 +22,7 @@ EVIDENCE_WEIGHTS = {
 
 
 @router.get("/user/{user_id}/latest", response_model=BriefResponse)
-def get_latest_brief(user_id: str, db: Session = Depends(get_db)):
+def get_latest_brief(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     brief = db.query(WeeklyBrief).filter(
         WeeklyBrief.user_id == user_id
     ).order_by(WeeklyBrief.week_start.desc(), WeeklyBrief.created_at.desc()).first()
@@ -30,7 +32,8 @@ def get_latest_brief(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/generate/{user_id}", response_model=BriefResponse)
-def generate_brief(user_id: str, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -186,7 +189,7 @@ def generate_brief(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/scores/{user_id}/current", response_model=DeltaScoreResponse)
-def get_current_score(user_id: str, db: Session = Depends(get_db)):
+def get_current_score(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     score = db.query(DeltaScore).filter(
         DeltaScore.user_id == user_id
     ).order_by(DeltaScore.score_date.desc()).first()
@@ -196,7 +199,7 @@ def get_current_score(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/scores/{user_id}/history", response_model=list[DeltaScoreResponse])
-def get_score_history(user_id: str, limit: int = 12, db: Session = Depends(get_db)):
+def get_score_history(user_id: str, limit: int = 12, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     return db.query(DeltaScore).filter(
         DeltaScore.user_id == user_id
     ).order_by(DeltaScore.score_date.desc()).limit(limit).all()
