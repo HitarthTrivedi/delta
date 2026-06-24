@@ -6,15 +6,36 @@ const api = axios.create({
   timeout: 120000,
 });
 
-// Inject the authenticated user's ID as X-User-Id on every request.
-// The backend uses this header to enforce resource ownership (BOLA prevention).
+// Inject the authenticated user's ID as X-User-Id and the JWT token in Authorization on every request.
+// The backend uses these headers to enforce resource ownership (BOLA prevention).
 api.interceptors.request.use((config) => {
   const userId = useAuthStore.getState().userId;
+  const token = useAuthStore.getState().token;
   if (userId) {
     config.headers['X-User-Id'] = userId;
   }
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
   return config;
 });
+
+// Automatically handle expired or invalid JWT sessions
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      console.warn("Session expired or invalid, logging out...");
+      useAuthStore.getState().logout();
+      // Only redirect if not already on the login page to avoid redirect loops
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 
 // ── Users API ──
 export const usersAPI = {

@@ -3,7 +3,7 @@ Ingestion Router v2 — Clean API endpoints for the new ingestion engine.
 Uses IngestionEngineV2 which reads/writes from profile_store JSON files.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Header
 import json
 import logging
 import re
@@ -16,7 +16,7 @@ logger = logging.getLogger("delta.ingestion_router")
 from app.database import get_db
 from app.services.ingestion_engine_v2 import engine
 from app.services.profile_store import load_profile, save_profile, profile_as_context_string
-from app.dependencies.auth import require_owner
+from app.dependencies.auth import require_owner, verify_resource_owner
 
 router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
 
@@ -54,8 +54,14 @@ class ResumeIngestionRequest(BaseModel):
 
 
 @router.post("/start")
-def start_ingestion_session(payload: StartSessionRequest, db: Session = Depends(get_db)):
+def start_ingestion_session(
+    payload: StartSessionRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
     """Start or resume an intake session for a user."""
+    verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
     try:
         session = engine.start_session(db, payload.user_id, payload.journey_type)
         conversation = json.loads(session.conversation_log or "[]")
@@ -78,8 +84,14 @@ def start_ingestion_session(payload: StartSessionRequest, db: Session = Depends(
 
 
 @router.post("/answer")
-def submit_ingestion_answer(payload: AnswerRequest, db: Session = Depends(get_db)):
+def submit_ingestion_answer(
+    payload: AnswerRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
     """Submit one user reply and get the next question or completion."""
+    verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
     try:
         result = engine.process_answer(db, payload.user_id, payload.session_id, payload.answer)
         return result
@@ -90,8 +102,14 @@ def submit_ingestion_answer(payload: AnswerRequest, db: Session = Depends(get_db
 
 
 @router.post("/resume")
-def ingest_resume(payload: ResumeIngestionRequest, db: Session = Depends(get_db)):
+def ingest_resume(
+    payload: ResumeIngestionRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
     """Dedicated endpoint for resume text ingestion — extracts all fields and returns follow-up."""
+    verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
     try:
         result = engine.ingest_resume(db, payload.user_id, payload.session_id, payload.resume_text)
         return result
@@ -100,8 +118,14 @@ def ingest_resume(payload: ResumeIngestionRequest, db: Session = Depends(get_db)
 
 
 @router.post("/bridge")
-def bridge_personal_data(payload: BridgeRequest, db: Session = Depends(get_db)):
+def bridge_personal_data(
+    payload: BridgeRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
     """Personal Data Bridge: ingest unstructured text (resume, LinkedIn) into profile."""
+    verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
     try:
         from app.models.semantic_memory import IngestionSession
         session = db.query(IngestionSession).filter(
@@ -208,4 +232,3 @@ def reset_ingestion(user_id: str, db: Session = Depends(get_db), _: str = Depend
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reset failed during session creation: {str(e)}")
-

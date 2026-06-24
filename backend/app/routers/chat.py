@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 import datetime
 import json
+import logging
 import re
 import uuid
+
+logger = logging.getLogger("delta.chat")
 
 from app.database import get_db
 from app.models import JourneyEvent, PersonalizationProfile, RoadmapState, SkillNode, User
@@ -34,6 +37,7 @@ from app.services.agent2_memory import (
     upsert_upcoming_event,
 )
 from app.limiter import limiter
+from app.dependencies.auth import require_owner, verify_resource_owner
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -72,6 +76,41 @@ def _as_json(value, fallback):
         return json.loads(value)
     except Exception:
         return fallback
+
+
+def _extract_updated_actions(response_text: str) -> tuple[str, list[dict] | None]:
+    """Extract the last JSON object/array from an LLM response without losing prose."""
+    if not response_text:
+        return "", None
+
+    blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", response_text, flags=re.IGNORECASE)
+    candidates = blocks + [response_text.strip()]
+    for candidate in reversed(candidates):
+        text = candidate.strip()
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])\s*$", text)
+            if not match:
+                continue
+            try:
+                parsed = json.loads(match.group(1))
+            except Exception:
+                continue
+
+        if isinstance(parsed, dict):
+            actions = parsed.get("updated_actions") or parsed.get("primary_actions")
+        else:
+            actions = parsed
+        if isinstance(actions, list):
+            cleaned = response_text
+            for block in blocks:
+                cleaned = cleaned.replace(f"```json\n{block}\n```", "").replace(f"```\n{block}\n```", "")
+            cleaned = re.sub(r"```(?:json)?\s*[\s\S]*?```", "", cleaned, flags=re.IGNORECASE).strip()
+            if cleaned.startswith("{") or cleaned.startswith("["):
+                cleaned = "I updated this week's tasks from your instruction."
+            return cleaned, actions
+    return response_text.strip(), None
 
 
 def _action_source(action: dict) -> str:
@@ -352,10 +391,29 @@ def _has_active_course(actions: list[dict], career_context: dict) -> dict | None
     return None
 
 
+def _format_action_bullets(actions: list[dict]) -> str:
+    if not actions:
+        return "No active task is saved yet."
+    lines = []
+    for index, action in enumerate(actions, start=1):
+        lines.append(
+            f"{index}. {action.get('title', 'Task')}: "
+            f"{action.get('description') or action.get('detail') or 'No description saved.'}"
+        )
+    return "\n".join(lines)
+
+
 def _save_weekly_actions(db: Session, roadmap: RoadmapState, actions: list[dict], phase_name: str):
     weekly_focus = _as_json(roadmap.weekly_focus, {})
+    # Back up the tasks we are about to overwrite so the user can undo/restore them.
+    existing = weekly_focus.get("primary_actions") or []
+    if existing and existing != actions:
+        weekly_focus["previous_actions"] = existing
+        weekly_focus["previous_phase_name"] = weekly_focus.get("phase_name")
     weekly_focus["phase_name"] = phase_name
     weekly_focus["primary_actions"] = actions
+    # Lock it: this list is what Agent 2 decided, so context-reload must NOT regenerate over it.
+    weekly_focus["manual"] = True
     roadmap.weekly_focus = json.dumps(weekly_focus)
     db.commit()
     db.refresh(roadmap)
@@ -532,13 +590,88 @@ def _date_context_text(date_info: dict) -> str:
     )
 
 
+_ACTION_TO_INTENT = {
+    "reduce_tasks": "trim",
+    "skip_task": "skip",
+    "next_week": "next_week",
+    "restore": "restore",
+    "harder": "advanced",
+    "easier": "normal",
+    "add_course": "course",
+    "constraint": "constraint",
+    "chat": "tutor_chat",
+}
+
+
+def _classify_intent_llm(user_message: str, current_actions: list[dict]) -> dict:
+    """
+    Ask the model to UNDERSTAND what the student wants (in any language or phrasing)
+    and return a small structured decision. Deterministic code then executes it, so the
+    model never has to regenerate the task list — it only has to understand intent.
+    Returns {} on failure so the caller can fall back to keyword matching.
+    """
+    titles = [f"{i+1}. {a.get('title', '')}" for i, a in enumerate(current_actions or [])]
+    titles_text = "\n".join(titles) if titles else "(no tasks yet)"
+    prompt = f"""You are the intent router for Delta's weekly study-plan assistant.
+The student may write in ANY language, script, or style. Understand their meaning, then decide what they want.
+
+The student's current week has {len(current_actions or [])} task(s):
+{titles_text}
+
+Student message:
+\"\"\"{user_message}\"\"\"
+
+Reply with ONLY a JSON object (no markdown), choosing exactly one action:
+{{
+  "action": "reduce_tasks | skip_task | next_week | restore | harder | easier | add_course | constraint | chat",
+  "count": <integer or null>,   // for reduce_tasks: how many tasks to KEEP. For a range like "2-3" use the higher number. null if unspecified.
+  "target": "<string or null>", // for skip_task: which task (its number or a keyword from its title). null if unclear.
+  "reply": "<one short, warm sentence to the student, written in the SAME language they used, confirming what you will do>"
+}}
+
+Meaning of each action:
+- reduce_tasks: they feel it is too much and want fewer tasks this week.
+- skip_task: they want to drop/remove one specific task.
+- next_week: they want a brand-new next week of tasks.
+- restore: they want their previous/earlier tasks back, or to undo a change.
+- harder: the work is too easy; they want tougher tasks.
+- easier: the work is too hard; they want simpler tasks.
+- add_course: they want a course assigned.
+- constraint: an exam, deadline, travel, illness, low energy, or busy period should reshape this week.
+- chat: anything else — a question, a request to explain, or normal conversation. When unsure, choose chat.
+
+Return only the JSON object."""
+    try:
+        from app.services.ai_service import generate_json
+        result = generate_json(prompt, temperature=0.1)
+        if isinstance(result, dict) and result.get("action") in _ACTION_TO_INTENT:
+            return result
+    except Exception as exc:
+        logger.warning(f"LLM intent classification failed, using keyword fallback: {exc}")
+    return {}
+
+
 def _agent2_intent(text: str) -> str:
     lowered = text.lower().strip()
     clean = lowered.strip(" .!?")
     if clean in {"hi", "hello", "hey", "hii", "yo", "good morning", "good evening"}:
         return "tutor_chat"
+    if any(phrase in lowered for phrase in [
+        "previous task", "previous tasks", "earlier task", "earlier tasks", "old task", "old tasks",
+        "original task", "original tasks", "restore", "undo", "bring back", "give them back",
+        "revert", "tasks you gave me before", "tasks you gave me",
+    ]):
+        return "restore"
     if re.search(r"\b(next week|new week|generate next|give next|advance week)\b", lowered):
         return "next_week"
+    if any(phrase in lowered for phrase in [
+        "too many task", "too many", "these many task", "these many", "cant do these",
+        "can't do these", "cannot do these", "reduce it to", "reduce to", "reduce the number",
+        "reduce the task", "reduce task", "fewer task", "fewer tasks", "less task", "less tasks",
+        "shorten", "shorter", "trim", "cut it to", "cut down the", "keep only", "only keep",
+        "lower the number", "make it 2", "make it 3", "just 2 task", "just 3 task",
+    ]):
+        return "trim"
     if any(phrase in lowered for phrase in [
         "skip this task", "skip the task", "skip it", "remove this task", "remove the task",
     ]):
@@ -664,21 +797,36 @@ def _explain_action(action: dict | None) -> str:
     )
 
 
-def _constraint_actions(profile: dict, user: User | None, text: str, date_info: dict | None = None) -> list[dict]:
+def _target_task_count(text: str, current_count: int) -> int:
+    """How many tasks to keep when the user asks to reduce. Handles '2-3', 'to 2', etc."""
+    nums = [int(n) for n in re.findall(r"\b(\d{1,2})\b", text) if 0 < int(n) <= 12]
+    target = max(nums) if nums else 2  # for "2-3" keep the higher so we don't over-trim
+    if current_count:
+        target = min(target, current_count)
+    return max(1, target)
+
+
+def _constraint_actions(
+    profile: dict,
+    user: User | None,
+    text: str,
+    date_info: dict | None = None,
+    current_actions: list[dict] | None = None,
+) -> list[dict]:
     domain = _domain_from_profile(profile, user)
-    exam_like = any(word in text.lower() for word in ["exam", "test", "quiz", "paper", "mid sem", "midsem", "viva", "practical"])
+    lowered = text.lower()
+    exam_like = any(word in lowered for word in ["exam", "test", "quiz", "paper", "mid sem", "midsem", "viva", "practical"])
     date_info = date_info or _parse_date_reference(text)
-    date_note = _date_context_text(date_info)
     days_until = date_info.get("days_until")
     if exam_like:
         if days_until is not None and days_until > 14:
             description = (
-                f"{date_note} Keep normal work light, but start exam prep now: list syllabus topics, mark weak areas, "
+                "Keep normal work light, but start exam prep now: list syllabus topics, mark weak areas, "
                 "and spend one short block on the weakest topic. Do not add a new course this week."
             )
         else:
             description = (
-                f"{date_note} Pause projects and courses this week. Make a topic list from your syllabus, revise the weakest 2 topics, "
+                "Pause projects and courses this week. Make a topic list from your syllabus, revise the weakest 2 topics, "
                 "solve past questions, and keep one mistake log."
             )
         return [{
@@ -691,12 +839,34 @@ def _constraint_actions(profile: dict, user: User | None, text: str, date_info: 
             "url": "",
             "due_date": date_info.get("mentioned_date"),
         }]
+
+    # "Busy / low energy / shorten the list" — the user still wants to make progress,
+    # just less of it. Keep their most important existing tasks (trimmed) instead of
+    # replacing everything with one generic maintenance task.
+    reduce_like = any(
+        word in lowered
+        for word in [
+            "shorten", "shorter", "fewer", "reduce", "less", "lighter", "light",
+            "trim", "busy", "little time", "low energy", "not much time", "cut down",
+        ]
+    )
+    current_actions = current_actions or []
+    if current_actions and reduce_like:
+        kept = []
+        for action in current_actions[:2]:
+            trimmed = dict(action)
+            base = (trimmed.get("description") or "").strip()
+            trimmed["description"] = f"Reduced scope for a busy week — do a smaller version: {base}" if base else "Do a smaller version of this task this week."
+            kept.append(trimmed)
+        return kept
+
+    # No existing tasks to trim, or a full block (travel/sick) — fall back to one light task.
     return [{
         "id": f"task-{domain}-light-week",
         "type": "practice",
         "title": "Light recovery week",
         "skill": "Consistency",
-        "description": f"{date_note} Keep only one small maintenance task this week: 60-90 minutes of review, one note, and one check-in message to Agent 2.",
+        "description": "Keep only one small maintenance task this week: 60-90 minutes of review, one note, and one check-in message to Agent 2.",
         "source": "Delta pace adjustment",
         "url": "",
         "due_date": date_info.get("mentioned_date"),
@@ -705,7 +875,14 @@ def _constraint_actions(profile: dict, user: User | None, text: str, date_info: 
 
 @router.post("/message", response_model=ChatResponse)
 @limiter.limit("20/minute")
-def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_db)):
+def chat_message(
+    request: Request,
+    data: ChatRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
+    verify_resource_owner(data.user_id, x_user_id=x_user_id, authorization=authorization)
     user = db.query(User).filter(User.id == data.user_id).first()
     skills = db.query(SkillNode).filter(SkillNode.user_id == data.user_id).all()
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == data.user_id).first()
@@ -714,11 +891,29 @@ def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_
     user_update = data.message.split("User update:", 1)[-1].strip() if "User update:" in data.message else data.message
     lowered_update = user_update.lower().strip(" .!?")
     current_actions = _current_actions_from_roadmap(roadmap)
-    intent = _agent2_intent(user_update) if is_weekly_agent else "chat"
+    # AI-first intent understanding: let the model interpret the message (any language /
+    # phrasing) into a structured decision, then deterministic code executes it. Keyword
+    # matching is only a fallback if the model is unavailable or unsure.
+    intent_obj = _classify_intent_llm(user_update, current_actions) if is_weekly_agent else {}
+    if intent_obj:
+        intent = _ACTION_TO_INTENT.get(intent_obj.get("action"), "tutor_chat")
+    else:
+        intent = _agent2_intent(user_update) if is_weekly_agent else "chat"
+    llm_reply = intent_obj.get("reply") if intent_obj else None
+    llm_count = intent_obj.get("count") if intent_obj else None
+    llm_target = intent_obj.get("target") if intent_obj else None
     date_info = _parse_date_reference(user_update)
     date_context = _date_context_text(date_info)
     profile_file = load_profile(data.user_id)
-    persisted_event = _event_from_user_message(user_update, date_info) if is_weekly_agent else None
+    # Intent over keywords: only treat a mentioned event as schedule-blocking when the AI
+    # judged the user actually wants the week reshaped (constraint). A casual mention like
+    # "a function at home this month" while asking to reduce tasks is context, NOT a command
+    # to block the week. The old code created a blocking event purely from the word "function".
+    persisted_event = (
+        _event_from_user_message(user_update, date_info)
+        if (is_weekly_agent and intent == "constraint")
+        else None
+    )
     if persisted_event:
         persisted_event = upsert_upcoming_event(data.user_id, persisted_event)
 
@@ -747,18 +942,43 @@ def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_
 
         lowered_update = user_update.lower()
         if is_weekly_agent:
+            if intent == "restore":
+                weekly_focus = _as_json(roadmap.weekly_focus, {}) if roadmap else {}
+                previous = weekly_focus.get("previous_actions") or []
+                if roadmap and previous:
+                    restored_phase = weekly_focus.get("previous_phase_name") or "Restored week"
+                    _save_weekly_actions(db, roadmap, previous, restored_phase)
+                    sync_current_week(data.user_id, career_context, previous, reason="User asked Agent 2 to restore the previous tasks.")
+                    response_text = (
+                        f"Done — I brought back your previous {len(previous)} task"
+                        f"{'s' if len(previous) != 1 else ''}.\n\n{_format_action_bullets(previous)}"
+                    )
+                else:
+                    response_text = (
+                        "I don't have a saved previous task list to restore. "
+                        "I can generate a fresh set for this week instead — just say 'give me this week's tasks'."
+                    )
+                append_chat_turn(data.user_id, user_update, response_text, intent)
+                return ChatResponse(
+                    response=response_text, context=user_context,
+                    updated_actions=(previous if (roadmap and previous) else None),
+                )
+
             if intent == "next_week":
                 try:
                     next_context = run_weekly_career_cycle(db, data.user_id)
                     next_actions = ((next_context.get("roadmap") or {}).get("weekly_focus") or {}).get("primary_actions") or []
                     sync_user_context(data.user_id, profile_file, next_context)
                     sync_current_week(data.user_id, next_context, next_actions, reason="User asked Agent 2 for next week's tasks.")
+                    next_phase = ((next_context.get("roadmap") or {}).get("weekly_focus") or {}).get("phase_name")
                     response_text = (
-                        "I generated the next week because your current week is accepted as complete or skipped. "
-                        "I saved the new weekly tasks, so refresh the roadmap if they are not visible yet."
-                    )
+                        f"Here is your next week ({next_phase}). " if next_phase else "Here is your next week. "
+                    ) + "These are the tasks I have set:\n\n" + _format_action_bullets(next_actions)
                     append_chat_turn(data.user_id, user_update, response_text, intent)
-                    return ChatResponse(response=response_text, context=user_context)
+                    return ChatResponse(
+                        response=response_text, context=user_context,
+                        updated_actions=next_actions, week_phase=next_phase,
+                    )
                 except ValueError as exc:
                     response_text = str(exc)
                     append_chat_turn(data.user_id, user_update, response_text, intent)
@@ -766,10 +986,26 @@ def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_
 
             if intent == "skip" and roadmap and current_actions:
                 target = current_actions[0]
-                for action in current_actions:
-                    if action.get("title", "").lower() in lowered_update or action.get("skill", "").lower() in lowered_update:
-                        target = action
-                        break
+                # Use the task the AI identified (number or keyword); fall back to text match.
+                hint = str(llm_target or "").lower().strip()
+                matched = False
+                if hint:
+                    if hint.isdigit():
+                        idx = int(hint) - 1
+                        if 0 <= idx < len(current_actions):
+                            target = current_actions[idx]
+                            matched = True
+                    if not matched:
+                        for action in current_actions:
+                            if hint in action.get("title", "").lower() or hint in action.get("skill", "").lower():
+                                target = action
+                                matched = True
+                                break
+                if not matched:
+                    for action in current_actions:
+                        if action.get("title", "").lower() in lowered_update or action.get("skill", "").lower() in lowered_update:
+                            target = action
+                            break
                 event = log_journey_event(
                     db=db,
                     user_id=data.user_id,
@@ -809,15 +1045,18 @@ def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_
                 )
                 append_progress_event(data.user_id, serialize_journey_event(event))
                 append_chat_turn(data.user_id, user_update, response_text, intent)
-                return ChatResponse(response=response_text, context=user_context)
+                return ChatResponse(
+                    response=response_text, context=user_context,
+                    updated_actions=[course], week_phase="One-course weekly sprint",
+                )
 
             if intent in {"advanced", "normal"} and roadmap:
                 profile = load_profile(data.user_id)
                 updated_actions = _advanced_actions(profile, user, "normal" if intent == "normal" else "tough")
                 _save_weekly_actions(db, roadmap, updated_actions, "Normal profile proof sprint" if intent == "normal" else "Advanced profile proof sprint")
                 response_text = (
-                    "Updated this week immediately. I used your existing profile instead of beginner tasks. "
-                    f"New first task: {updated_actions[0]['title']}. Start by creating a GitHub folder, then follow the task description exactly."
+                    "Updated this week immediately. I used your resume/profile evidence instead of beginner tasks.\n\n"
+                    f"{_format_action_bullets(updated_actions)}"
                 )
                 sync_current_week(data.user_id, career_context, updated_actions, reason="Agent 2 changed task difficulty.")
                 event = log_journey_event(
@@ -830,15 +1069,57 @@ def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_
                 )
                 append_progress_event(data.user_id, serialize_journey_event(event))
                 append_chat_turn(data.user_id, user_update, response_text, intent)
-                return ChatResponse(response=response_text, context=user_context)
+                return ChatResponse(
+                    response=response_text, context=user_context,
+                    updated_actions=updated_actions,
+                    week_phase=("Normal profile proof sprint" if intent == "normal" else "Advanced profile proof sprint"),
+                )
+
+            if intent == "trim" and roadmap:
+                if not current_actions:
+                    response_text = "There are no tasks to reduce right now. Ask me for this week's tasks first."
+                    append_chat_turn(data.user_id, user_update, response_text, intent)
+                    return ChatResponse(response=response_text, context=user_context)
+                # Prefer the count the AI understood from the message; fall back to regex.
+                if isinstance(llm_count, (int, float)) and llm_count > 0:
+                    keep = max(1, min(int(llm_count), len(current_actions)))
+                else:
+                    keep = _target_task_count(user_update, len(current_actions))
+                updated_actions = current_actions[:keep]
+                _save_weekly_actions(db, roadmap, updated_actions, "Reduced weekly load")
+                sync_current_week(data.user_id, career_context, updated_actions, reason="User asked Agent 2 to reduce the number of tasks.")
+                lead = (llm_reply or "").strip() or (
+                    f"Done — I reduced this week to your {keep} most important task"
+                    f"{'s' if keep != 1 else ''} so it stays manageable."
+                )
+                response_text = f"{lead}\n\n{_format_action_bullets(updated_actions)}"
+                event = log_journey_event(
+                    db=db,
+                    user_id=data.user_id,
+                    event_type="assistant_guidance",
+                    summary=f"Agent 2 reduced weekly task count to {keep}: {user_update[:100]}",
+                    evidence={"message": data.message, "response_text": response_text, "updated_actions": updated_actions},
+                    impact={"weekly_tasks_updated": True, "task_count_reduced": True},
+                )
+                append_progress_event(data.user_id, serialize_journey_event(event))
+                append_chat_turn(data.user_id, user_update, response_text, intent)
+                return ChatResponse(
+                    response=response_text, context=user_context,
+                    updated_actions=updated_actions, week_phase="Reduced weekly load",
+                )
 
             if intent == "constraint" and roadmap:
                 profile = load_profile(data.user_id)
-                updated_actions = _constraint_actions(profile, user, user_update, date_info)
+                updated_actions = _constraint_actions(profile, user, user_update, date_info, current_actions)
                 _save_weekly_actions(db, roadmap, updated_actions, "Pace-adjusted week")
+                count = len(updated_actions)
+                lead = (
+                    f"I trimmed this week to your {count} most important task{'s' if count != 1 else ''} so it stays manageable while you're busy."
+                    if count > 1
+                    else "I lightened this week to a single focused task."
+                )
                 response_text = (
-                    f"I adjusted only this week for that constraint. {date_context} New task: {updated_actions[0]['title']}. "
-                    f"{updated_actions[0]['description']}"
+                    f"{lead} {date_context}\n\n{_format_action_bullets(updated_actions)}"
                 )
                 sync_current_week(data.user_id, career_context, updated_actions, reason="Agent 2 adjusted for event or schedule constraint.")
                 event = log_journey_event(
@@ -851,8 +1132,11 @@ def chat_message(request: Request, data: ChatRequest, db: Session = Depends(get_
                 )
                 append_progress_event(data.user_id, serialize_journey_event(event))
                 append_chat_turn(data.user_id, user_update, response_text, intent)
-                return ChatResponse(response=response_text, context=user_context)
-            
+                return ChatResponse(
+                    response=response_text, context=user_context,
+                    updated_actions=updated_actions, week_phase="Pace-adjusted week",
+                )
+
             role_prompt = f"""You are Agent 2 inside Delta Career OS: the weekly roadmap strategist for any student domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
 Current date/time context: {date_context}
 Default behavior: chat like a normal human tutor. Answer the user's actual query using the student profile, persistent memory files, and this week's tasks. Be clear, direct, and useful.
@@ -917,28 +1201,10 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
         )
         cleaned_response = response.strip()
         updated_actions = None
+        returned_actions = None
 
-        if is_weekly_agent and "```json" in response:
-            try:
-                parts = response.split("```json")
-                before_json = parts[0]
-                after_json_block = parts[1].split("```")
-                json_text = after_json_block[0].strip()
-                after_json = after_json_block[1] if len(after_json_block) > 1 else ""
-                
-                parsed_json = json.loads(json_text)
-                updated_actions = parsed_json.get("updated_actions")
-                
-                cleaned_response = (before_json.strip() + "\n" + after_json.strip()).strip()
-            except Exception as e:
-                print(f"Error parsing updated actions from LLM: {e}")
-        elif is_weekly_agent and (cleaned_response.startswith("{") or cleaned_response.startswith("[")):
-            try:
-                parsed_json = json.loads(cleaned_response)
-                updated_actions = parsed_json.get("updated_actions") or parsed_json.get("primary_actions")
-                cleaned_response = "I have updated your tasks for this week based on our conversation! Let me know if you need any other adjustments."
-            except Exception:
-                pass
+        if is_weekly_agent:
+            cleaned_response, updated_actions = _extract_updated_actions(response)
 
         if is_weekly_agent and updated_actions and roadmap:
             try:
@@ -955,9 +1221,11 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
                         "url": act.get("url") or act.get("resource_url") or "",
                     })
                 weekly_focus["primary_actions"] = sanitized_actions
+                weekly_focus["manual"] = True  # locked: this is the AI's decided list
                 roadmap.weekly_focus = json.dumps(weekly_focus)
                 db.commit()
                 db.refresh(roadmap)
+                returned_actions = sanitized_actions
             except Exception as db_err:
                 db.rollback()
                 print(f"Error updating roadmap actions in DB: {db_err}")
@@ -990,7 +1258,7 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
         )
         append_progress_event(data.user_id, serialize_journey_event(event))
         append_chat_turn(data.user_id, user_update, cleaned_response, intent)
-        return ChatResponse(response=cleaned_response, context=user_context)
+        return ChatResponse(response=cleaned_response, context=user_context, updated_actions=returned_actions)
     except Exception:
         next_project = (career_context.get("proof_projects") or [{}])[0]
         weekly_focus = (career_context.get("roadmap") or {}).get("weekly_focus", {})
@@ -1006,7 +1274,7 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
 
 
 @router.get("/history/{user_id}")
-def chat_history(user_id: str, db: Session = Depends(get_db)):
+def chat_history(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     events = db.query(JourneyEvent).filter(
         JourneyEvent.user_id == user_id,
         JourneyEvent.event_type == "assistant_guidance",

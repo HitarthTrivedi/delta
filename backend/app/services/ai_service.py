@@ -32,14 +32,23 @@ def _get_client():
     return _genai_client
 
 
-MODEL = "gemma-4-31b-it"
-
-
-def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 10000) -> str:
+def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None) -> str:
     """
-    Send a prompt to gemma-4-31b-it and return the response text.
+    Send a prompt to a Gemini model and return the response text.
+
+    `model` overrides the globally configured GEMINI_MODEL for this single call —
+    used so the intake agent can run on a stronger model than the rest of the app.
     """
-    print(f"\n=================== [LLM REQUEST - {MODEL}] ===================")
+    if model:
+        model_name = model
+    else:
+        try:
+            from app.config import settings
+            model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"
+        except Exception:
+            model_name = "gemini-2.5-flash"
+
+    print(f"\n=================== [LLM REQUEST - {model_name}] ===================")
     print(f"Temp: {temperature} | Max Tokens: {max_tokens}")
     print(f"Prompt preview (last 300 chars):\n...{prompt[-300:] if len(prompt) > 300 else prompt}")
     print(f"===========================================================")
@@ -48,7 +57,7 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
     if client:
         try:
             response = client.models.generate_content(
-                model=MODEL,
+                model=model_name,
                 contents=prompt,
                 config={
                     "temperature": temperature,
@@ -58,12 +67,12 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
             text = response.text
             if text:
                 print(f"\n=================== [LLM RESPONSE SUCCESS] ===================")
-                print(f"Length: {len(text)} chars | Model: {MODEL}")
+                print(f"Length: {len(text)} chars | Model: {model_name}")
                 print(f"Response preview:\n{text[:250]}...")
                 print(f"==============================================================")
                 return text.strip()
         except Exception as e:
-            print(f"\n❌ [LLM RESPONSE ERROR] Model {MODEL} call failed: {e}")
+            print(f"\n❌ [LLM RESPONSE ERROR] Model {model_name} call failed: {e}")
             import traceback
             traceback.print_exc()
             print(f"==============================================================")
@@ -73,11 +82,13 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
     return _mock_structured_response(prompt)
 
 
-def generate_json(prompt: str, temperature: float = 0.3) -> dict | list:
+def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None) -> dict | list:
     """
     Generate a JSON response. Strips markdown fences and parses automatically.
+
+    `model` overrides the globally configured GEMINI_MODEL for this single call.
     """
-    raw = generate_response(prompt, temperature=temperature)
+    raw = generate_response(prompt, temperature=temperature, model=model)
     
     # Strip markdown fences
     clean_raw = raw

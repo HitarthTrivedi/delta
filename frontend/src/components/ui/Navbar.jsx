@@ -1,8 +1,9 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ClipboardList, FileText, Map, BarChart3, Bell
+  ClipboardList, FileText, Map, BarChart3, LogOut
 } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 
 const navItems = [
   { label: 'Part 1 Input', path: '/intake', icon: ClipboardList },
@@ -13,13 +14,24 @@ const navItems = [
 
 export default function Navbar({ user }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black/88 backdrop-blur-xl border-b border-white/10">
       <div className="max-w-[1180px] mx-auto px-6 flex items-center justify-between h-16 gap-5">
         <Link to="/" className="flex items-center gap-2 text-white font-bold text-base tracking-normal shrink-0">
-          <span className="w-7 h-7 rounded-md bg-white text-black flex items-center justify-center">
-            <FileText size={15} />
+          <span className="w-7 h-7 rounded-md bg-white/5 border border-white/15 overflow-hidden flex items-center justify-center">
+            <img src="/delta-bg.jpeg" alt="Delta logo" className="w-full h-full object-cover" />
           </span>
           Delta
         </Link>
@@ -53,8 +65,12 @@ export default function Navbar({ user }) {
               {user?.target_role || 'No Target Set'}
             </p>
           </div>
-          <button className="relative p-2 rounded-lg bg-white/5 border border-white/10 text-white/45 hover:text-white transition-colors">
-            <Bell size={14} />
+          <button 
+            onClick={handleLogout} 
+            title="Sign Out"
+            className="relative p-2 rounded-lg bg-white/5 border border-white/10 text-white/45 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all"
+          >
+            <LogOut size={14} />
           </button>
           <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white text-xs font-bold">
             {(user?.name || 'G')[0]}

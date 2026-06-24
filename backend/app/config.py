@@ -42,9 +42,13 @@ def _database_url() -> str:
 class Settings(BaseSettings):
     DATABASE_URL: str = _database_url()
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     SERPER_API_KEY: str = os.getenv("SERPER_API_KEY", "")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
     CORS_ORIGINS: list[str] = parse_csv_env(
         "CORS_ORIGINS",
         ["http://localhost:3000", "http://127.0.0.1:3000"],

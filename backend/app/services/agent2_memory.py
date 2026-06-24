@@ -5,14 +5,22 @@ from __future__ import annotations
 import datetime
 import json
 import pathlib
+import re
 from typing import Any
 
 
 BASE_DIR = pathlib.Path(__file__).resolve().parents[3] / "data" / "agent2_memory"
 
 
+def _safe_user_id(user_id: str) -> str:
+    user_id = str(user_id or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", user_id):
+        raise ValueError("Invalid user_id.")
+    return user_id
+
+
 def _user_dir(user_id: str) -> pathlib.Path:
-    path = BASE_DIR / user_id
+    path = BASE_DIR / _safe_user_id(user_id)
     path.mkdir(parents=True, exist_ok=True)
     return path
 

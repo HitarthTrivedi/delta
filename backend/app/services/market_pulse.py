@@ -8,6 +8,7 @@ import requests
 
 from app.services.domain_packs import infer_domain_pack
 from app.services.opportunity_adapters import collect_opportunities, summarize_opportunity_signals
+from app.services.web_search import WebSearchService
 
 
 SKILL_ALIASES = {
@@ -42,20 +43,27 @@ def get_market_snapshot(target_role: str = "AI Developer / Software Engineer") -
     source_documents.extend(_fetch_stackexchange_signals(domain_pack["skill_taxonomy"]))
     source_documents.extend(_fetch_job_signals(target_role))
 
+    search_snapshot = _fetch_search_market_snapshot(target_role, domain_pack["skill_taxonomy"])
     skill_counts = _count_skills(source_documents, domain_pack["skill_taxonomy"])
     top_demanded = [skill for skill, _ in skill_counts.most_common(8)]
+    top_demanded = _merge_unique(top_demanded, search_snapshot.get("demanded_skills", []), domain_pack["skill_taxonomy"])[:8]
     if not top_demanded:
         top_demanded = domain_pack["skill_taxonomy"][:6]
 
     emerging = _derive_emerging_skills(source_documents, top_demanded, domain_pack["skill_taxonomy"])
-    recruiter_language = _extract_recruiter_phrases(source_documents)
-    project_patterns = _derive_project_patterns(target_role, top_demanded)
-    certifications = _derive_certifications(top_demanded, domain_pack["certifications"])
-    market_warnings = _derive_market_warnings(source_documents, top_demanded)
+    emerging = _merge_unique(emerging, search_snapshot.get("emerging_skills", []))[:6]
+    recruiter_language = _merge_unique(_extract_recruiter_phrases(source_documents), search_snapshot.get("recruiter_signals", []))[:6]
+    project_patterns = _merge_unique(_derive_project_patterns(target_role, top_demanded), search_snapshot.get("project_patterns", []))[:6]
+    certifications = _merge_unique(_derive_certifications(top_demanded, domain_pack["certifications"]), search_snapshot.get("certification_signals", []))[:5]
+    market_warnings = _merge_unique(_derive_market_warnings(source_documents, top_demanded), search_snapshot.get("market_warnings", []))[:5]
 
     opportunities = collect_opportunities(domain_pack["skill_taxonomy"][:5], target_role)
     source_names = sorted({doc["source"] for doc in source_documents})
-    confidence = min(0.9, 0.35 + 0.08 * len(source_names) + 0.01 * len(source_documents))
+    search_sources = search_snapshot.get("sources", [])
+    confidence = min(0.92, max(
+        search_snapshot.get("confidence_score", 0),
+        0.35 + 0.08 * len(source_names) + 0.01 * len(source_documents),
+    ))
 
     return {
         "top_demanded_skills": top_demanded,
@@ -65,12 +73,35 @@ def get_market_snapshot(target_role: str = "AI Developer / Software Engineer") -
         "certifications": certifications,
         "market_warnings": market_warnings,
         "sources": source_names,
+        "search_sources": search_sources[:8],
         "domain_pack": domain_pack,
         "confidence_score": round(confidence, 2),
         "opportunities": opportunities[:8],
         "opportunity_signals": summarize_opportunity_signals(opportunities),
-        "source_mode": "live_public_sources" if source_documents else "live_sources_unavailable",
+        "source_mode": search_snapshot.get("provider") or ("live_public_sources" if source_documents else "live_sources_unavailable"),
     }
+
+
+def _fetch_search_market_snapshot(target_role: str, taxonomy: list[str]) -> dict:
+    try:
+        return WebSearchService().search_for_market_pulse(target_role, taxonomy[:8])
+    except Exception:
+        return {}
+
+
+def _merge_unique(*groups) -> list:
+    merged = []
+    seen = set()
+    for group in groups:
+        if not group:
+            continue
+        for item in group:
+            key = str(item).strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            merged.append(item)
+    return merged
 
 
 def _fetch_github_signals(target_role: str, taxonomy: list[str]) -> list[dict]:

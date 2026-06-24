@@ -125,6 +125,9 @@ def _profile_text(profile: dict, skills: list[SkillNode], user: User) -> str:
         str(profile.get("target_role", "")),
         str(profile.get("major", "")),
         str(profile.get("past_experience", "")),
+        str(profile.get("projects", "")),
+        str(profile.get("resume_text", "")),
+        str(profile.get("career_goals", "")),
         " ".join(_profile_skills(profile)),
         " ".join(skill.name for skill in skills),
         str(user.target_role or ""),
@@ -149,49 +152,271 @@ def _profile_domain(profile: dict, skills: list[SkillNode], user: User) -> str:
 
 
 def _has_prior_profile_depth(profile: dict, skills: list[SkillNode], user: User) -> bool:
-    profile_text = " ".join([
-        str(profile.get("target_role", "")),
-        str(profile.get("experience_level", "")),
+    profile_text = _profile_text(profile, skills, user)
+    advanced_markers = [
+        "advanced", "intermediate", "production", "deployed", "published", "pypi",
+        "downloads", "multi-agent", "multi agent", "agentic rag", "llm orchestration",
+        "long-term memory", "weighted scoring", "benchmark", "evaluation", "alpha.kore",
+        "lazycook", "github", "open source",
+    ]
+    return any(marker in profile_text for marker in advanced_markers) or len(_profile_skills(profile)) >= 5
+
+
+def _profile_project_label(profile: dict) -> str:
+    text = " ".join([
         str(profile.get("past_experience", "")),
-        " ".join(_profile_skills(profile)),
-        " ".join(skill.name for skill in skills),
-        str(user.target_role or ""),
+        str(profile.get("projects", "")),
+        str(profile.get("resume_text", "")),
     ]).lower()
-    return "intermediate" in profile_text or "advanced" in profile_text or len(_profile_skills(profile)) >= 5
+    if "alpha.kore" in text or "alpha kore" in text:
+        return "Alpha.Kore"
+    if "lazycook" in text or "lazy cook" in text:
+        return "LazyCook"
+    if "agentic" in text or "multi-agent" in text or "multi agent" in text:
+        return "your agentic AI system"
+    if "pypi" in text or "package" in text:
+        return "your shipped package"
+    return "your strongest existing project"
+
+
+def _planning_horizon_months(profile: dict) -> int:
+    try:
+        months = int(profile.get("planning_horizon_months") or 0)
+    except Exception:
+        months = 0
+    if months <= 0:
+        try:
+            months = int(profile.get("timeline_months") or 0)
+        except Exception:
+            months = 0
+    return months or 12
+
+
+def _monthly_progress_counts(db: Session, user_id: str) -> dict:
+    today = datetime.date.today()
+    month_start = datetime.datetime(today.year, today.month, 1)
+    events = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user_id,
+        JourneyEvent.event_type.in_(["weekly_task_completed", "weekly_task_skipped"]),
+        JourneyEvent.created_at >= month_start,
+    ).all()
+    return {
+        "completed": len([event for event in events if event.event_type == "weekly_task_completed"]),
+        "skipped": len([event for event in events if event.event_type == "weekly_task_skipped"]),
+        "accepted": len(events),
+    }
+
+
+def _should_assign_break_week(db: Session, user: User, profile: dict, roadmap: "RoadmapState | None" = None) -> bool:
+    # In DEV_MODE the pacing guards are off so the plan can be iterated freely while testing.
+    import os as _os
+    if _os.getenv("DEV_MODE", "false").lower() in {"true", "1", "yes"}:
+        return False
+    # Never stack break weeks. If the current week is already a break week, or one was
+    # assigned in the last 21 days, do not assign another — otherwise the monthly counter
+    # (which keeps counting completed break-week tasks) traps the user in an endless loop.
+    if roadmap:
+        weekly_focus = _as_json(roadmap.weekly_focus, {})
+        if (weekly_focus.get("phase_name") or "") == "Break week" or weekly_focus.get("is_break_week"):
+            return False
+        destination = _as_json(roadmap.destination, {})
+        last_break = destination.get("last_break_week_at")
+        if last_break:
+            try:
+                last_dt = datetime.datetime.fromisoformat(last_break)
+                if (datetime.datetime.utcnow() - last_dt).days < 21:
+                    return False
+            except Exception:
+                pass
+
+    progress = _monthly_progress_counts(db, user.id)
+    accepted = progress["accepted"]
+    hours = user.hours_per_week or profile.get("hours_per_week") or 10
+    try:
+        hours = int(hours)
+    except Exception:
+        hours = 10
+    monthly_target = 4 if hours <= 6 else 6 if hours <= 12 else 8
+    return accepted >= monthly_target and progress["completed"] >= max(2, monthly_target // 2)
+
+
+def _break_week_actions(profile: dict, user: User, reason: str = "") -> list[dict]:
+    project_label = _profile_project_label(profile)
+    return [{
+        "id": "break-week-maintenance",
+        "node_id": "recovery-and-review",
+        "type": "practice",
+        "title": "Break week: review and recover",
+        "skill": "Sustainable execution",
+        "description": (
+            f"No new heavy project this week. Spend one short 60-90 minute block reviewing {project_label}, "
+            "write what you finished this month, clean one README or task note, and then rest. "
+            "Ask Agent 2 to add work only if you genuinely want a challenge."
+        ),
+        "why_now": reason or "You have already accepted enough work this month, so Delta is protecting your pace.",
+        "source": "Delta monthly pacing guard",
+        "url": "",
+        "prior_exposure": True,
+    }]
+
+
+LEETCODE_SEQUENCE = [
+    ("Arrays and Hashing", "Solve 4 problems: 2 easy + 2 medium. Focus on frequency maps, sets, and duplicate detection."),
+    ("Two Pointers", "Solve 3 problems: valid palindrome style, sorted two-sum style, and container/window boundary reasoning."),
+    ("Sliding Window", "Solve 3 problems: fixed window, variable window, and longest substring/pattern tracking."),
+    ("Stack", "Solve 3 problems: valid parentheses, monotonic stack, and expression/min-stack style reasoning."),
+    ("Binary Search", "Solve 4 problems: classic search, lower/upper bound, search rotated array, and answer-space binary search."),
+    ("Linked List", "Solve 3 problems: reverse, fast/slow pointer, and merge/reorder style."),
+    ("Trees", "Solve 4 problems: DFS traversal, BFS level order, path/depth, and lowest common ancestor style."),
+    ("Heap / Priority Queue", "Solve 3 problems: top-k, streaming median/kth, and scheduling/merge pattern."),
+    ("Backtracking", "Solve 3 problems: subsets, permutations/combinations, and constraint pruning."),
+    ("Graphs", "Solve 4 problems: BFS/DFS traversal, connected components, topological sort, and shortest path basics."),
+    ("Dynamic Programming 1D", "Solve 3 problems: climbing/house-robber, coin/change style, and LIS-style recurrence."),
+    ("Dynamic Programming 2D", "Solve 3 problems: grid path, LCS/edit-distance style, and knapsack-style state design."),
+]
+
+
+def _week_number_from_user(user: User) -> int:
+    if not user.created_at:
+        return 1
+    elapsed_days = (datetime.datetime.utcnow() - user.created_at).days
+    return max(1, (elapsed_days // 7) + 1)
+
+
+def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User) -> list[dict]:
+    domain = _profile_domain(profile, skills, user)
+    week_number = _week_number_from_user(user)
+    actions = []
+    if domain in {"ai_agents", "general"} or "software" in str(user.target_role or "").lower() or "engineer" in str(user.target_role or "").lower():
+        topic, detail = LEETCODE_SEQUENCE[(week_number - 1) % len(LEETCODE_SEQUENCE)]
+        actions.append({
+            "id": f"recurring-leetcode-week-{week_number}-{topic.lower().replace(' ', '-').replace('/', '-')}",
+            "node_id": "recurring-leetcode",
+            "type": "practice",
+            "title": f"LeetCode habit: {topic}",
+            "skill": "DSA interview consistency",
+            "description": (
+                f"This is a recurring weekly habit, not a one-time course. {detail} "
+                "Write down the pattern, the mistake you made, and one reusable template."
+            ),
+            "why_now": "Interview readiness compounds through small weekly practice, not short bursts.",
+            "source": "LeetCode topic rotation",
+            "url": "https://leetcode.com/problemset/",
+            "cadence": "weekly",
+            "recurring": True,
+        })
+    return actions
+
+
+def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, market: MarketSnapshot) -> list[dict]:
+    raw = _as_json(market.raw_data, {})
+    emerging = _as_json(market.emerging_skills, [])
+    demanded = _as_json(market.top_demanded_skills, [])
+    project_patterns = raw.get("project_patterns") or []
+    market_warnings = raw.get("market_warnings") or []
+    trend = (emerging or demanded or ["market-backed proof"])[0]
+    pattern = project_patterns[0] if project_patterns else f"Build a small proof using {trend} and explain the tradeoffs."
+    warning = market_warnings[0] if market_warnings else "Make the proof measurable, deployed or documented, and easy for a recruiter to inspect."
+    return [{
+        "id": f"trend-proof-{str(trend).lower().replace(' ', '-').replace('/', '-')[:40]}",
+        "node_id": "market-trend-response",
+        "type": "project",
+        "title": f"Trend proof: {trend}",
+        "skill": str(trend).title(),
+        "description": (
+            f"Create one small resume-visible proof responding to this market signal: {pattern} "
+            f"Add a README section explaining why it matters now. Hiring warning to address: {warning}"
+        ),
+        "why_now": "Delta uses live/search-backed market signals so your roadmap keeps adapting to future demand.",
+        "source": raw.get("source") or market.target_role or "Delta market pulse",
+        "url": "",
+        "cadence": "trend",
+    }]
+
+
+def _long_horizon_plan(profile: dict, skills: list[SkillNode], user: User, market: MarketSnapshot) -> dict:
+    months = _planning_horizon_months(profile)
+    domain = _profile_domain(profile, skills, user)
+    raw = _as_json(market.raw_data, {})
+    demanded = _as_json(market.top_demanded_skills, [])[:6]
+    emerging = _as_json(market.emerging_skills, [])[:5]
+    if domain == "ai_agents":
+        lanes = [
+            {"name": "Interview consistency", "cadence": "Every week", "rule": "3-4 LeetCode problems from the current topic rotation."},
+            {"name": "AI engineering proof", "cadence": "Every 2-3 weeks", "rule": "Ship or upgrade one eval, RAG, agent, deployment, or observability artifact."},
+            {"name": "Market trend response", "cadence": "Monthly", "rule": f"Pick one emerging signal from {', '.join(emerging or demanded or ['current hiring trends'])} and turn it into proof."},
+            {"name": "Resume/story polish", "cadence": "Monthly", "rule": "Convert completed work into one strong resume bullet, README section, or portfolio note."},
+        ]
+    else:
+        lanes = [
+            {"name": "Core skill practice", "cadence": "Every week", "rule": "Do one repeated practice block matched to the target domain."},
+            {"name": "Portfolio proof", "cadence": "Every 2-3 weeks", "rule": "Create or improve one inspectable project/case study/simulation/report."},
+            {"name": "Market trend response", "cadence": "Monthly", "rule": f"Use one trend from {', '.join(emerging or demanded or ['current market signals'])}."},
+            {"name": "Communication polish", "cadence": "Monthly", "rule": "Write a clear proof note showing problem, method, result, and tradeoff."},
+        ]
+    return {
+        "horizon_months": months,
+        "intent": "Long-scale career improvement plan with recurring habits, market tracking, and proof-building.",
+        "lanes": lanes,
+        "market_signals": {
+            "demanded_skills": demanded,
+            "emerging_skills": emerging,
+            "project_patterns": (raw.get("project_patterns") or [])[:4],
+            "sources": (raw.get("search_sources") or raw.get("sources") or [])[:6],
+        },
+    }
 
 
 def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User, db: Session) -> list[dict]:
     domain = _profile_domain(profile, skills, user)
     project_context = profile.get("past_experience") or "your existing work"
+    project_label = _profile_project_label(profile)
     templates = {
         "ai_agents": [
             {
-            "id": "task-agent-memory-eval",
-            "node_id": "advanced-agent-memory",
-            "type": "project",
-            "title": "Build a memory-quality evaluation for your agent system",
-            "skill": "Long-Term Memory Systems",
-            "description": (
-                f"Use your {project_context} experience. Create a small eval with 8-10 test prompts that checks whether an agent remembers, forgets, and retrieves the right facts."
-            ),
-            "why_now": "You already know the basics; this proves reliability, not just usage.",
-            "source": "Your existing Alpha.Kore / agentic systems work",
-            "url": "",
-            "prior_exposure": True,
+                "id": "task-agent-eval-harness",
+                "node_id": "advanced-agent-evaluation",
+                "type": "project",
+                "title": f"Build an eval harness for {project_label}",
+                "skill": "Agent Evaluation Engineering",
+                "description": (
+                    f"Use {project_label}. Create 12 realistic prompts across normal use, ambiguity, missing context, and adversarial input. "
+                    "Score each run on task success, factual grounding, tool choice, memory use, and formatting. Ship a README table with pass/fail results and one code or prompt fix."
+                ),
+                "why_now": "Your resume already shows advanced AI work, so the proof should measure reliability like an engineer, not teach basics.",
+                "source": "Your existing resume/project evidence",
+                "url": "",
+                "prior_exposure": True,
             },
             {
-            "id": "task-adversarial-agent-redteam",
-            "node_id": "advanced-adversarial-ai",
-            "type": "project",
-            "title": "Red-team one agent workflow against prompt attacks",
-            "skill": "Adversarial AI Architecture",
-            "description": (
-                "Write 6 adversarial prompts, run them against one agent workflow, record failures, then add one guardrail or scoring rule that improves behavior."
-            ),
-            "why_now": "This is beyond beginner ML and directly matches your adversarial AI goal.",
-            "source": "OWASP LLM risk style practice",
-            "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
-            "prior_exposure": True,
+                "id": "task-agent-redteam-regression",
+                "node_id": "advanced-adversarial-ai",
+                "type": "project",
+                "title": f"Create a red-team regression suite for {project_label}",
+                "skill": "Adversarial AI Architecture",
+                "description": (
+                    "Write 8 attack or edge-case prompts: prompt injection, conflicting instructions, fake tool output, private-data request, hallucinated citation, malformed JSON, vague user goal, and impossible deadline. "
+                    "Record the failure mode, add one guardrail/scoring rule, and rerun the suite to show before/after behavior."
+                ),
+                "why_now": "This turns your existing agent work into a security and reliability signal.",
+                "source": "OWASP LLM risk style practice",
+                "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+                "prior_exposure": True,
+            },
+            {
+                "id": "task-agent-observability",
+                "node_id": "advanced-agent-observability",
+                "type": "project",
+                "title": f"Add an observability note to {project_label}",
+                "skill": "AI System Observability",
+                "description": (
+                    "Instrument one workflow with a simple trace log: user intent, retrieved context, tool decision, model response, validation result, and final status. "
+                    "Publish a short architecture note explaining two failures the trace makes easier to debug."
+                ),
+                "why_now": "Advanced projects become stronger when you can explain and debug their behavior.",
+                "source": "Your existing codebase or project notes",
+                "url": "",
+                "prior_exposure": True,
             },
         ],
         "commerce": [
@@ -777,12 +1002,15 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         if event_type in {"weekly_task_completed", "weekly_task_skipped"}
     }
 
-    if expected_ids and not expected_ids.issubset(accepted_ids):
+    import os as _os
+    dev_mode = _os.getenv("DEV_MODE", "false").lower() in {"true", "1", "yes"}
+
+    # Completion gate: require the current tasks to be finished/skipped before advancing.
+    # Skipped in DEV_MODE so the plan can be iterated freely during testing.
+    if not dev_mode and expected_ids and not expected_ids.issubset(accepted_ids):
         remaining = len(expected_ids - accepted_ids)
         raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
 
-    import os as _os
-    dev_mode = _os.getenv("DEV_MODE", "false").lower() in {"true", "1", "yes"}
     elapsed_seconds = (datetime.datetime.utcnow() - current_week_start).total_seconds()
     minimum_seconds = max(300, min(5400, len(expected_ids or accepted_ids or [1]) * 900))
     if not dev_mode and elapsed_seconds < minimum_seconds:
@@ -1107,8 +1335,13 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         weekly_focus = _as_json(roadmap.weekly_focus, {})
         actions = weekly_focus.get("primary_actions") or []
         has_stable_actions = actions and all(action.get("id") and action.get("title") for action in actions)
+        # If Agent 2 (or the user) explicitly set this week, it is the source of truth.
+        # Return it untouched — never auto-regenerate over an explicit decision.
+        if has_stable_actions and weekly_focus.get("manual"):
+            return roadmap
         low_level_start = any(str(action.get("title", "")).lower().startswith("start ") for action in actions)
-        profile_says_advanced = _has_prior_profile_depth(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user)
+        skills_for_profile = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
+        profile_says_advanced = _has_prior_profile_depth(profile, skills_for_profile, user)
         if has_stable_actions:
             if blocking_events:
                 weekly_focus["primary_actions"] = _event_block_actions(blocking_events)
@@ -1118,14 +1351,44 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                 db.commit()
                 db.refresh(roadmap)
             elif profile_says_advanced and low_level_start:
-                proof_actions = _domain_proof_actions(profile, db.query(SkillNode).filter(SkillNode.user_id == user.id).all(), user, db)
+                proof_actions = _domain_proof_actions(profile, skills_for_profile, user, db)
                 if proof_actions:
-                    weekly_focus["primary_actions"] = proof_actions
+                    recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user)
+                    trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
+                    long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
+                    weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
+                    weekly_focus["long_horizon_lanes"] = long_plan["lanes"]
                     weekly_focus["phase_name"] = "Profile-based proof sprint"
+                    weekly_focus["selection_reason"] = "Adjusted away from beginner tasks using resume/profile experience and market trends."
+                    destination = _as_json(roadmap.destination, {})
+                    destination["planning_horizon_months"] = _planning_horizon_months(profile)
+                    destination["long_horizon_plan"] = long_plan
+                    roadmap.destination = _dump(destination)
                     roadmap.weekly_focus = _dump(weekly_focus)
                     roadmap.last_replanned_reason = "Adjusted away from beginner tasks using resume/profile experience."
                     db.commit()
                     db.refresh(roadmap)
+            elif not weekly_focus.get("long_horizon_lanes"):
+                recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user)
+                trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
+                existing_ids = {str(action.get("id")) for action in actions}
+                durable_actions = [
+                    action for action in [*recurring_actions, *trend_actions[:1]]
+                    if str(action.get("id")) not in existing_ids
+                ]
+                if durable_actions:
+                    weekly_focus["primary_actions"] = durable_actions + actions[:3]
+                long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
+                weekly_focus["long_horizon_lanes"] = long_plan["lanes"]
+                weekly_focus["selection_reason"] = "Upgraded existing week with durable habit and trend lanes."
+                destination = _as_json(roadmap.destination, {})
+                destination["planning_horizon_months"] = _planning_horizon_months(profile)
+                destination["long_horizon_plan"] = long_plan
+                roadmap.destination = _dump(destination)
+                roadmap.weekly_focus = _dump(weekly_focus)
+                roadmap.last_replanned_reason = "Added long-scale habit, trend, and proof planning to existing roadmap."
+                db.commit()
+                db.refresh(roadmap)
             return roadmap
     skills = _sync_profile_skills_to_db(db, user)
 
@@ -1137,20 +1400,46 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     destination = {
         "target_role": user.target_role or market.target_role or "Career-ready professional",
         "long_term_projection": "Build capability, proof, and market awareness until the user can compete for real opportunities.",
+        "planning_horizon_months": _planning_horizon_months(profile),
+        "timeline_basis": profile.get("inferred_planning_reason") or "Delta inferred a flexible planning horizon from the current profile.",
     }
+    long_plan = _long_horizon_plan(profile, skills, user, market)
+    destination["long_horizon_plan"] = long_plan
     weekly_focus = {
         "phase_id": active_phase.get("id") if active_phase else None,
         "phase_name": active_phase.get("name") if active_phase else None,
         "primary_actions": _derive_weekly_actions(active_phase),
+        "planning_horizon_months": destination["planning_horizon_months"],
+        "long_horizon_lanes": long_plan["lanes"],
     }
+    recurring_actions = _recurring_habit_actions(profile, skills, user)
+    trend_actions = _trend_response_actions(profile, skills, user, market)
+    if recurring_actions:
+        weekly_focus["primary_actions"] = recurring_actions + weekly_focus["primary_actions"][:2]
+        weekly_focus["selection_reason"] = "Includes recurring long-term habit work plus the current roadmap slice."
     if _has_prior_profile_depth(profile, skills, user):
         proof_actions = _domain_proof_actions(profile, skills, user, db)
         if proof_actions:
             weekly_focus["phase_name"] = "Profile-based proof sprint"
-            weekly_focus["primary_actions"] = proof_actions
+            weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
+            weekly_focus["selection_reason"] = "Matched against resume/project evidence and current skill depth."
+    if regenerate and not blocking_events and _should_assign_break_week(db, user, profile, roadmap):
+        weekly_focus["phase_name"] = "Break week"
+        weekly_focus["is_break_week"] = True
+        weekly_focus["primary_actions"] = _break_week_actions(
+            profile,
+            user,
+            "You have already completed or skipped enough tasks this month."
+        )
+        weekly_focus["selection_reason"] = "Monthly pacing guard assigned recovery instead of extra work."
+        # Record when this break was given so we don't re-trigger another one for ~3 weeks.
+        destination["last_break_week_at"] = datetime.datetime.utcnow().isoformat()
     if blocking_events:
         weekly_focus["phase_name"] = "Event-focused week"
         weekly_focus["primary_actions"] = _event_block_actions(blocking_events)
+    # A freshly generated week is also authoritative — lock it so a later context-load
+    # does not silently regenerate different tasks over it.
+    weekly_focus["manual"] = True
     proof_requirements = _derive_proof_requirements(phases)
 
     if roadmap:

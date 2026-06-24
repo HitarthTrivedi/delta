@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, SkillNode
 from app.services.calendar_service import generate_upcoming_events
 from app.services.opportunity_adapters import get_source_statuses
+from app.dependencies.auth import verify_resource_owner
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
@@ -18,11 +19,14 @@ def get_calendar_events(
     days_ahead: int = 30,
     sources: str | None = None,
     db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
 ):
     """
     Exposes a dynamic calendar of coding contests, hackathons, and machine learning sprints.
     Matches events against the student's active SkillNode list and ranks them by skill-match percent.
     """
+    verify_resource_owner(user_id, x_user_id=x_user_id, authorization=authorization)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

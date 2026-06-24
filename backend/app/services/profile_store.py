@@ -48,6 +48,7 @@ import json
 import pathlib
 import datetime
 import logging
+import re
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger("delta.profile_store")
@@ -56,9 +57,16 @@ logger = logging.getLogger("delta.profile_store")
 _PROFILES_DIR = pathlib.Path(__file__).resolve().parents[3] / "data" / "profiles"
 
 
+def _safe_user_id(user_id: str) -> str:
+    user_id = str(user_id or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", user_id):
+        raise ValueError("Invalid user_id.")
+    return user_id
+
+
 def _profile_path(user_id: str) -> pathlib.Path:
     _PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-    return _PROFILES_DIR / f"{user_id}.json"
+    return _PROFILES_DIR / f"{_safe_user_id(user_id)}.json"
 
 
 def load_profile(user_id: str) -> Dict[str, Any]:
@@ -125,7 +133,11 @@ def profile_as_context_string(user_id: str) -> str:
         f"Email: {p.get('email', '')}",
         f"Personal introduction / backstory: {p.get('personal_introduction') or p.get('backstory') or 'Not specified'}",
         f"Transition reason: {p.get('transition_reason', 'Not specified')}",
-        f"Target Role: {p.get('target_role', 'Not specified')}",
+        f"Current status: {p.get('current_status', 'Not specified')}",
+        f"Education/life stage: {p.get('education_stage', 'Not specified')}",
+        f"Has resume: {p.get('has_resume', 'Not specified')}",
+        f"Target Role: {p.get('target_role') or p.get('goal_direction') or 'Not specified'}",
+        f"Goal direction: {p.get('goal_direction', 'Not specified')}",
         f"Detected goal/exam track: {p.get('detected_goal_track') or p.get('target_exam') or 'Not specified'}",
         f"Target attempt/intake/date: {p.get('target_attempt', 'Not specified')}",
         f"Exam/goal detail: {p.get('exam_goal_detail', 'Not specified')}",
@@ -136,6 +148,8 @@ def profile_as_context_string(user_id: str) -> str:
         f"GPA: {p.get('gpa', 'Not specified')}",
         f"Experience Level: {p.get('experience_level', 'beginner')}",
         f"Past experience description: {p.get('past_experience', 'Not specified')}",
+        f"Projects: {', '.join(p.get('projects', [])) if isinstance(p.get('projects'), list) else p.get('projects', 'None listed')}",
+        f"No experience yet: {p.get('no_experience_yet', 'Not specified')}",
         f"Hours/week available: {p.get('hours_per_week', 10)}",
         f"Preferred learning style: {p.get('learning_style', 'practical')}",
         f"Preferred Content Types: {', '.join(p.get('preferred_content_types', [])) if isinstance(p.get('preferred_content_types'), list) else p.get('preferred_content_types', 'Not specified')}",

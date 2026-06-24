@@ -4,6 +4,7 @@ import json
 from app.database import get_db
 from app.models import User, SkillNode, MarketSnapshot
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserWithSkills
+from app.dependencies.auth import require_owner
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -12,10 +13,23 @@ from app.services.profile_store import load_profile
 from app.services.ingestion_engine_v2 import REQUIRED_FIELDS
 
 @router.get("/{user_id}", response_model=UserResponse)
-def get_user(user_id: str, db: Session = Depends(get_db)):
+def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Auto-create user from Supabase user ID
+        user = User(
+            id=user_id,
+            email="",
+            name="Delta Member",
+            current_role="Professional",
+            years_experience=0,
+            target_role="Software Engineer",
+            hours_per_week=10,
+            learning_style="hands-on"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
     
     profile = load_profile(user_id)
     onboarding_complete = profile.get("onboarding_complete", False)
@@ -32,10 +46,23 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/with-skills", response_model=UserWithSkills)
-def get_user_with_skills(user_id: str, db: Session = Depends(get_db)):
+def get_user_with_skills(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        # Auto-create user from Supabase user ID
+        user = User(
+            id=user_id,
+            email="",
+            name="Delta Member",
+            current_role="Professional",
+            years_experience=0,
+            target_role="Software Engineer",
+            hours_per_week=10,
+            learning_style="hands-on"
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
     
     profile = load_profile(user_id)
     onboarding_complete = profile.get("onboarding_complete", False)
@@ -52,7 +79,7 @@ def get_user_with_skills(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-def update_user(user_id: str, data: UserUpdate, db: Session = Depends(get_db)):
+def update_user(user_id: str, data: UserUpdate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -64,7 +91,7 @@ def update_user(user_id: str, data: UserUpdate, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/stats")
-def get_user_stats(user_id: str, db: Session = Depends(get_db)):
+def get_user_stats(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

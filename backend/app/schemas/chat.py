@@ -8,6 +8,11 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     context: Optional[str] = None
+    # When Agent 2 changes the weekly plan, it returns the authoritative task list here so
+    # the frontend displays exactly what the AI decided — no separate re-derivation that
+    # could disagree. None means "no change to the task list this turn".
+    updated_actions: Optional[List[dict]] = None
+    week_phase: Optional[str] = None
 
 class OnboardingStartRequest(BaseModel):
     raw_input: str

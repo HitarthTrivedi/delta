@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, AlertCircle } from 'lucide-react';
+import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { careerOSAPI, chatAPI } from '../lib/api';
 import { getTaskProgress } from '../lib/taskProgress';
@@ -35,6 +35,7 @@ export default function WeeklyPlan() {
   ]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [chatExpanded, setChatExpanded] = useState(false);
   const bottomRef = useRef(null);
 
   const loadContext = useCallback(async (regenerate = false) => {
@@ -73,6 +74,8 @@ export default function WeeklyPlan() {
   const educationStage = memory.identity_context?.education_stage || memory.identity?.education_stage || 'Profile building';
   const targetRole = memory.ambitions?.target_role || roadmap.destination?.target_role || 'your goal';
   const hoursPerWeek = memory.constraints?.hours_per_week || 10;
+  const longHorizonPlan = roadmap.destination?.long_horizon_plan || {};
+  const longHorizonLanes = longHorizonPlan.lanes || weeklyFocus.long_horizon_lanes || [];
 
   const actions = useMemo(() => {
     return getTaskProgress(context, fallbackActions).actions;
@@ -80,6 +83,18 @@ export default function WeeklyPlan() {
 
   const opportunities = context?.opportunities || [];
   const nextQuestions = context?.next_questions || [];
+  const chatPanelStyle = chatExpanded
+    ? {
+        ...panelStyle,
+        position: 'fixed',
+        inset: '5.25rem 1.25rem 1.25rem',
+        zIndex: 60,
+        padding: 20,
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.72)',
+      }
+    : { ...panelStyle, padding: 20 };
 
   const refreshWeek = async () => {
     setRefreshing(true);
@@ -178,7 +193,25 @@ export default function WeeklyPlan() {
         message: `Agent 2 weekly plan discussion. Current weekly actions: ${actions.map(a => a.title).join('; ')}. User update: ${text}`,
       });
       setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
-      await loadContext();
+      // Single source of truth: if Agent 2 returned a task list, display EXACTLY that list.
+      // No separate re-derivation that could disagree with what the AI just said.
+      if (Array.isArray(response.updated_actions)) {
+        setContext(prev => ({
+          ...(prev || {}),
+          roadmap: {
+            ...((prev || {}).roadmap || {}),
+            weekly_focus: {
+              ...(((prev || {}).roadmap || {}).weekly_focus || {}),
+              primary_actions: response.updated_actions,
+              phase_name: response.week_phase || (((prev || {}).roadmap || {}).weekly_focus || {}).phase_name,
+            },
+          },
+        }));
+        setChecked({});   // list changed — reset progress marks
+        setSkipped({});
+      } else {
+        await loadContext();
+      }
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, {
@@ -248,6 +281,31 @@ export default function WeeklyPlan() {
             );
           })}
         </section>
+
+        {longHorizonLanes.length > 0 && (
+          <section style={{ ...panelStyle, padding: 20, marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>Long-scale plan</h2>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.5 }}>
+                  Delta keeps these lanes alive across the selected timeline, then chooses the right weekly slice.
+                </p>
+              </div>
+              <span style={{ color: 'rgba(255,255,255,0.62)', fontSize: 13, whiteSpace: 'nowrap' }}>
+                {longHorizonPlan.horizon_months || roadmap.destination?.planning_horizon_months || 12} months
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+              {longHorizonLanes.map((lane) => (
+                <div key={lane.name} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 14 }}>
+                  <p style={{ margin: '0 0 6px', color: '#fff', fontSize: 14, fontWeight: 700 }}>{lane.name}</p>
+                  <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.52)', fontSize: 12 }}>{lane.cadence}</p>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.68)', fontSize: 13, lineHeight: 1.45 }}>{lane.rule}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(320px, 0.85fr)', gap: 22 }} className="agent2-grid">
           <section style={{ ...panelStyle, padding: 22 }}>
@@ -399,9 +457,37 @@ export default function WeeklyPlan() {
           </section>
 
           <aside style={{ display: 'grid', gap: 22 }}>
-            <section style={{ ...panelStyle, padding: 20 }}>
-              <h2 style={{ margin: '0 0 14px', fontSize: 20 }}>Talk to Agent 2</h2>
-              <div style={{ height: 330, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
+            {chatExpanded && (
+              <div
+                onClick={() => setChatExpanded(false)}
+                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 50 }}
+              />
+            )}
+            <section style={chatPanelStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <h2 style={{ margin: 0, fontSize: 20 }}>Talk to Agent 2</h2>
+                <button
+                  type="button"
+                  onClick={() => setChatExpanded(prev => !prev)}
+                  title={chatExpanded ? 'Minimize chat' : 'Maximize chat'}
+                  aria-label={chatExpanded ? 'Minimize Agent 2 chat' : 'Maximize Agent 2 chat'}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    background: 'rgba(255,255,255,0.06)',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {chatExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+              </div>
+              <div style={{ height: chatExpanded ? 'calc(100vh - 15rem)' : 330, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
                 {messages.map((message, index) => {
                   const isUser = message.role === 'user';
                   return (

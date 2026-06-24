@@ -74,36 +74,6 @@ const Hero = () => {
           gap: '0',
         }}
       >
-        {/* Announcement badge */}
-        <motion.button
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          onClick={() => window.location.href = '/intake'}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.14)',
-            borderRadius: 999,
-            padding: '6px 16px',
-            color: 'rgba(255,255,255,0.75)',
-            fontSize: 12,
-            fontWeight: 500,
-            letterSpacing: '0.04em',
-            cursor: 'pointer',
-            marginBottom: 28,
-            transition: 'border-color 0.2s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)'}
-          onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'}
-        >
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block', opacity: 0.8 }} />
-          Three-Agent Career OS
-          <ArrowRight size={12} style={{ opacity: 0.6 }} />
-        </motion.button>
-
         {/* Hero Title */}
         <motion.h1
           initial={{ opacity: 0, y: 16 }}
@@ -119,7 +89,7 @@ const Hero = () => {
             marginBottom: 20,
           }}
         >
-          Plan and navigate<br />from student to engineer
+          F#CK COLLEGE!<br />Delta is here
         </motion.h1>
 
         {/* Subtitle */}

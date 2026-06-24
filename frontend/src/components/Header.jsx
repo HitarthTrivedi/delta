@@ -15,8 +15,11 @@ const Header = () => {
   }, []);
 
   const navItems = [
-    { label: 'Agents', href: '#features' },
     { label: 'Workflow', href: '#how-it-works' },
+    { label: 'About', href: '/about' },
+    { label: 'Partners', href: '/partners' },
+    { label: 'Investors', href: '/investors' },
+    { label: 'Contact', href: '/contact' },
   ];
 
   const headerStyle = {
@@ -54,14 +57,20 @@ const Header = () => {
             style={{
               width: 28,
               height: 28,
-              background: '#fff',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: 6,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              overflow: 'hidden',
             }}
           >
-            <span style={{ color: '#000', fontWeight: 900, fontSize: 14, fontFamily: 'monospace' }}>Δ</span>
+            <img
+              src="/delta-bg.jpeg"
+              alt="Delta logo"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </div>
           <span
             style={{

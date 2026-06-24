@@ -155,27 +155,15 @@ const Bubble = ({ msg }) => {
 
 const REQUIRED_FIELDS_METADATA = [
   { key: 'name', label: 'Name' },
-  { key: 'email', label: 'Email' },
-  { key: 'target_role', label: 'Target Role' },
-  { key: 'major', label: 'Major' },
-  { key: 'university', label: 'College' },
-  { key: 'study_year', label: 'Study Year' },
-  { key: 'gpa', label: 'GPA' },
+  { key: 'current_status', label: 'Status' },
+  { key: 'education_stage', label: 'Stage' },
+  { key: 'target_role', label: 'Direction' },
+  { key: 'goal_direction', label: 'Goal' },
+  { key: 'learning_style', label: 'Style' },
+  { key: 'hours_per_week', label: 'Hours' },
+  { key: 'skills', label: 'Skills' },
   { key: 'past_experience', label: 'Experience' },
   { key: 'career_goals', label: 'Goals' },
-  { key: 'skills', label: 'Skills' },
-  { key: 'experience_level', label: 'Level' },
-  { key: 'target_industries', label: 'Industries' },
-  { key: 'learning_style', label: 'Style' },
-  { key: 'preferred_content_types', label: 'Content' },
-  { key: 'hours_per_week', label: 'Hours' },
-  { key: 'relocation', label: 'Relocation' },
-  { key: 'extracurricular_interests', label: 'Interests' },
-  { key: 'planning_horizon_years', label: 'Horizon' },
-  { key: 'phone_number', label: 'Phone' },
-  { key: 'linkedin_url', label: 'LinkedIn' },
-  { key: 'github_url', label: 'GitHub' },
-  { key: 'portfolio_url', label: 'Portfolio' }
 ];
 
 /* Helper conversions for arrays */
@@ -201,6 +189,7 @@ export default function Onboarding() {
   const [sessionId,  setSessionId]  = useState(null);
   const [isThinking, setIsThinking] = useState(false);
   const [isDone,     setIsDone]     = useState(false);
+  const [reviewMode, setReviewMode] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [parsing,    setParsing]    = useState(false);
 
@@ -238,10 +227,15 @@ export default function Onboarding() {
         const state = await ingestionAPI.getState(userId);
         setProgress(Math.round((state.confidence_score || 0) * 100));
         setFilledFields(state.filled_fields || []);
+        if (state.profile) {
+          setProfile(state.profile);
+        }
         
-        if (state.onboarding_complete) {
+        if (state.onboarding_complete || state.profile_review_pending) {
           setIsDone(true);
+          setReviewMode(!!state.profile_review_pending && !state.onboarding_complete);
           await loadProfileData();
+          return;
         }
 
         const res = await ingestionAPI.start(userId, 'general');
@@ -250,14 +244,14 @@ export default function Onboarding() {
         if (res.conversation && res.conversation.length > 0) {
           setMessages(res.conversation);
         } else {
-          const firstMsg = res.initial_question || res.message || "Hi, I am Delta's intake advisor. Before the resume, give me a small introduction: who you are, what you studied, why you are here, your goal or exam, and any deadline, intake, family constraint, or weekly time limit. After that, attach your resume if you have one.";
+          const firstMsg = res.initial_question || res.message || "Hi, I am Delta's intake advisor. You can do this fully by conversation, even if you do not have a resume. Tell me who you are, your current stage, what you want to improve toward, and how much time you realistically have each week.";
           setMessages([{ role: 'assistant', content: firstMsg }]);
         }
       } catch (e) {
         console.error(e);
         setMessages([{
           role: 'assistant',
-          content: "Hi, I am Delta's intake advisor. Before the resume, give me a small introduction: who you are, what you studied, why you are here, your goal or exam, and any deadline, intake, family constraint, or weekly time limit. After that, attach your resume if you have one.",
+          content: "Hi, I am Delta's intake advisor. You can do this fully by conversation, even if you do not have a resume. Tell me who you are, your current stage, what you want to improve toward, and how much time you realistically have each week.",
         }]);
       } finally {
         setIsThinking(false);
@@ -289,15 +283,19 @@ export default function Onboarding() {
         setFilledFields(res.filled_fields);
       }
 
-      if (res.completed || res.status === 'complete' || res.status === 'completed') {
+      if (res.review_required || res.status === 'review_required') {
         setIsDone(true);
+        setReviewMode(true);
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: "Your profile is complete. I saved the intake details, and Agent 2 is ready to create this week's plan.",
+          content: "Your profile draft is ready. Please review and edit anything before Delta creates your roadmap.",
         }]);
         await loadProfileData();
         queryClient.invalidateQueries({ queryKey: ['user', userId] });
-        setTimeout(() => navigate('/roadmap?from=intake'), 2200);
+      } else if (res.completed || res.status === 'complete' || res.status === 'completed') {
+        setIsDone(true);
+        setReviewMode(false);
+        await loadProfileData();
       }
     } catch (e) {
       console.error(e);
@@ -308,7 +306,7 @@ export default function Onboarding() {
     } finally {
       setIsThinking(false);
     }
-  }, [input, sessionId, userId, isThinking, navigate, queryClient, loadProfileData]);
+  }, [input, sessionId, userId, isThinking, queryClient, loadProfileData]);
 
   /* file upload — uses dedicated resume extraction endpoint */
   const handleFileSelect = async (e) => {
@@ -346,6 +344,12 @@ export default function Onboarding() {
         }
         if (res.filled_fields) {
           setFilledFields(res.filled_fields);
+        }
+        if (res.review_required || res.status === 'review_required') {
+          setIsDone(true);
+          setReviewMode(true);
+          await loadProfileData();
+          queryClient.invalidateQueries({ queryKey: ['user', userId] });
         }
       } else {
         toast.error(res.message || 'Could not extract resume data.');
@@ -386,6 +390,10 @@ export default function Onboarding() {
         target_industries: Array.isArray(profile.target_industries) ? profile.target_industries : stringToArray(profile.target_industries),
         preferred_content_types: Array.isArray(profile.preferred_content_types) ? profile.preferred_content_types : stringToArray(profile.preferred_content_types),
         extracurricular_interests: Array.isArray(profile.extracurricular_interests) ? profile.extracurricular_interests : stringToArray(profile.extracurricular_interests),
+        projects: Array.isArray(profile.projects) ? profile.projects : stringToArray(profile.projects),
+        constraints: Array.isArray(profile.constraints) ? profile.constraints : stringToArray(profile.constraints),
+        has_resume: profile.has_resume === true || profile.has_resume === 'true',
+        no_experience_yet: profile.no_experience_yet === true || profile.no_experience_yet === 'true',
         hours_per_week: Number(profile.hours_per_week) || 10,
         planning_horizon_years: Number(profile.planning_horizon_years) || 1,
         planning_horizon_months: Number(profile.planning_horizon_months) || undefined,
@@ -405,8 +413,24 @@ export default function Onboarding() {
     }
   };
 
-  // If user has completed onboarding, show a beautiful "Details already input" dashboard
-  if (user?.onboarding_complete) {
+  const handleConfirmProfile = async () => {
+    if (isEditing) return;
+    try {
+      if (reviewMode) {
+        await ingestionAPI.forceComplete(userId);
+        setReviewMode(false);
+        queryClient.invalidateQueries({ queryKey: ['user', userId] });
+        queryClient.invalidateQueries({ queryKey: ['user-with-skills', userId] });
+      }
+      navigate('/roadmap?from=intake');
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not finalize your profile yet.");
+    }
+  };
+
+  // If profile is ready/complete, show review dashboard before roadmap
+  if (user?.onboarding_complete || isDone) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -429,10 +453,12 @@ export default function Onboarding() {
               <CheckCircle2 size={26} style={{ color: '#000' }} />
             </div>
             <h1 style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8 }}>
-              Onboarding Profile Sync
+              {reviewMode ? 'Review Your Delta Profile' : 'Onboarding Profile Sync'}
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: 500, margin: '0 auto' }}>
-              Your details are gathered. You can modify any parsed fields below to fine-tune your profile.
+              {reviewMode
+                ? 'Check the details Delta collected. Edit anything that feels wrong or incomplete before the roadmap is created.'
+                : 'Your details are gathered. You can modify any parsed fields below to fine-tune your profile.'}
             </p>
           </div>
 
@@ -497,10 +523,13 @@ export default function Onboarding() {
               {/* Field Block Helper */}
               {[{ key: 'name', label: 'Full Name', type: 'text' },
                 { key: 'email', label: 'Email Address', type: 'text' },
+                { key: 'current_status', label: 'Current Status', type: 'select', options: ['school', 'dropped_out', 'undergrad', 'graduate', 'working', 'career_switcher', 'exam_aspirant', 'other'] },
+                { key: 'education_stage', label: 'Education / Life Stage', type: 'text' },
                 { key: 'target_role', label: 'Target Career Role', type: 'text' },
-                { key: 'major', label: 'Degree Major', type: 'text' },
-                { key: 'university', label: 'College / University', type: 'text' },
-                { key: 'study_year', label: 'Study Year / Year of Study', type: 'text' },
+                { key: 'goal_direction', label: 'Goal Direction if Role is Unclear', type: 'text' },
+                { key: 'major', label: 'Degree Major / School Stream', type: 'text' },
+                { key: 'university', label: 'School / College / University', type: 'text' },
+                { key: 'study_year', label: 'Class / Year / Status', type: 'text' },
                 { key: 'gpa', label: 'GPA', type: 'text' },
                 { key: 'phone_number', label: 'Phone Number', type: 'text' },
                 { key: 'linkedin_url', label: 'LinkedIn Profile URL', type: 'text' },
@@ -509,6 +538,8 @@ export default function Onboarding() {
                 { key: 'experience_level', label: 'Experience Level', type: 'select', options: ['beginner', 'intermediate', 'advanced'] },
                 { key: 'learning_style', label: 'Learning Style', type: 'select', options: ['practical', 'theoretical', 'mixed'] },
                 { key: 'relocation', label: 'Relocation Openness', type: 'select', options: ['yes', 'no', 'maybe'] },
+                { key: 'has_resume', label: 'Has Resume?', type: 'select', options: ['true', 'false'] },
+                { key: 'no_experience_yet', label: 'No Experience Yet?', type: 'select', options: ['true', 'false'] },
                 { key: 'hours_per_week', label: 'Weekly Hours Commitment', type: 'number' },
                 { key: 'planning_horizon_years', label: 'Inferred Planning Horizon (Years)', type: 'number' },
                 { key: 'planning_horizon_months', label: 'Inferred Planning Horizon (Months)', type: 'number' },
@@ -648,7 +679,7 @@ export default function Onboarding() {
           {/* Action Row */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
             <button
-              onClick={() => navigate('/roadmap')}
+              onClick={handleConfirmProfile}
               disabled={isEditing}
               style={{
                 background: isEditing ? 'rgba(255,255,255,0.2)' : '#fff',
@@ -664,7 +695,7 @@ export default function Onboarding() {
               onMouseEnter={e => { if(!isEditing) e.currentTarget.style.opacity = '0.9' }}
               onMouseLeave={e => { if(!isEditing) e.currentTarget.style.opacity = '1' }}
             >
-              Go to Part 2 Roadmap
+              {reviewMode ? 'Confirm Profile & Build Roadmap' : 'Go to Part 2 Roadmap'}
             </button>
             
             <button
