@@ -43,7 +43,7 @@ INTAKE_CHAT_MODEL = "gemma-4-31b-it"
 # Minimum number of genuine user answers required before the intake can finish —
 # guarantees a real goals/ambitions conversation even when a resume already fills
 # most factual fields.
-MIN_INTAKE_ROUNDS = 3
+MIN_INTAKE_ROUNDS = 6
 
 from app.models.semantic_memory import IngestionSession
 from app.models.user import User
@@ -168,10 +168,9 @@ REQUIRED_FIELDS = [
     "past_experience", "career_goals", "skills", "learning_style", "hours_per_week"
 ]
 
-# hours_per_week is intentionally NOT required — delta suggests it from the joining
-# story. The joining story (why they came + how urgent) is what must be captured.
 CORE_REQUIRED_FIELDS = [
-    "personal_introduction", "name", "joining_reason", "learning_style"
+    "personal_introduction", "name", "joining_reason", "learning_style",
+    "target_role", "skills", "career_goals", "education_stage",
 ]
 
 PROFILE_REVIEW_FIELDS = [
@@ -297,11 +296,30 @@ class IngestionEngineV2:
         )
 
     def _profile_review_missing_fields(self, profile: dict) -> list[str]:
-        missing = [field for field in CORE_REQUIRED_FIELDS if not profile.get(field)]
+        missing = []
+
+        if not profile.get("name"):
+            missing.append("name")
+        if not profile.get("personal_introduction"):
+            missing.append("personal_introduction")
+        if not profile.get("joining_reason"):
+            missing.append("joining_reason")
         if not self._has_goal_signal(profile):
-            missing.append("goal_direction")
+            missing.append("target_role")
         if not self._has_stage_signal(profile):
             missing.append("education_stage")
+
+        skills = profile.get("skills")
+        if not skills or skills == ["Exploring"]:
+            missing.append("skills")
+
+        if not profile.get("career_goals"):
+            missing.append("career_goals")
+        if not profile.get("learning_style"):
+            missing.append("learning_style")
+        if not profile.get("past_experience") and not profile.get("no_experience_yet"):
+            missing.append("past_experience")
+
         return list(dict.fromkeys(missing))
 
     def _review_readiness(self, profile: dict, round_count: int) -> tuple[bool, float, list[str]]:
@@ -477,20 +495,25 @@ class IngestionEngineV2:
         missing = set(missing_fields or [])
         if "name" in missing:
             return "What should I call you?"
+        if "personal_introduction" in missing:
+            return "Tell me a bit about yourself — who you are, what you have studied or worked on, and why you are here."
         if "education_stage" in missing:
-            return "What is your current stage right now: school, college, dropped out, graduated, working, or something else?"
-        if "goal_direction" in missing:
-            return "What direction do you want delta to help you build toward, even if you do not know the exact job title yet?"
-        if "hours_per_week" in missing:
-            return "How many hours per week can you realistically give to this plan?"
+            return "What is your current stage: school, college, dropped out, graduated, working, or something else?"
+        if "target_role" in missing or "goal_direction" in missing:
+            return "What role or field do you want to work toward — even a rough direction is fine?"
+        if "joining_reason" in missing:
+            return "What specifically brought you to delta, and is there any deadline or urgency driving you?"
+        if "skills" in missing:
+            return "What tools, languages, or skills have you picked up so far, even if self-taught or just started?"
+        if "career_goals" in missing:
+            return "What is the main goal you want delta to help you reach in the next 1-2 years?"
+        if "past_experience" in missing:
+            return "Have you built any projects, done internships, or worked anywhere — even informally or at a small scale?"
         if "learning_style" in missing:
-            return "Do you learn better by watching, reading, building, practicing, or a mix?"
-        if not profile.get("skills") and not profile.get("projects"):
-            return "What have you tried so far, even casually, and what tool or skill are you learning right now?"
-        # Facts are covered — ask about genuine goals/ambitions, which a resume can't capture.
-        if not profile.get("career_goals"):
-            return "In your own words, what is the main goal you want delta to help you reach?"
-        return "What is driving you toward this, and what would success look like for you a year from now?"
+            return "Do you learn best by building projects, watching videos, reading, or a mix of all?"
+        if "hours_per_week" in missing:
+            return "How many hours per week can you realistically dedicate to this learning path?"
+        return "Is there anything else about your background, constraints, or goals that delta should know to build the right roadmap for you?"
 
     def _enrich_profile_context(self, user_id: str, profile: dict) -> dict:
         track_info = self._detect_exam_or_goal_track(profile)
