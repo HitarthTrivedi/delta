@@ -452,13 +452,18 @@ class IngestionEngineV2:
         return {key: value for key, value in extracted.items() if value not in ("", [], None)}
 
     def _safe_generate_json(self, prompt: str, conversation: list[dict]) -> dict:
+        heuristic = self._heuristic_extract_from_conversation(conversation)
         try:
             extracted = generate_json(prompt, model=INTAKE_CHAT_MODEL)
             if isinstance(extracted, dict) and extracted:
+                # Heuristic fills in fields the AI missed (e.g. hours_per_week from regex)
+                for key, val in heuristic.items():
+                    if not extracted.get(key):
+                        extracted[key] = val
                 return extracted
         except Exception as exc:
             logger.warning(f"AI extraction failed; using heuristic intake extraction: {exc}")
-        return self._heuristic_extract_from_conversation(conversation)
+        return heuristic
 
     def _safe_generate_text(self, prompt: str, fallback: str, temperature: float = 0.6, max_tokens: int = 2000) -> str:
         try:
@@ -666,6 +671,13 @@ class IngestionEngineV2:
             temperature=0.7,
             max_tokens=2000
         )
+        # Hard guard: never re-ask about a field already saved in the profile
+        if profile.get("hours_per_week") and "hours per week" in next_q.lower():
+            remaining = [f for f in missing_required if f != "hours_per_week"]
+            next_q = self._fallback_next_question(remaining, profile)
+        if profile.get("name") and "your name" in next_q.lower():
+            remaining = [f for f in missing_required if f != "name"]
+            next_q = self._fallback_next_question(remaining, profile)
         conversation.append({"role": "assistant", "content": next_q, "round": session.current_round})
         session.conversation_log = json.dumps(conversation)
         db.commit()
