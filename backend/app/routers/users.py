@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 import json
 from app.database import get_db
 from app.models import User, SkillNode, MarketSnapshot
@@ -16,29 +17,34 @@ from app.services.ingestion_engine_v2 import REQUIRED_FIELDS
 def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        # Auto-create user from Supabase user ID
-        user = User(
-            id=user_id,
-            email="",
-            name="delta Member",
-            current_role="Professional",
-            years_experience=0,
-            target_role="Software Engineer",
-            hours_per_week=10,
-            learning_style="hands-on"
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    
+        try:
+            user = User(
+                id=user_id,
+                email=f"user_{user_id}@delta.local",
+                name="delta Member",
+                current_role="Professional",
+                years_experience=0,
+                target_role="Software Engineer",
+                hours_per_week=10,
+                learning_style="hands-on"
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=500, detail="Failed to create user.")
+
     profile = load_profile(user_id)
     onboarding_complete = profile.get("onboarding_complete", False)
-    
+
     filled = [f for f in REQUIRED_FIELDS if profile.get(f)]
     pct = round((len(filled) / len(REQUIRED_FIELDS)) * 100, 1) if REQUIRED_FIELDS else 100.0
     if onboarding_complete:
         pct = 100.0
-        
+
     user_resp = UserResponse.model_validate(user)
     user_resp.onboarding_complete = onboarding_complete
     user_resp.onboarding_percentage = pct
@@ -49,20 +55,25 @@ def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(requi
 def get_user_with_skills(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        # Auto-create user from Supabase user ID
-        user = User(
-            id=user_id,
-            email="",
-            name="delta Member",
-            current_role="Professional",
-            years_experience=0,
-            target_role="Software Engineer",
-            hours_per_week=10,
-            learning_style="hands-on"
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            user = User(
+                id=user_id,
+                email=f"user_{user_id}@delta.local",
+                name="delta Member",
+                current_role="Professional",
+                years_experience=0,
+                target_role="Software Engineer",
+                hours_per_week=10,
+                learning_style="hands-on"
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=500, detail="Failed to create user.")
     
     profile = load_profile(user_id)
     onboarding_complete = profile.get("onboarding_complete", False)
