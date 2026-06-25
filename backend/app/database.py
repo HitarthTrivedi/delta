@@ -6,9 +6,10 @@ database_url = settings.DATABASE_URL
 if database_url.startswith("sqlite+aiosqlite://"):
     database_url = database_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
 
+connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
 engine = create_engine(
     database_url,
-    connect_args={"check_same_thread": False},
+    connect_args=connect_args,
     echo=settings.SQL_ECHO,
 )
 
