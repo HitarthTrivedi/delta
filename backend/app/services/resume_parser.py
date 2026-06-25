@@ -87,9 +87,25 @@ def _extract_text(content: bytes, filename: str) -> str:
     if name.endswith(".pdf"):
         try:
             from pypdf import PdfReader
-
             reader = PdfReader(io.BytesIO(content))
             return "\n".join(page.extract_text() or "" for page in reader.pages)
+        except Exception:
+            return ""
+
+    if name.endswith(".docx"):
+        try:
+            from docx import Document
+            doc = Document(io.BytesIO(content))
+            parts = []
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    parts.append(para.text)
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            parts.append(cell.text)
+            return "\n".join(parts)
         except Exception:
             return ""
 

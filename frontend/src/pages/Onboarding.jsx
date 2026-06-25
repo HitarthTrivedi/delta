@@ -11,16 +11,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ingestionAPI } from '../lib/api';
 import { toast } from 'sonner';
 
-/* ─── PDF / TXT parser ─── */
+/* ─── PDF / DOCX / TXT parser ─── */
 const parseFile = async (file) => {
   if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target.result);
-      reader.onerror  = reject;
+      reader.onerror = reject;
       reader.readAsText(file);
     });
   }
+
   if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -43,7 +44,7 @@ const parseFile = async (file) => {
           const pdf = await window.pdfjsLib.getDocument(typedarray).promise;
           let text = '';
           for (let i = 1; i <= pdf.numPages; i++) {
-            const page    = await pdf.getPage(i);
+            const page = await pdf.getPage(i);
             const content = await page.getTextContent();
             text += content.items.map(it => it.str).join(' ') + '\n';
           }
@@ -56,7 +57,36 @@ const parseFile = async (file) => {
       reader.readAsArrayBuffer(file);
     });
   }
-  throw new Error('Unsupported file type. Use .pdf, .txt, or .md');
+
+  if (
+    file.name.endsWith('.docx') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          if (!window.mammoth) {
+            await new Promise((res, rej) => {
+              const s = document.createElement('script');
+              s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+              s.onload = res;
+              s.onerror = rej;
+              document.head.appendChild(s);
+            });
+          }
+          const result = await window.mammoth.extractRawText({ arrayBuffer: e.target.result });
+          resolve(result.value);
+        } catch (err) {
+          reject(new Error('Failed to parse DOCX file.'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  throw new Error('Unsupported file type. Use .pdf, .docx, .txt, or .md');
 };
 
 /* ─── Typing indicator ─── */
