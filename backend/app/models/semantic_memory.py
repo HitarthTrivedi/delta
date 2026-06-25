@@ -1,7 +1,7 @@
 """
-Semantic Memory Models — Graph-vector memory layer for Delta's cognitive architecture.
+Semantic Memory Models — Graph-vector memory layer for delta's cognitive architecture.
 
-This module defines the SQLAlchemy models that power Delta's semantic knowledge graph:
+This module defines the SQLAlchemy models that power delta's semantic knowledge graph:
 - SemanticNodeModel: Vertices in the user's career knowledge graph (skills, ambitions, constraints, etc.)
 - SemanticEdgeModel: Typed, weighted relationships between semantic nodes
 - TensionNodeModel: Detected contradictions between user beliefs and market reality

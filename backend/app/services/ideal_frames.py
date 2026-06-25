@@ -1,5 +1,5 @@
 """
-Ideal Frames and Pitfall Detection System for Delta Career OS.
+Ideal Frames and Pitfall Detection System for delta Career OS.
 
 This service defines the "gold standard" Target State Frames for each career
 journey type, computes ingestion confidence and gaps, and implements detectors

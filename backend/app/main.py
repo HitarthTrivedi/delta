@@ -11,7 +11,7 @@ from app.routers import users, skills, briefs, chat, resume, calendar, dossier, 
 # Global rate limiter imported from app.limiter (avoids circular imports)
 
 app = FastAPI(
-    title="Delta 2.0 API",
+    title="delta 2.0 API",
     description="Career Intelligence Platform — AI-driven skill tracking & market alignment",
     version="2.0.0",
 )
@@ -45,7 +45,7 @@ app.include_router(feedback.router)
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
-    print("[OK] Delta 2.0 API started - tables synced")
+    print("[OK] delta 2.0 API started - tables synced")
     try:
         from seed_guest import seed
         seed()
@@ -55,7 +55,7 @@ def startup():
 
 @app.get("/")
 def root():
-    return {"status": "ok", "app": "Delta 2.0", "version": "2.0.0"}
+    return {"status": "ok", "app": "delta 2.0", "version": "2.0.0"}
 
 
 @app.get("/health")

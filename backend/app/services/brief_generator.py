@@ -44,7 +44,7 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
 
     # Dense structural system prompt
     prompt = f"""
-    You are Delta's Senior Career OS Roadmap Compiler. Your task is to generate a highly customized, production-grade 3-phase curriculum and weekly brief tailored exactly to the user's ambition and capability profile.
+    You are delta's Senior Career OS Roadmap Compiler. Your task is to generate a highly customized, production-grade 3-phase curriculum and weekly brief tailored exactly to the user's ambition and capability profile.
 
     USER PROFILE:
     - Target Career Role: {role}
@@ -346,7 +346,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
     ]
 
     questions_for_user = [
-        "What specific target domain or career path do you want Delta to refine next?",
+        "What specific target domain or career path do you want delta to refine next?",
         "Would you prefer highly visual video tutorials or deep-dive text documentation for your current phase?"
     ]
 

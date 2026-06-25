@@ -2,7 +2,7 @@ import os
 from google import genai
 from dotenv import load_dotenv
 
-load_dotenv("/Users/hitarthtrivedi/Documents/PythonProgram/Delta/backend/.env")
+load_dotenv("//backend/.env")
 key = os.getenv("GEMINI_API_KEY", "")
 print("API Key loaded:", len(key) > 0)
 

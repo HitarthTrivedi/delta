@@ -1,5 +1,5 @@
 """
-AI Service — unified LLM client for all Delta agents.
+AI Service — unified LLM client for all delta agents.
 Uses google-genai SDK (new API style) with gemma-4-31b-it.
 Falls back gracefully if the key or model is unavailable.
 """
@@ -131,7 +131,7 @@ def _mock_structured_response(prompt: str) -> str:
     # Onboarding opening
     if "intake agent" in prompt_lower or "opening question" in prompt_lower or "welcome them" in prompt_lower:
         return (
-            "Hi! I'm your Delta AI advisor. I'm here to build your personalized career roadmap. "
+            "Hi! I'm your delta AI advisor. I'm here to build your personalized career roadmap. "
             "Let's start simple — what's your name, and what field or role are you working toward?"
         )
 
@@ -189,7 +189,7 @@ def _mock_structured_response(prompt: str) -> str:
     # Encouragement / completion
     if "inspiring" in prompt_lower or "onboarding wrap" in prompt_lower or "welcome them officially" in prompt_lower:
         return (
-            "Welcome to Delta Career OS! Your profile has been compiled. "
+            "Welcome to delta Career OS! Your profile has been compiled. "
             "Your top immediate focus should be building your first proof project "
             "and strengthening your core technical skills. "
             "Head to your dashboard to see your personalized roadmap!"

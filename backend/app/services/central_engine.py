@@ -1,4 +1,4 @@
-"""Central career engine for Delta's personalized operating system."""
+"""Central career engine for delta's personalized operating system."""
 import datetime
 import json
 import uuid
@@ -253,8 +253,8 @@ def _break_week_actions(profile: dict, user: User, reason: str = "") -> list[dic
             "write what you finished this month, clean one README or task note, and then rest. "
             "Ask Agent 2 to add work only if you genuinely want a challenge."
         ),
-        "why_now": reason or "You have already accepted enough work this month, so Delta is protecting your pace.",
-        "source": "Delta monthly pacing guard",
+        "why_now": reason or "You have already accepted enough work this month, so delta is protecting your pace.",
+        "source": "delta monthly pacing guard",
         "url": "",
         "prior_exposure": True,
     }]
@@ -327,8 +327,8 @@ def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, 
             f"Create one small resume-visible proof responding to this market signal: {pattern} "
             f"Add a README section explaining why it matters now. Hiring warning to address: {warning}"
         ),
-        "why_now": "Delta uses live/search-backed market signals so your roadmap keeps adapting to future demand.",
-        "source": raw.get("source") or market.target_role or "Delta market pulse",
+        "why_now": "delta uses live/search-backed market signals so your roadmap keeps adapting to future demand.",
+        "source": raw.get("source") or market.target_role or "delta market pulse",
         "url": "",
         "cadence": "trend",
     }]
@@ -573,9 +573,9 @@ def _event_block_actions(events: list[dict]) -> list[dict]:
     is_exam = kind == "exam" or "exam" in str(event.get("title", "")).lower()
     title = "Exam-only study week" if is_exam else "Blocked-event light week"
     description = (
-        "Pause Delta projects and courses for this week. Study for the examination: list syllabus topics, revise weak areas, solve past questions, and keep a mistake log."
+        "Pause delta projects and courses for this week. Study for the examination: list syllabus topics, revise weak areas, solve past questions, and keep a mistake log."
         if is_exam
-        else "Do not assign heavy Delta work this week. Keep only a light check-in or review task because the user has a blocked personal event."
+        else "Do not assign heavy delta work this week. Keep only a light check-in or review task because the user has a blocked personal event."
     )
     return [{
         "id": f"event-block-{event.get('id', 'active')}",
@@ -1015,7 +1015,7 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     minimum_seconds = max(300, min(5400, len(expected_ids or accepted_ids or [1]) * 900))
     if not dev_mode and elapsed_seconds < minimum_seconds:
         minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
-        raise ValueError(f"Delta needs a little more real work time before advancing. Try again in about {minutes} minute(s).")
+        raise ValueError(f"delta needs a little more real work time before advancing. Try again in about {minutes} minute(s).")
 
     memory = refresh_career_memory_from_user_state(db, user)
     pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
@@ -1401,7 +1401,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         "target_role": user.target_role or market.target_role or "Career-ready professional",
         "long_term_projection": "Build capability, proof, and market awareness until the user can compete for real opportunities.",
         "planning_horizon_months": _planning_horizon_months(profile),
-        "timeline_basis": profile.get("inferred_planning_reason") or "Delta inferred a flexible planning horizon from the current profile.",
+        "timeline_basis": profile.get("inferred_planning_reason") or "delta inferred a flexible planning horizon from the current profile.",
     }
     long_plan = _long_horizon_plan(profile, skills, user, market)
     destination["long_horizon_plan"] = long_plan
@@ -1643,11 +1643,11 @@ def _get_or_create_market_snapshot(db: Session, user: User) -> MarketSnapshot:
 def _derive_open_questions(user: User, structured: dict) -> list[str]:
     questions = []
     if not user.target_role:
-        questions.append("Which role or domain do you want Delta to optimize your journey for first?")
+        questions.append("Which role or domain do you want delta to optimize your journey for first?")
     if not structured.get("extracted_skills"):
         questions.append("Which skills have you actually used in a project, even at a beginner level?")
     if not structured.get("constraints") and not user.hours_per_week:
-        questions.append("What weekly time limit should Delta respect while planning your roadmap?")
+        questions.append("What weekly time limit should delta respect while planning your roadmap?")
     if not structured.get("learning_style") and not user.learning_style:
         questions.append("Do you learn faster by videos, docs, building projects, or guided practice?")
     return questions[:4]

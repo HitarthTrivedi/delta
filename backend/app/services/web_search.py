@@ -1,5 +1,5 @@
 """
-Web Search Service — cognitive search layer for Delta Career OS.
+Web Search Service — cognitive search layer for delta Career OS.
 
 Abstracts web search behind a unified interface so downstream services
 (Market Pulse, Ingestion Pipeline, Brief Generator) never couple directly to a
@@ -47,7 +47,7 @@ Expected shape:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class WebSearchService:
-    """Unified web-search abstraction for the Delta Career OS.
+    """Unified web-search abstraction for the delta Career OS.
 
     Usage::
 

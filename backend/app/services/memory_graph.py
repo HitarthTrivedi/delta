@@ -1,5 +1,5 @@
 """
-Memory Graph Service — The core cognitive memory engine for Delta.
+Memory Graph Service — The core cognitive memory engine for delta.
 
 This is the heart of the GraphRAG architecture. Instead of storing user data as flat JSON
 columns, this module creates a living semantic graph where:

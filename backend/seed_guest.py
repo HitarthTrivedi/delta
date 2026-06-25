@@ -62,7 +62,7 @@ def seed():
         confidence_score=0.82,
     ))
 
-    # 4. Delta score
+    # 4. delta score
     db.add(DeltaScore(
         id=str(uuid.uuid4()),
         user_id=GUEST_ID,

@@ -1,4 +1,4 @@
-"""Domain packs let Delta generalize beyond a CS-only career path."""
+"""Domain packs let delta generalize beyond a CS-only career path."""
 
 DOMAIN_PACKS = {
     "cs_ai": {

@@ -1,5 +1,5 @@
 """
-Resume Service — Delta Career OS
+Resume Service — delta Career OS
 Handles: generation, suggestion diffing, ATS optimization, and .docx export.
 """
 from __future__ import annotations

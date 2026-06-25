@@ -1,5 +1,5 @@
 """
-Ingestion Engine v2 — Clean, reliable intake agent for Delta Career OS.
+Ingestion Engine v2 — Clean, reliable intake agent for delta Career OS.
 
 Architecture:
   - Uses google-genai via ai_service.generate_response / generate_json: the resume
@@ -51,7 +51,7 @@ from app.models.user import User
 
 # ── Prompt templates ──────────────────────────────────────────────────────────
 
-SYSTEM_PERSONA = """You are Delta's AI career intake advisor. Your persona is a comforting, friendly, and supportive tutor interacting with a student.
+SYSTEM_PERSONA = """You are delta's AI career intake advisor. Your persona is a comforting, friendly, and supportive tutor interacting with a student.
 Your goal is to make the student feel encouraged, understood, and supported, like a caring mentor who is excited about their growth.
 Your job is to gather a complete career profile through a natural, comforting conversation. The student's backstory matters as much as the resume.
 Rules:
@@ -62,8 +62,8 @@ Rules:
 - If the user pastes a resume or uploads one, extract facts silently, confirm receipt in a supportive tutor-like way, and ask what's still missing.
 - A resume is optional. Many users may be school students, dropouts, undergrads, exam aspirants, freshers, or career switchers with no resume yet.
 - Start from the person's story: what they studied, why they are here, what changed, what they want, and what constraints or exams are real.
-- ALWAYS ask the story behind why they joined Delta and how urgent their goal is — are they just sharpening skills with no rush, or racing a real deadline? This story decides their whole pace.
-- Do NOT force the user to state weekly hours. If they have not said how much time they have, Delta will SUGGEST a sensible weekly-hours and pace from their story and deadline; only ask for hours if their story is genuinely unclear.
+- ALWAYS ask the story behind why they joined delta and how urgent their goal is — are they just sharpening skills with no rush, or racing a real deadline? This story decides their whole pace.
+- Do NOT force the user to state weekly hours. If they have not said how much time they have, delta will SUGGEST a sensible weekly-hours and pace from their story and deadline; only ask for hours if their story is genuinely unclear.
 - Accept "no projects yet", "no resume", "not sure", or "still exploring" as valid profile facts. Do not force professional fields on school/no-resume users.
 - Do not force them to choose a planning horizon if it can be inferred from their education year, target exam, intake, graduation, or goal.
 - When enough details are gathered, send the user to review/edit their profile before roadmap generation.
@@ -79,7 +79,7 @@ Return ONLY valid JSON with any of these fields you can extract (omit fields you
 {{
   "personal_introduction": "string (the user's short self-introduction/backstory in their own context)",
   "backstory": "string (education/career/life context that explains why this roadmap is needed)",
-  "joining_reason": "string — the STORY behind why they came to Delta and what they want to change (e.g. 'just want to sharpen skills', 'need a job fast', 'switching careers', 'preparing for placements').",
+  "joining_reason": "string — the STORY behind why they came to delta and what they want to change (e.g. 'just want to sharpen skills', 'need a job fast', 'switching careers', 'preparing for placements').",
   "urgency_level": "relaxed|moderate|urgent — how time-pressured they are about reaching the goal. Only set if it is clear from what they said.",
   "time_to_goal": "string — any deadline or timeframe to reach the goal (e.g. '3 months', 'placements in December', 'no fixed deadline'). Only if stated.",
   "transition_reason": "string (why they are changing direction, if any)",
@@ -107,7 +107,7 @@ Return ONLY valid JSON with any of these fields you can extract (omit fields you
   "target_industries": ["string"],
   "learning_style": "practical|theoretical|mixed",
   "preferred_content_types": ["string"],
-  "hours_per_week": "number — ONLY if the student states how much time they have. If they do not say, OMIT it; Delta will suggest a pace from their story.",
+  "hours_per_week": "number — ONLY if the student states how much time they have. If they do not say, OMIT it; delta will suggest a pace from their story.",
   "relocation": "yes|no|maybe",
   "extracurricular_interests": ["string"],
   "phone_number": "string",
@@ -120,7 +120,7 @@ Return ONLY valid JSON with any of these fields you can extract (omit fields you
 Return ONLY the JSON object, no markdown, no explanation.
 """
 
-NEXT_QUESTION_PROMPT = """You are Delta's AI career intake advisor. Your persona is a comforting, friendly, and supportive tutor interacting with a student.
+NEXT_QUESTION_PROMPT = """You are delta's AI career intake advisor. Your persona is a comforting, friendly, and supportive tutor interacting with a student.
 
 Current student profile (already collected):
 {profile_context}
@@ -141,15 +141,15 @@ Hard rules:
 - Do NOT use emojis.
 
 What to ask about, in priority order:
-1. The STORY behind joining Delta and the time pressure — if you do not yet know WHY they came (just improving skills? chasing a job? a deadline?) or HOW urgent it is, ask that first. It decides their pace.
+1. The STORY behind joining delta and the time pressure — if you do not yet know WHY they came (just improving skills? chasing a job? a deadline?) or HOW urgent it is, ask that first. It decides their pace.
 2. If a real field is still missing, ask for that field.
 3. Otherwise (e.g. a resume already covers the facts), ask about the things a resume CANNOT tell you — the student's actual goals, ambitions, motivation ("why this path"), what success looks like for them, or the kind of role/work they truly want.
 
-Never ask "how many hours per week can you give" unless their story gives no clue about their time pressure — Delta suggests the hours itself.
+Never ask "how many hours per week can you give" unless their story gives no clue about their time pressure — delta suggests the hours itself.
 
 Reply with just the question text, nothing else."""
 
-COMPLETION_PROMPT = """You are Delta's AI career intake advisor. Your persona is a comforting, friendly, and supportive tutor interacting with a student.
+COMPLETION_PROMPT = """You are delta's AI career intake advisor. Your persona is a comforting, friendly, and supportive tutor interacting with a student.
 
 The student's profile is ready for review. Here is what was collected:
 {profile_context}
@@ -157,8 +157,8 @@ The student's profile is ready for review. Here is what was collected:
 Write a warm, comforting, and encouraging completion message (3-4 sentences) that:
 1. Confirms their profile is successfully saved.
 2. Highlights their target role and key strengths in a comforting, encouraging way.
-3. States the weekly pace and hours Delta is suggesting for them based on their story and time pressure (use the 'pace' and 'recommended_hours_per_week' from the profile), and tell them they can change it.
-4. Tells them to review and edit anything before Delta builds the roadmap.
+3. States the weekly pace and hours delta is suggesting for them based on their story and time pressure (use the 'pace' and 'recommended_hours_per_week' from the profile), and tell them they can change it.
+4. Tells them to review and edit anything before delta builds the roadmap.
 
 Do NOT use emojis. Be warm, supportive, and comforting."""
 
@@ -168,7 +168,7 @@ REQUIRED_FIELDS = [
     "past_experience", "career_goals", "skills", "learning_style", "hours_per_week"
 ]
 
-# hours_per_week is intentionally NOT required — Delta suggests it from the joining
+# hours_per_week is intentionally NOT required — delta suggests it from the joining
 # story. The joining story (why they came + how urgent) is what must be captured.
 CORE_REQUIRED_FIELDS = [
     "personal_introduction", "name", "joining_reason", "learning_style"
@@ -251,7 +251,7 @@ class IngestionEngineV2:
 
         if track in {"UPSC", "GPSC"}:
             months = 18
-            reason = f"{track} preparation usually needs a long exam-cycle plan, so Delta should plan around attempt/intake and syllabus phases."
+            reason = f"{track} preparation usually needs a long exam-cycle plan, so delta should plan around attempt/intake and syllabus phases."
         elif track in {"GATE", "CAT"}:
             if "2nd" in study_year or "second" in study_year:
                 months = 24
@@ -261,13 +261,13 @@ class IngestionEngineV2:
                 months = 8
             else:
                 months = 12
-            reason = f"{track} is exam-cycle driven, so Delta inferred a timeline from study year and likely attempt window."
+            reason = f"{track} is exam-cycle driven, so delta inferred a timeline from study year and likely attempt window."
         elif track in {"GRE", "IELTS/TOEFL"}:
             months = 12
-            reason = "Masters-abroad goals need intake, language tests, SOP/LOR, projects, and application deadlines, so Delta inferred a 12 month planning base."
+            reason = "Masters-abroad goals need intake, language tests, SOP/LOR, projects, and application deadlines, so delta inferred a 12 month planning base."
         elif track == "Placements":
             months = 6
-            reason = "Placement or internship preparation is usually near-term, so Delta inferred a shorter proof-and-interview planning base."
+            reason = "Placement or internship preparation is usually near-term, so delta inferred a shorter proof-and-interview planning base."
         else:
             # No exam/track and no explicit timeline from the user — use a soft default
             # for internal planning but do NOT fabricate a confident-sounding reason.
@@ -315,7 +315,7 @@ class IngestionEngineV2:
             or bool(profile.get("projects"))
             or bool(profile.get("skills"))
         )
-        # Always require a minimum number of real answers so Delta actually asks about
+        # Always require a minimum number of real answers so delta actually asks about
         # the student's goals/ambitions, even when a resume already fills the facts.
         ready = (not missing) and (round_count >= MIN_INTAKE_ROUNDS) and has_substance
         return ready, confidence, missing
@@ -323,7 +323,7 @@ class IngestionEngineV2:
     def _suggest_pace(self, profile: dict) -> dict:
         """
         Recommend weekly hours + pace from the user's joining story and time pressure.
-        This is the core of "tell me your story and Delta sets your pace".
+        This is the core of "tell me your story and delta sets your pace".
         """
         urgency = (profile.get("urgency_level") or "").lower().strip()
         story = " ".join(
@@ -362,13 +362,13 @@ class IngestionEngineV2:
 
         if urgency == "urgent":
             hours, pace = 14, "intensive"
-            reason = "You have a short runway to your goal, so Delta suggests an intensive pace to make every week count."
+            reason = "You have a short runway to your goal, so delta suggests an intensive pace to make every week count."
         elif urgency == "relaxed":
             hours, pace = 5, "light"
-            reason = "You are here to steadily build skills with no hard deadline, so Delta suggests a light, sustainable pace you can keep without burnout."
+            reason = "You are here to steadily build skills with no hard deadline, so delta suggests a light, sustainable pace you can keep without burnout."
         else:
             hours, pace = 9, "steady"
-            reason = "Delta suggests a steady pace that balances real progress with your other commitments."
+            reason = "delta suggests a steady pace that balances real progress with your other commitments."
 
         return {
             "urgency_level": urgency,
@@ -383,7 +383,7 @@ class IngestionEngineV2:
             updates["target_role"] = profile["goal_direction"]
         if not profile.get("past_experience"):
             if profile.get("no_experience_yet") or str(profile.get("has_resume", "")).lower() == "false":
-                updates["past_experience"] = "No formal projects or work experience yet. Delta should begin with beginner-friendly proof building."
+                updates["past_experience"] = "No formal projects or work experience yet. delta should begin with beginner-friendly proof building."
             elif profile.get("projects"):
                 updates["past_experience"] = "; ".join(str(item) for item in profile.get("projects", [])[:5])
         if not profile.get("skills"):
@@ -391,7 +391,7 @@ class IngestionEngineV2:
         if not profile.get("career_goals") and profile.get("goal_direction"):
             updates["career_goals"] = [profile["goal_direction"]]
 
-        # Delta suggests pace + weekly hours from the joining story. If the user never
+        # delta suggests pace + weekly hours from the joining story. If the user never
         # stated their own hours, adopt the suggestion as their working hours_per_week.
         suggestion = self._suggest_pace(profile)
         updates["recommended_hours_per_week"] = suggestion["recommended_hours_per_week"]
@@ -475,7 +475,7 @@ class IngestionEngineV2:
         if "education_stage" in missing:
             return "What is your current stage right now: school, college, dropped out, graduated, working, or something else?"
         if "goal_direction" in missing:
-            return "What direction do you want Delta to help you build toward, even if you do not know the exact job title yet?"
+            return "What direction do you want delta to help you build toward, even if you do not know the exact job title yet?"
         if "hours_per_week" in missing:
             return "How many hours per week can you realistically give to this plan?"
         if "learning_style" in missing:
@@ -484,7 +484,7 @@ class IngestionEngineV2:
             return "What have you tried so far, even casually, and what tool or skill are you learning right now?"
         # Facts are covered — ask about genuine goals/ambitions, which a resume can't capture.
         if not profile.get("career_goals"):
-            return "In your own words, what is the main goal you want Delta to help you reach?"
+            return "In your own words, what is the main goal you want delta to help you reach?"
         return "What is driving you toward this, and what would success look like for you a year from now?"
 
     def _enrich_profile_context(self, user_id: str, profile: dict) -> dict:
@@ -568,7 +568,7 @@ class IngestionEngineV2:
                 "what changed, what you are aiming for now, and whether any exam, intake, or deadline is coming up."
             )
         return (
-            "Hi, I am Delta's intake advisor. Before the resume, give me a small introduction in your own words: "
+            "Hi, I am delta's intake advisor. Before the resume, give me a small introduction in your own words: "
             "who you are, what you have studied or worked on, why you are here, what goal or exam you are aiming for, "
             "and any deadline, intake, family constraint, or weekly time limit I should know. After that, attach your resume if you have one."
         )
@@ -631,7 +631,7 @@ class IngestionEngineV2:
             profile_ctx = profile_as_context_string(user_id)
             completion_msg = self._safe_generate_text(
                 COMPLETION_PROMPT.format(profile_context=profile_ctx),
-                "Your profile draft is ready. Review the details once, edit anything that feels wrong, and then Delta can build your roadmap from this.",
+                "Your profile draft is ready. Review the details once, edit anything that feels wrong, and then delta can build your roadmap from this.",
                 temperature=0.6,
                 max_tokens=2000
             )
@@ -813,7 +813,7 @@ Return ONLY the JSON object."""
                     profile_ctx = profile_as_context_string(user_id)
                     completion_msg = self._safe_generate_text(
                         COMPLETION_PROMPT.format(profile_context=profile_ctx),
-                        "Your profile draft is ready. Review the details once, edit anything that feels wrong, and then Delta can build your roadmap from this.",
+                        "Your profile draft is ready. Review the details once, edit anything that feels wrong, and then delta can build your roadmap from this.",
                         temperature=0.6,
                         max_tokens=2000
                     )

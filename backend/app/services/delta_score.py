@@ -1,8 +1,8 @@
-"""Delta score computation service with habit and market alignment metrics."""
+"""delta score computation service with habit and market alignment metrics."""
 
 def compute_delta_score(skills, market_demands: list = None, completed_recs_count: int = 0) -> float:
     """
-    Compute Delta Career Score (0-100) based on:
+    Compute delta Career Score (0-100) based on:
     1. Skill Proficiency & Evidence Quality (50% weight)
     2. Market Alignment (30% weight)
     3. Consistency and Recommendation Completion Streak (20% weight)

@@ -1,5 +1,5 @@
 """
-auth.py — Ownership enforcement dependency for Delta Career OS.
+auth.py — Ownership enforcement dependency for delta Career OS.
 
 Every route that operates on a user_id path parameter should depend on
 `require_owner`.  It reads the `X-User-Id` request header (set by the

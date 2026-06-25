@@ -30,7 +30,7 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Old folders (not part of Delta 2.0)
+# Old folders (not part of delta 2.0)
 .emergent/
 memory/
 test_reports/

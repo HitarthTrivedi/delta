@@ -1,5 +1,5 @@
 """
-Profile Store — the single source of truth for all Delta agents.
+Profile Store — the single source of truth for all delta agents.
 
 Every agent (intake, roadmap, brief, dossier) reads and writes through this module.
 Profiles are stored as JSON files at:
@@ -53,7 +53,7 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger("delta.profile_store")
 
-# Profile directory: Delta/data/profiles/
+# Profile directory: delta/data/profiles/
 _PROFILES_DIR = pathlib.Path(__file__).resolve().parents[3] / "data" / "profiles"
 
 

@@ -1,4 +1,4 @@
-"""Memory consolidation pass for Delta's semantic graph.
+"""Memory consolidation pass for delta's semantic graph.
 
 This is the system's lightweight "sleep cycle": it decays stale activation,
 merges duplicate concepts, and returns a report the weekly loop can store.

@@ -1,4 +1,4 @@
-"""Resume router — Delta Career OS."""
+"""Resume router — delta Career OS."""
 from __future__ import annotations
 
 import datetime
@@ -55,7 +55,7 @@ def get_resume(user_id: str, db: Session = Depends(get_db), _: str = Depends(req
 
 @router.post("/{user_id}/generate")
 def generate_resume(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
-    """Generate a structured resume from the user's Delta Career OS profile."""
+    """Generate a structured resume from the user's delta Career OS profile."""
     try:
         structured = build_resume_from_profile(user_id, db)
     except ValueError as exc:

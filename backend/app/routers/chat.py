@@ -612,7 +612,7 @@ def _classify_intent_llm(user_message: str, current_actions: list[dict]) -> dict
     """
     titles = [f"{i+1}. {a.get('title', '')}" for i, a in enumerate(current_actions or [])]
     titles_text = "\n".join(titles) if titles else "(no tasks yet)"
-    prompt = f"""You are the intent router for Delta's weekly study-plan assistant.
+    prompt = f"""You are the intent router for delta's weekly study-plan assistant.
 The student may write in ANY language, script, or style. Understand their meaning, then decide what they want.
 
 The student's current week has {len(current_actions or [])} task(s):
@@ -741,7 +741,7 @@ def _event_from_user_message(text: str, date_info: dict) -> dict | None:
         "end_date": end_date,
         "time": date_info.get("mentioned_time"),
         "blocks_normal_work": True,
-        "impact": "Normal Delta coursework should pause or reduce during this event.",
+        "impact": "Normal delta coursework should pause or reduce during this event.",
     }
 
 
@@ -867,7 +867,7 @@ def _constraint_actions(
         "title": "Light recovery week",
         "skill": "Consistency",
         "description": "Keep only one small maintenance task this week: 60-90 minutes of review, one note, and one check-in message to Agent 2.",
-        "source": "Delta pace adjustment",
+        "source": "delta pace adjustment",
         "url": "",
         "due_date": date_info.get("mentioned_date"),
     }]
@@ -1137,12 +1137,12 @@ def chat_message(
                     updated_actions=updated_actions, week_phase="Pace-adjusted week",
                 )
 
-            role_prompt = f"""You are Agent 2 inside Delta Career OS: the weekly roadmap strategist for any student domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
+            role_prompt = f"""You are Agent 2 inside delta Career OS: the weekly roadmap strategist for any student domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
 Current date/time context: {date_context}
 Default behavior: chat like a normal human tutor. Answer the user's actual query using the student profile, persistent memory files, and this week's tasks. Be clear, direct, and useful.
 Do not change the weekly tasks during ordinary conversation. Explain, teach, clarify, estimate effort, suggest deliverables, and help the user express completed work professionally.
 Change the weekly tasks only when the user clearly asks for a change, skip, replacement, easier/harder work, a course, an exam/deadline pause, or the next week's tasks.
-When the user gives a date, day, duration, or relative time, reason from the current date/time context and persistent upcoming-events file. If a blocked event spans multiple weeks, keep normal Delta tasks paused/reduced throughout that span.
+When the user gives a date, day, duration, or relative time, reason from the current date/time context and persistent upcoming-events file. If a blocked event spans multiple weeks, keep normal delta tasks paused/reduced throughout that span.
 If the user has an exam period, the weekly task should focus on exam study until the event period is over.
 Never assign a long pre-made roadmap. Give one practical adjustment for this week and ask at most one follow-up question.
 The student profile/resume is the source of truth. If the profile says they already know a skill, do not assign beginner learning for it; assign a domain-appropriate harder proof, evaluation, portfolio piece, case study, design review, simulation, benchmark, red-team, audit, or extension task.
@@ -1170,7 +1170,7 @@ Current tasks in the user's plan:
 
 Keep the conversation friendly, comforting, and supportively warm. Ask at most one follow-up question. Do not output JSON for normal tutor answers."""
         else:
-            role_prompt = """You are Delta, the central AI assistant inside a personalized Career OS.
+            role_prompt = """You are delta, the central AI assistant inside a personalized Career OS.
 Use the user's Career Memory, Roadmap State, Market Pulse, Journey Log, Proof Projects, and Portfolio Assessment.
 Be honest, specific, and action-oriented. If the user is drifting, say it clearly but supportively."""
 
@@ -1252,7 +1252,7 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
             db=db,
             user_id=data.user_id,
             event_type="assistant_guidance",
-            summary=f"Delta answered career question: {data.message[:120]}",
+            summary=f"delta answered career question: {data.message[:120]}",
             evidence={"message": data.message, "response_text": cleaned_response},
             impact={"context_used": bool(career_context)},
         )
@@ -1285,7 +1285,7 @@ def chat_history(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
         user_msg = payload.get("message", "")
         # Prefer stored response_text; fall back to summary only if it doesn't look like a meta-description
         assistant_msg = payload.get("response_text") or (
-            event.summary if not event.summary.startswith("Delta answered career question:") else ""
+            event.summary if not event.summary.startswith("delta answered career question:") else ""
         )
         if user_msg:
             messages.append({"role": "user", "content": user_msg})
