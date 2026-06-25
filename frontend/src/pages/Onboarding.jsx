@@ -1081,7 +1081,7 @@ export default function Onboarding() {
       <input
         ref={fileRef}
         type="file"
-        accept=".pdf,.txt,.md"
+        accept=".pdf,.docx,.txt,.md"
         style={{ display: 'none' }}
         onChange={handleFileSelect}
       />
