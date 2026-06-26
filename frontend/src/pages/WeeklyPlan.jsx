@@ -27,6 +27,7 @@ export default function WeeklyPlan() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  const [advanceStep, setAdvanceStep] = useState(0);
   const [checked, setChecked] = useState({});
   const [skipped, setSkipped] = useState({});
   const [messages, setMessages] = useState([
@@ -135,10 +136,29 @@ export default function WeeklyPlan() {
     }
   };
 
+  const ADVANCE_STEPS = [
+    'Reading your profile and past activity...',
+    'Checking your Agent 2 conversations...',
+    'Analysing completed and skipped tasks...',
+    'Scanning market signals for your role...',
+    'Agent 2 is curating your next week...',
+    'Finalising your personalised task list...',
+  ];
+
   const requestNextWeek = async () => {
     setAdvancing(true);
+    setAdvanceStep(0);
+    const stepInterval = setInterval(() => {
+      setAdvanceStep(prev => {
+        if (prev < ADVANCE_STEPS.length - 2) return prev + 1;
+        clearInterval(stepInterval);
+        return prev;
+      });
+    }, 4000);
     try {
       const data = await careerOSAPI.runWeeklyCycle(userId);
+      clearInterval(stepInterval);
+      setAdvanceStep(ADVANCE_STEPS.length - 1);
       setContext(data);
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
@@ -147,8 +167,9 @@ export default function WeeklyPlan() {
         role: 'assistant',
         content: 'I have generated the next weekly plan for you. If the new week has exams, deadlines, or if you need to adjust the pace, let me know here!',
       }]);
-      toast.success('Successfully requested and loaded next week\'s activities!');
+      toast.success('Next week loaded — Agent 2 has updated your tasks.');
     } catch (err) {
+      clearInterval(stepInterval);
       console.error(err);
       const detail = err?.response?.data?.detail
         || err?.message
@@ -160,6 +181,7 @@ export default function WeeklyPlan() {
       }]);
     } finally {
       setAdvancing(false);
+      setAdvanceStep(0);
     }
   };
 
@@ -323,7 +345,36 @@ export default function WeeklyPlan() {
               {loading && <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'rgba(255,255,255,0.5)' }} />}
             </div>
 
-            <div style={{ display: 'grid', gap: 12 }}>
+            {advancing && (
+              <div style={{ display: 'grid', gap: 14, padding: '8px 0' }}>
+                {ADVANCE_STEPS.map((step, i) => {
+                  const done = i < advanceStep;
+                  const active = i === advanceStep;
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, opacity: i > advanceStep ? 0.25 : 1, transition: 'opacity 0.4s ease' }}>
+                      <span style={{
+                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: done ? 'rgba(255,255,255,0.15)' : active ? 'rgba(255,255,255,0.06)' : 'transparent',
+                        border: `1px solid ${done ? 'rgba(255,255,255,0.4)' : active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`,
+                      }}>
+                        {done
+                          ? <Check size={13} color="#fff" />
+                          : active
+                            ? <Loader2 size={13} color="rgba(255,255,255,0.8)" style={{ animation: 'spin 1s linear infinite' }} />
+                            : <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} />
+                        }
+                      </span>
+                      <span style={{ fontSize: 14, color: done ? 'rgba(255,255,255,0.55)' : active ? '#fff' : 'rgba(255,255,255,0.25)', fontWeight: active ? 600 : 400 }}>
+                        {step}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ display: advancing ? 'none' : 'grid', gap: 12 }}>
               {actions.map((action, index) => {
                 const isDone = !!checked[index];
                 const isSkipped = !!skipped[index];
