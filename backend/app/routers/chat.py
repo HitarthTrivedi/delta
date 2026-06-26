@@ -979,8 +979,9 @@ def chat_message(
                         response=response_text, context=user_context,
                         updated_actions=next_actions, week_phase=next_phase,
                     )
-                except ValueError as exc:
-                    response_text = str(exc)
+                except (ValueError, Exception) as exc:
+                    logger.error("next_week via chat failed for %s: %s", data.user_id, exc, exc_info=True)
+                    response_text = str(exc) if isinstance(exc, ValueError) else f"Something went wrong generating next week's plan. Please try the 'Request Next Week' button on the Roadmap page."
                     append_chat_turn(data.user_id, user_update, response_text, intent)
                     return ChatResponse(response=response_text, context=user_context)
 
@@ -1259,18 +1260,11 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
         append_progress_event(data.user_id, serialize_journey_event(event))
         append_chat_turn(data.user_id, user_update, cleaned_response, intent)
         return ChatResponse(response=cleaned_response, context=user_context, updated_actions=returned_actions)
-    except Exception:
-        next_project = (career_context.get("proof_projects") or [{}])[0]
-        weekly_focus = (career_context.get("roadmap") or {}).get("weekly_focus", {})
-        fallback_response = (
-            f"I see you're working toward becoming a {user.target_role if user else 'developer'}! "
-            f"Your current focus is {weekly_focus.get('phase_name', 'building proof-backed skills')}. "
-            f"Based on your {len(skills)} tracked skills, the strongest next proof is: "
-            f"{next_project.get('title', 'one GitHub project with a clean README and demo')}. "
-            f"Do that before adding more claimed skills."
-        )
-        append_chat_turn(data.user_id, user_update, fallback_response, intent)
-        return ChatResponse(response=fallback_response, context=user_context)
+    except Exception as exc:
+        logger.error("chat endpoint failed for %s: %s", data.user_id, exc, exc_info=True)
+        error_msg = "Sorry, something went wrong on my end. Please try again in a moment."
+        append_chat_turn(data.user_id, user_update, error_msg, intent)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/history/{user_id}")

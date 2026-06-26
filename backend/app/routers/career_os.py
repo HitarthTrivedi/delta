@@ -1,4 +1,7 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
+
+_log = logging.getLogger("delta.career_os")
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -92,6 +95,9 @@ def get_career_context(user_id: str, db: Session = Depends(get_db), _: str = Dep
         return compile_career_context(db, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        _log.error("compile_career_context failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Could not load career context: {exc}") from exc
 
 
 @router.post("/user/{user_id}/initialize")
@@ -104,22 +110,29 @@ def initialize_career_os(user_id: str, payload: CareerOSInitializeRequest, db: S
             structured=payload.structured,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        _log.error("initialize_career_os failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Career OS initialization failed: {exc}") from exc
 
 
 @router.post("/user/{user_id}/journey")
 def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
-    event = log_journey_event(
-        db=db,
-        user_id=user_id,
-        event_type=payload.event_type,
-        summary=payload.summary,
-        evidence=payload.evidence,
-        impact=payload.impact,
-    )
-    serialized = serialize_journey_event(event)
-    append_progress_event(user_id, serialized)
-    return serialized
+    try:
+        event = log_journey_event(
+            db=db,
+            user_id=user_id,
+            event_type=payload.event_type,
+            summary=payload.summary,
+            evidence=payload.evidence,
+            impact=payload.impact,
+        )
+        serialized = serialize_journey_event(event)
+        append_progress_event(user_id, serialized)
+        return serialized
+    except Exception as exc:
+        _log.error("log_journey_event failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Could not save event: {exc}") from exc
 
 
 @router.post("/user/{user_id}/weekly-cycle")
@@ -127,7 +140,10 @@ def run_weekly_cycle(user_id: str, db: Session = Depends(get_db), _: str = Depen
     try:
         return run_weekly_career_cycle(db, user_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        _log.error("weekly-cycle failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Agent 2 hit an error generating your next week: {exc}") from exc
 
 
 @router.post("/user/{user_id}/consolidate-memory")
@@ -135,4 +151,7 @@ def run_memory_consolidation(user_id: str, db: Session = Depends(get_db), _: str
     try:
         return run_memory_consolidation_cycle(db, user_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        _log.error("consolidate-memory failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Memory consolidation failed: {exc}") from exc

@@ -150,7 +150,9 @@ export default function WeeklyPlan() {
       toast.success('Successfully requested and loaded next week\'s activities!');
     } catch (err) {
       console.error(err);
-      const detail = err?.response?.data?.detail || 'Agent 2 could not advance the week yet.';
+      const detail = err?.response?.data?.detail
+        || err?.message
+        || 'Something went wrong — Agent 2 could not generate next week. Try again in a moment.';
       toast.error(detail);
       setMessages(prev => [...prev, {
         role: 'assistant',

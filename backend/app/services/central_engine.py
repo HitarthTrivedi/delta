@@ -1012,10 +1012,10 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
 
     elapsed_seconds = (datetime.datetime.utcnow() - current_week_start).total_seconds()
-    minimum_seconds = max(300, min(5400, len(expected_ids or accepted_ids or [1]) * 900))
+    minimum_seconds = max(30, len(expected_ids or accepted_ids or [1]) * 60)
     if not dev_mode and elapsed_seconds < minimum_seconds:
         minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
-        raise ValueError(f"delta needs a little more real work time before advancing. Try again in about {minutes} minute(s).")
+        raise ValueError(f"Please wait about {minutes} more minute(s) before requesting the next week.")
 
     memory = refresh_career_memory_from_user_state(db, user)
     pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")

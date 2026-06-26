@@ -60,15 +60,14 @@ def generate_resume(user_id: str, db: Session = Depends(get_db), _: str = Depend
     """Generate a structured resume from the user's delta Career OS profile."""
     try:
         structured = build_resume_from_profile(user_id, db)
+        market_skills = get_market_skills(user_id, db)
+        resume = save_resume(user_id, db, structured, source="generated", market_skills=market_skills)
+        return {"status": "generated", "resume": serialize_resume(resume)}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    market_skills = get_market_skills(user_id, db)
-    resume = save_resume(user_id, db, structured, source="generated", market_skills=market_skills)
-    return {
-        "status": "generated",
-        "resume": serialize_resume(resume),
-    }
+    except Exception as exc:
+        logger.error("generate_resume failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Resume generation failed: {exc}") from exc
 
 
 # ── POST /api/resume/{user_id}/upload ────────────────────────────────────────
@@ -136,20 +135,20 @@ def get_suggestions(user_id: str, db: Session = Depends(get_db), _: str = Depend
     resume = get_or_create_resume_profile(user_id, db)
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found. Generate one first.")
-
-    suggestions = generate_suggestions(user_id, db, resume)
-
-    # Update last_suggested_at timestamp
-    resume.last_suggested_at = datetime.datetime.utcnow()
-    db.commit()
-
-    return {
-        "suggestions_due": True,
-        "to_add": suggestions["to_add"],
-        "to_remove": suggestions["to_remove"],
-        "since": suggestions["since"],
-        "generated_at": suggestions["generated_at"],
-    }
+    try:
+        suggestions = generate_suggestions(user_id, db, resume)
+        resume.last_suggested_at = datetime.datetime.utcnow()
+        db.commit()
+        return {
+            "suggestions_due": True,
+            "to_add": suggestions["to_add"],
+            "to_remove": suggestions["to_remove"],
+            "since": suggestions["since"],
+            "generated_at": suggestions["generated_at"],
+        }
+    except Exception as exc:
+        logger.error("generate_suggestions failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Could not generate suggestions: {exc}") from exc
 
 
 # ── POST /api/resume/{user_id}/apply-suggestions ─────────────────────────────
@@ -172,13 +171,14 @@ def apply_resume_suggestions(
     except Exception:
         structured = {}
 
-    updated = apply_suggestions(structured, payload.accepted_adds, payload.accepted_removes)
-    market_skills = get_market_skills(user_id, db)
-    saved = save_resume(user_id, db, updated, source=resume.source or "generated", market_skills=market_skills)
-    return {
-        "status": "updated",
-        "resume": serialize_resume(saved),
-    }
+    try:
+        updated = apply_suggestions(structured, payload.accepted_adds, payload.accepted_removes)
+        market_skills = get_market_skills(user_id, db)
+        saved = save_resume(user_id, db, updated, source=resume.source or "generated", market_skills=market_skills)
+        return {"status": "updated", "resume": serialize_resume(saved)}
+    except Exception as exc:
+        logger.error("apply_suggestions failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Could not apply suggestions: {exc}") from exc
 
 
 # ── GET /api/resume/{user_id}/download ───────────────────────────────────────
@@ -227,14 +227,18 @@ def ats_optimize(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
     except Exception:
         structured = {}
 
-    market_skills = get_market_skills(user_id, db)
-    optimized = optimize_for_ats(structured, market_skills)
-    saved = save_resume(user_id, db, optimized, source=resume.source or "generated", market_skills=market_skills)
-    return {
-        "status": "ats_optimized",
-        "resume": serialize_resume(saved),
-        "keywords_applied": market_skills[:15],
-    }
+    try:
+        market_skills = get_market_skills(user_id, db)
+        optimized = optimize_for_ats(structured, market_skills)
+        saved = save_resume(user_id, db, optimized, source=resume.source or "generated", market_skills=market_skills)
+        return {
+            "status": "ats_optimized",
+            "resume": serialize_resume(saved),
+            "keywords_applied": market_skills[:15],
+        }
+    except Exception as exc:
+        logger.error("ats_optimize failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"ATS optimization failed: {exc}") from exc
 
 
 # ── Legacy upload endpoint (keep for backward compat) ────────────────────────
