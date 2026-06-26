@@ -137,13 +137,9 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
 
 
 @router.post("/user/{user_id}/weekly-cycle")
-def run_weekly_cycle(user_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+def run_weekly_cycle(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
-        result = run_weekly_career_cycle(db, user_id)
-        # After responding instantly with rule-based tasks, regenerate roadmap
-        # phases with AI in the background so the week after gets smarter tasks.
-        background_tasks.add_task(refresh_roadmap_with_ai, user_id)
-        return result
+        return run_weekly_career_cycle(db, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

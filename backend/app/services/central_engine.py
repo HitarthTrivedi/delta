@@ -1017,14 +1017,13 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
 
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
 
-    # Reuse the most recent market snapshot — skips web scraping (30+ seconds)
-    # which was the primary cause of the 120s timeout on Render free tier.
+    # Reuse the most recent market snapshot — skips web scraping (30+ s of network calls).
+    # Market data doesn't change week-to-week enough to justify re-fetching every cycle.
     market = db.query(MarketSnapshot).filter(
         MarketSnapshot.user_id == user.id,
     ).order_by(MarketSnapshot.created_at.desc()).first()
 
     if not market:
-        # No snapshot at all — do a fresh fetch just this once
         pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
         opportunity_feed = collect_opportunities([skill.name for skill in skills], user.target_role)
         opportunity_signals = summarize_opportunity_signals(opportunity_feed)
@@ -1051,67 +1050,33 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         db.commit()
         db.refresh(market)
 
-    # Advance weekly focus without an AI call.
-    # The roadmap phases are already in the DB from initial generation.
-    # Weekly advancement just picks the next batch of tasks using rule-based
-    # logic — AI only ran once (at onboarding) to build the phase structure.
-    roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
+    # Load Agent 2 memory and recent journey events to give the AI full personal context.
+    try:
+        from app.services.agent2_memory import load_agent2_memory
+        agent2_memory = load_agent2_memory(user_id)
+    except Exception:
+        agent2_memory = {}
 
-    if not roadmap:
-        # First ever cycle — no roadmap exists yet, must generate with AI
-        roadmap = get_or_create_roadmap_state(db, user, market, regenerate=True)
-    else:
-        # Roadmap exists — build next week's tasks from rule-based functions
-        try:
-            from app.services.profile_store import load_profile
-            profile = load_profile(user_id)
-        except Exception:
-            profile = {}
+    try:
+        from app.services.profile_store import load_profile
+        onboarding_profile = load_profile(user_id)
+    except Exception:
+        onboarding_profile = {}
 
-        week_number = _week_number_from_user(user)
-        recurring = _recurring_habit_actions(profile, skills, user)
-        trend = _trend_response_actions(profile, skills, user, market)
+    recent_events = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user_id,
+    ).order_by(JourneyEvent.created_at.desc()).limit(15).all()
+    recent_events_summary = [
+        {"type": e.event_type, "summary": e.summary}
+        for e in recent_events
+    ]
 
-        # Pull next unfinished nodes from existing roadmap phases
-        phases = _as_json(roadmap.phases, [])
-        phase_nodes = []
-        for phase in phases:
-            for node in phase.get("nodes", []):
-                node_id = _normalize(node.get("id") or node.get("label") or "")
-                if node_id not in accepted_ids and node.get("status") != "mastered":
-                    phase_nodes.append({
-                        "id": node.get("id") or node_id,
-                        "node_id": node.get("id") or node_id,
-                        "type": "course",
-                        "title": node.get("label") or node.get("title") or node_id,
-                        "skill": node.get("skill_name") or node.get("label") or node_id,
-                        "description": node.get("description") or node.get("label") or "",
-                        "why_now": node.get("tech_twist") or "Next step in your learning roadmap.",
-                        "url": node.get("resource_url") or "",
-                        "source": "roadmap",
-                    })
-                    if len(phase_nodes) >= 2:
-                        break
-            if len(phase_nodes) >= 2:
-                break
-
-        primary_actions = recurring + phase_nodes + trend[:1]
-        if not primary_actions:
-            primary_actions = recurring + trend
-
-        existing_focus = _as_json(roadmap.weekly_focus, {})
-        new_focus = {
-            "phase_id": existing_focus.get("phase_id"),
-            "phase_name": existing_focus.get("phase_name"),
-            "primary_actions": primary_actions[:4],
-            "long_horizon_lanes": existing_focus.get("long_horizon_lanes") or _long_horizon_plan(profile, skills, user, market).get("lanes"),
-            "selection_reason": f"Week {week_number}: rule-based advancement using recurring habits, roadmap nodes, and market trend.",
-        }
-        roadmap.weekly_focus = _dump(new_focus)
-        roadmap.last_replanned_reason = f"Advanced to week {week_number} task set."
-        roadmap.updated_at = datetime.datetime.utcnow()
-        db.commit()
-        db.refresh(roadmap)
+    roadmap = get_or_create_roadmap_state(
+        db, user, market, regenerate=True,
+        agent2_memory=agent2_memory,
+        onboarding_profile=onboarding_profile,
+        recent_events=recent_events_summary,
+    )
     event = log_journey_event(
         db=db,
         user_id=user_id,
@@ -1423,7 +1388,7 @@ def log_journey_event(
     return event
 
 
-def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False) -> RoadmapState:
+def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> RoadmapState:
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
     try:
         from app.services.profile_store import load_profile
@@ -1496,7 +1461,12 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             return roadmap
     skills = _sync_profile_skills_to_db(db, user)
 
-    roadmap_payload = generate_weekly_brief(user, skills, market)
+    roadmap_payload = generate_weekly_brief(
+        user, skills, market,
+        agent2_memory=agent2_memory or {},
+        onboarding_profile=onboarding_profile or {},
+        recent_events=recent_events or [],
+    )
 
     phases = roadmap_payload.get("phases", [])
     active_phase = _select_active_phase(phases)

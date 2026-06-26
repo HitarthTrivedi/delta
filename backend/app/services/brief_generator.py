@@ -1,19 +1,27 @@
-"""Brief generator service — compiles role-specific 3-phase roadmaps dynamically using OpenAI."""
+"""Brief generator service — compiles role-specific 3-phase roadmaps dynamically."""
 import json
 import uuid
 import re
 from app.services.ai_service import generate_response
 
-def generate_weekly_brief(user, skills, market_snapshot) -> dict:
+# Use a fast model for roadmap generation — gemini-2.0-flash is significantly
+# quicker than 2.5-flash for structured JSON output while still being capable.
+ROADMAP_MODEL = "gemini-2.0-flash"
+
+def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> dict:
     """
     Generate highly personalized, role-specific Weekly Brief and Phase-Based Dynamic Roadmap.
     Calls OpenAI (gpt-4o-mini) to design a custom 3-phase chronological learning path 
     appropriate for the user's actual target role, then programmatically overrides node status
     to match user's SQLite skill node proficiencies exactly.
     """
-    role = user.target_role or (market_snapshot.target_role if market_snapshot else "AI Developer / Software Engineer")
-    hours = user.hours_per_week or 15
-    style = user.learning_style or "hands-on"
+    agent2_memory = agent2_memory or {}
+    onboarding_profile = onboarding_profile or {}
+    recent_events = recent_events or []
+
+    role = user.target_role or onboarding_profile.get("target_role") or (market_snapshot.target_role if market_snapshot else "AI Developer / Software Engineer")
+    hours = user.hours_per_week or onboarding_profile.get("hours_per_week") or 15
+    style = user.learning_style or onboarding_profile.get("learning_style") or "hands-on"
 
     # Normalize demanded skills list
     demanded = []
@@ -42,17 +50,49 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
         skills_context.append(f"- {s.name}: proficiency={s.proficiency}/10, evidence_type={s.evidence_type}")
     skills_list_str = "\n".join(skills_context) if skills_context else "No active skills claimed yet."
 
+    # Build Agent 2 memory context (preferences, constraints, notes from chat)
+    preferences = agent2_memory.get("preferences") or {}
+    chat_notes = agent2_memory.get("chat_notes") or []
+    recent_chat = chat_notes[-5:] if chat_notes else []
+    recent_chat_str = "\n".join(
+        f"  - User said: \"{n.get('user_message', '')}\" → Agent noted: \"{n.get('assistant_response', '')[:120]}\""
+        for n in recent_chat if n.get("user_message")
+    ) or "No recent Agent 2 conversations."
+
+    # Build onboarding profile context
+    constraints = onboarding_profile.get("constraints") or onboarding_profile.get("limitation") or ""
+    planning_horizon = onboarding_profile.get("planning_horizon") or onboarding_profile.get("timeline") or ""
+    goals = onboarding_profile.get("goals") or onboarding_profile.get("ambitions") or ""
+    projects = onboarding_profile.get("projects") or onboarding_profile.get("past_projects") or ""
+
+    # Build recent activity context
+    recent_activity_str = "\n".join(
+        f"  - [{e.get('type', '')}] {e.get('summary', '')}"
+        for e in recent_events[:10]
+    ) or "No recent activity logged."
+
     # Dense structural system prompt
     prompt = f"""
-    You are delta's Senior Career OS Roadmap Compiler. Your task is to generate a highly customized, production-grade 3-phase curriculum and weekly brief tailored exactly to the user's ambition and capability profile.
+    You are delta's Senior Career OS Roadmap Compiler. Generate a highly personalized, production-grade 3-phase curriculum and weekly brief using ALL of the user's context below.
 
     USER PROFILE:
     - Target Career Role: {role}
     - Commitment: {hours} hours/week
     - Preferred Learning Style: {style}
-    
+    - Planning Horizon / Timeline: {planning_horizon or "Not specified"}
+    - Goals beyond target role: {goals or "Not specified"}
+    - Personal constraints: {constraints or "None mentioned"}
+    - Past projects / prior work: {projects or "None mentioned"}
+    - Preferences noted by Agent 2: {json.dumps(preferences) if preferences else "None recorded"}
+
     USER'S CURRENT SKILLS:
     {skills_list_str}
+
+    RECENT ACTIVITY (last completed / skipped tasks and events):
+    {recent_activity_str}
+
+    RECENT AGENT 2 CONVERSATIONS (what the user has been asking for, their frustrations, requests):
+    {recent_chat_str}
 
     MARKET DEMAND PULSE:
     - Top Demanded Skills: {json.dumps(demanded)}
@@ -136,7 +176,7 @@ def generate_weekly_brief(user, skills, market_snapshot) -> dict:
     print(f"=========================================================================")
 
     try:
-        response_text = generate_response(prompt).strip()
+        response_text = generate_response(prompt, model=ROADMAP_MODEL).strip()
         
         # Clean potential markdown wrapping
         if "```json" in response_text:

@@ -107,7 +107,7 @@ export const careerOSAPI = {
   getDomainPack: (domainId) => api.get(`/career-os/domain-packs/${domainId}`).then(r => r.data),
   getContext: (userId) => api.get(`/career-os/user/${userId}/context`).then(r => r.data),
   initialize: (userId, data) => api.post(`/career-os/user/${userId}/initialize`, data).then(r => r.data),
-  runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`).then(r => r.data),
+  runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`, {}, { timeout: 300000 }).then(r => r.data),
   consolidateMemory: (userId) => api.post(`/career-os/user/${userId}/consolidate-memory`).then(r => r.data),
   logJourneyEvent: (userId, data) => api.post(`/career-os/user/${userId}/journey`, data).then(r => r.data),
 };
