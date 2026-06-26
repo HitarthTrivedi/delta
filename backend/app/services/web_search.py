@@ -25,6 +25,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
+from app.services.cache import cached
+
 logger = logging.getLogger("delta.web_search")
 
 # ---------------------------------------------------------------------------
@@ -107,6 +109,11 @@ class WebSearchService:
     # Public API
     # ------------------------------------------------------------------
 
+    @cached(
+        "web_search",
+        ttl=21600,  # 6h — market/search results change slowly
+        key_fn=lambda self, query, max_results=10: f"{str(query).strip().lower()}|{max_results}",
+    )
     def search(
         self,
         query: str,
@@ -200,12 +207,23 @@ class WebSearchService:
             ),
         }
 
-        # --- 2. Execute searches -----------------------------------------------
+        # --- 2. Execute searches (concurrently — the 4 queries are independent) -
+        from app.services.parallel import run_parallel
+
+        results_map = run_parallel(
+            {
+                category: (lambda q=query: self.search(q, max_results=8))
+                for category, query in queries.items()
+            },
+            timeout=20,
+            default=[],
+        )
+
         raw_results: dict[str, list[SearchResult]] = {}
         all_sources: list[dict[str, str]] = []
 
-        for category, query in queries.items():
-            results = self.search(query, max_results=8)
+        for category in queries:
+            results = results_map.get(category) or []
             raw_results[category] = results
             for r in results:
                 all_sources.append({"url": r["url"], "title": r["title"]})

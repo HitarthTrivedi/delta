@@ -39,7 +39,9 @@ def _build_clients():
             return
         for key in keys:
             try:
-                _clients.append(genai.Client(api_key=key))
+                # http_options.timeout (ms) bounds a hung call so it fails fast
+                # instead of riding the SDK default and stalling the request.
+                _clients.append(genai.Client(api_key=key, http_options={"timeout": 60000}))
             except Exception as e:
                 logger.warning(f"Failed to init genai client for a key: {e}")
         if _clients:

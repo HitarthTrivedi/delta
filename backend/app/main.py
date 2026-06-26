@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
@@ -19,6 +20,9 @@ app = FastAPI(
 # Attach limiter to app state so decorators can find it
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Compress large JSON payloads (career context, market snapshots) over the wire.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # CORS
 app.add_middleware(
@@ -63,6 +67,24 @@ def startup():
             conn.commit()
     except Exception as e:
         print(f"[WARN] users column migration skipped: {e}")
+
+    # Composite indexes for the hot ordered/range queries (latest market
+    # snapshot per user, recent journey events per user). IF NOT EXISTS is
+    # supported by both SQLite and Postgres, so this is a safe idempotent no-op.
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_market_user_date "
+                "ON market_snapshots (user_id, snapshot_date)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_journey_user_created "
+                "ON journey_events (user_id, created_at)"
+            ))
+            conn.commit()
+    except Exception as e:
+        print(f"[WARN] composite index creation skipped: {e}")
     print("[OK] delta 2.0 API started - tables synced")
 
 

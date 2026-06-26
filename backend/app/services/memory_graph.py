@@ -44,13 +44,25 @@ def _get_embedding_model():
 
 
 def _compute_embedding(text: str) -> np.ndarray:
-    """Compute a vector embedding for a text string."""
+    """Compute a vector embedding for a text string.
+
+    Embeddings are deterministic, so we cache them by text hash to avoid
+    recomputing the (CPU-heavy) encode pass for repeated strings.
+    """
     model = _get_embedding_model()
     if model == "MOCK":
         # Deterministic mock: hash the text to get a reproducible vector
         np.random.seed(hash(text) % (2**32))
         return np.random.randn(_EMBEDDING_DIM).astype(np.float32)
-    return model.encode(text, normalize_embeddings=True).astype(np.float32)
+
+    from app.services.cache import cache_get, cache_set
+    cached_vec = cache_get("embedding", text)
+    if cached_vec is not None:
+        return np.array(cached_vec, dtype=np.float32)
+
+    vec = model.encode(text, normalize_embeddings=True).astype(np.float32)
+    cache_set("embedding", text, vec.tolist(), ttl=2592000)  # 30 days
+    return vec
 
 
 def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

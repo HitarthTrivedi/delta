@@ -3,7 +3,10 @@ import { useAuthStore } from '../store/authStore';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
-  timeout: 120000,
+  // 90s default keeps headroom above the backend's 60s single-LLM-call bound,
+  // so slow generations aren't aborted prematurely; the long weekly-cycle call
+  // sets its own 300s override below.
+  timeout: 90000,
 });
 
 // Inject the authenticated user's ID as X-User-Id and the JWT token in Authorization on every request.

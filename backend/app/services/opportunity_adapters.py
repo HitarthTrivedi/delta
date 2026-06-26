@@ -296,9 +296,22 @@ def collect_opportunities(
         adapters = [adapter for adapter in adapters if adapter.source.lower() in wanted]
 
     user_skill_set = {skill.lower() for skill in user_skills}
+
+    # Each adapter hits a different live source — fetch them concurrently.
+    from app.services.parallel import run_parallel
+
+    fetched = run_parallel(
+        {
+            adapter.source: (lambda a=adapter: a.fetch(user_skills, target_role, days_ahead))
+            for adapter in adapters
+        },
+        timeout=20,
+        default=[],
+    )
+
     opportunities = []
     for adapter in adapters:
-        for event in adapter.fetch(user_skills, target_role, days_ahead):
+        for event in (fetched.get(adapter.source) or []):
             event["source_mode"] = adapter.mode
             if event.get("source_status") == "mock_adapter_ready_for_live_fetch":
                 event["source_status"] = adapter._source_status()

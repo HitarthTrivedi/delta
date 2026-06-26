@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense, lazy } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -14,48 +14,50 @@ import Showcase from "./components/Showcase";
 import Feedback from "./components/Feedback";
 import Footer from "./components/Footer";
 
-// Public pages (separate routes, not landing sections)
-import AboutPage from "./pages/AboutPage";
-import CareersPage from "./pages/CareersPage";
-import ContactPage from "./pages/ContactPage";
-import PartnersPage from "./pages/PartnersPage";
-import InvestorsPage from "./pages/InvestorsPage";
-import EarlyAccessPage from "./pages/EarlyAccessPage";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
-
-// UI Layout Components
+// UI Layout Components (eager — always rendered)
 import Navbar from "./components/ui/Navbar";
 
-// Supplementary feature pages (with beautiful HUD styling)
-import {
-  Ledger,
-  Briefs,
-  Pulse,
-  Calendar,
-  Portfolio,
-  Profile
-} from "./pages/FeaturePages";
+// Route pages are code-split with React.lazy so they ship as separate chunks
+// and aren't downloaded until visited (keeps the initial/landing bundle small).
+const AboutPage = lazy(() => import("./pages/AboutPage"));
+const CareersPage = lazy(() => import("./pages/CareersPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
+const PartnersPage = lazy(() => import("./pages/PartnersPage"));
+const InvestorsPage = lazy(() => import("./pages/InvestorsPage"));
+const EarlyAccessPage = lazy(() => import("./pages/EarlyAccessPage"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+
+// Supplementary feature pages (named exports → map to default for lazy)
+const Ledger = lazy(() => import("./pages/FeaturePages").then((m) => ({ default: m.Ledger })));
+const Briefs = lazy(() => import("./pages/FeaturePages").then((m) => ({ default: m.Briefs })));
+const Pulse = lazy(() => import("./pages/FeaturePages").then((m) => ({ default: m.Pulse })));
+const Calendar = lazy(() => import("./pages/FeaturePages").then((m) => ({ default: m.Calendar })));
+const Portfolio = lazy(() => import("./pages/FeaturePages").then((m) => ({ default: m.Portfolio })));
+const Profile = lazy(() => import("./pages/FeaturePages").then((m) => ({ default: m.Profile })));
 
 // Core high-fidelity custom pages
-import Onboarding from "./pages/Onboarding";
-import Dashboard from "./pages/Dashboard";
-import CareerChat from "./pages/CareerChat";
-import WeeklyPlan from "./pages/WeeklyPlan";
-import ProgressReport from "./pages/ProgressReport";
-import ResumePage from "./pages/ResumePage";
-import LoginPage from "./pages/LoginPage";
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const WeeklyPlan = lazy(() => import("./pages/WeeklyPlan"));
+const ProgressReport = lazy(() => import("./pages/ProgressReport"));
+const ResumePage = lazy(() => import("./pages/ResumePage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
 
 // Core connection hooks
 import { useUserWithSkills } from "./hooks/useUser";
 import { useAuthStore } from "./store/authStore";
 
-// Initialize Query Client for caching
+// Initialize Query Client for caching.
+// Global staleTime keeps data fresh across remounts/navigation so pages don't
+// refetch the same (slow) endpoints on every mount; gcTime keeps it in memory.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 60000,
+      gcTime: 5 * 60 * 1000,
     },
   },
 });
@@ -172,6 +174,11 @@ function AppContent() {
 
   return (
     <LayoutWrapper>
+      <Suspense fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+        </div>
+      }>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<AboutPage />} />
@@ -202,6 +209,7 @@ function AppContent() {
         <Route path="/portfolio" element={<RequireAuth><ProtectedRoute><Portfolio /></ProtectedRoute></RequireAuth>} />
         <Route path="/profile" element={<RequireAuth><ProtectedRoute><Profile /></ProtectedRoute></RequireAuth>} />
       </Routes>
+      </Suspense>
     </LayoutWrapper>
   );
 }

@@ -6,8 +6,10 @@ from collections import Counter
 
 import requests
 
+from app.services.cache import cached
 from app.services.domain_packs import infer_domain_pack
 from app.services.opportunity_adapters import collect_opportunities, summarize_opportunity_signals
+from app.services.parallel import run_parallel
 from app.services.web_search import WebSearchService
 
 
@@ -35,15 +37,35 @@ SKILL_ALIASES = {
 }
 
 
+def _market_snapshot_key(target_role: str = "AI Developer / Software Engineer") -> str:
+    return str(target_role).strip().lower()
+
+
+@cached("market_snapshot", ttl=43200, key_fn=_market_snapshot_key)  # 12h — role-scoped, not per-user
 def get_market_snapshot(target_role: str = "AI Developer / Software Engineer") -> dict:
     """Return current market demand signals for a target role from public sources."""
     domain_pack = infer_domain_pack(target_role)
-    source_documents = []
-    source_documents.extend(_fetch_github_signals(target_role, domain_pack["skill_taxonomy"]))
-    source_documents.extend(_fetch_stackexchange_signals(domain_pack["skill_taxonomy"]))
-    source_documents.extend(_fetch_job_signals(target_role))
+    taxonomy = domain_pack["skill_taxonomy"]
 
-    search_snapshot = _fetch_search_market_snapshot(target_role, domain_pack["skill_taxonomy"])
+    # These five sources are independent — fan them out concurrently instead of
+    # blocking on each in turn (was ~30-50s sequential, now ~max single source).
+    fetched = run_parallel(
+        {
+            "github": lambda: _fetch_github_signals(target_role, taxonomy),
+            "stackexchange": lambda: _fetch_stackexchange_signals(taxonomy),
+            "jobs": lambda: _fetch_job_signals(target_role),
+            "search": lambda: _fetch_search_market_snapshot(target_role, taxonomy),
+            "opportunities": lambda: collect_opportunities(taxonomy[:5], target_role),
+        },
+        timeout=20,
+    )
+
+    source_documents = []
+    source_documents.extend(fetched.get("github") or [])
+    source_documents.extend(fetched.get("stackexchange") or [])
+    source_documents.extend(fetched.get("jobs") or [])
+
+    search_snapshot = fetched.get("search") or {}
     skill_counts = _count_skills(source_documents, domain_pack["skill_taxonomy"])
     top_demanded = [skill for skill, _ in skill_counts.most_common(8)]
     top_demanded = _merge_unique(top_demanded, search_snapshot.get("demanded_skills", []), domain_pack["skill_taxonomy"])[:8]
@@ -57,7 +79,7 @@ def get_market_snapshot(target_role: str = "AI Developer / Software Engineer") -
     certifications = _merge_unique(_derive_certifications(top_demanded, domain_pack["certifications"]), search_snapshot.get("certification_signals", []))[:5]
     market_warnings = _merge_unique(_derive_market_warnings(source_documents, top_demanded), search_snapshot.get("market_warnings", []))[:5]
 
-    opportunities = collect_opportunities(domain_pack["skill_taxonomy"][:5], target_role)
+    opportunities = fetched.get("opportunities") or []
     source_names = sorted({doc["source"] for doc in source_documents})
     search_sources = search_snapshot.get("sources", [])
     confidence = min(0.92, max(

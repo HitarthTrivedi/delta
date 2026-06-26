@@ -9,6 +9,7 @@ import uuid
 logger = logging.getLogger("delta.chat")
 
 from app.database import get_db
+from app.services.cache import cached
 from app.models import JourneyEvent, PersonalizationProfile, RoadmapState, SkillNode, User
 from app.schemas.chat import (
     ChatRequest,
@@ -603,6 +604,14 @@ _ACTION_TO_INTENT = {
 }
 
 
+def _intent_cache_key(user_message: str, current_actions: list[dict]) -> str:
+    # Classification depends on the message AND the current task list (it can
+    # reference tasks by number/title), so both must be part of the key.
+    titles = "|".join(a.get("title", "") for a in (current_actions or []))
+    return f"{str(user_message).strip().lower()}||{titles}"
+
+
+@cached("intent", ttl=3600, key_fn=_intent_cache_key)  # 1h — deterministic routing decision
 def _classify_intent_llm(user_message: str, current_actions: list[dict]) -> dict:
     """
     Ask the model to UNDERSTAND what the student wants (in any language or phrasing)

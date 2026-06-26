@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
     SQL_ECHO: bool = parse_bool_env("SQL_ECHO", False)
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    CACHE_ENABLED: bool = parse_bool_env("CACHE_ENABLED", True)
 
     @property
     def CORS_ORIGINS(self) -> list[str]:

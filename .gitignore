@@ -12,6 +12,9 @@ dist/
 
 # Database
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Logs
 *.log

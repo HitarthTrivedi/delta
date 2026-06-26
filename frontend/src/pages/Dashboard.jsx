@@ -179,6 +179,17 @@ export default function Dashboard() {
     loadData();
   }, [loadData]);
 
+  // After a single task toggle / answer, only stats and context can change —
+  // refresh just those two instead of re-firing all 7 dashboard calls.
+  const refreshDerived = useCallback(async () => {
+    const [statsRes, contextRes] = await Promise.all([
+      usersAPI.getStats(userId).catch(() => null),
+      careerOSAPI.getContext(userId).catch(() => null),
+    ]);
+    if (statsRes) setStats(statsRes);
+    if (contextRes) setCareerContext(contextRes);
+  }, [userId]);
+
   const playBeep = useCallback((freq = 800, type = 'sine', duration = 0.08) => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -245,11 +256,11 @@ export default function Dashboard() {
         evidence: { action: actionText, index: idx, completed },
         impact: { progress_updated: true },
       });
-      await loadData();
+      await refreshDerived();
     } catch (err) {
       console.error(err);
     }
-  }, [brief, checkedActions, loadData, playBeep, userId]);
+  }, [brief, checkedActions, refreshDerived, playBeep, userId]);
 
   const submitAnswer = useCallback(async (idx, question) => {
     const answer = resolverAnswers[idx]?.trim();
@@ -265,12 +276,12 @@ export default function Dashboard() {
         evidence: { question, answer },
         impact: { memory_uncertainty_reduced: true },
       });
-      await loadData();
+      await refreshDerived();
       toast.success('Answer added to journey memory.');
     } catch (err) {
       console.error(err);
     }
-  }, [loadData, playBeep, resolverAnswers, userId]);
+  }, [refreshDerived, playBeep, resolverAnswers, userId]);
 
   const submitMilestone = async (recId, skillName) => {
     if (!githubUrl.trim() || !githubUrl.includes('github.com/')) {
