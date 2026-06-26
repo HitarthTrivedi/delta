@@ -1015,21 +1015,16 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
         raise ValueError(f"Please wait about {minutes} more minute(s) before requesting the next week.")
 
-    memory = refresh_career_memory_from_user_state(db, user)
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
 
-    # Reuse a recent market snapshot if one was created in the last 12 hours — skips
-    # web scraping and opportunity fetching which together can take 30+ seconds and
-    # cause Render's proxy to cut the connection before we respond.
-    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=12)
-    recent_market = db.query(MarketSnapshot).filter(
+    # Reuse the most recent market snapshot — skips web scraping (30+ seconds)
+    # which was the primary cause of the 120s timeout on Render free tier.
+    market = db.query(MarketSnapshot).filter(
         MarketSnapshot.user_id == user.id,
-        MarketSnapshot.created_at >= cutoff,
     ).order_by(MarketSnapshot.created_at.desc()).first()
 
-    if recent_market:
-        market = recent_market
-    else:
+    if not market:
+        # No snapshot at all — do a fresh fetch just this once
         pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
         opportunity_feed = collect_opportunities([skill.name for skill in skills], user.target_role)
         opportunity_signals = summarize_opportunity_signals(opportunity_feed)
@@ -1056,7 +1051,67 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         db.commit()
         db.refresh(market)
 
-    roadmap = get_or_create_roadmap_state(db, user, market, regenerate=True)
+    # Advance weekly focus without an AI call.
+    # The roadmap phases are already in the DB from initial generation.
+    # Weekly advancement just picks the next batch of tasks using rule-based
+    # logic — AI only ran once (at onboarding) to build the phase structure.
+    roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
+
+    if not roadmap:
+        # First ever cycle — no roadmap exists yet, must generate with AI
+        roadmap = get_or_create_roadmap_state(db, user, market, regenerate=True)
+    else:
+        # Roadmap exists — build next week's tasks from rule-based functions
+        try:
+            from app.services.profile_store import load_profile
+            profile = load_profile(user_id)
+        except Exception:
+            profile = {}
+
+        week_number = _week_number_from_user(user)
+        recurring = _recurring_habit_actions(profile, skills, user)
+        trend = _trend_response_actions(profile, skills, user, market)
+
+        # Pull next unfinished nodes from existing roadmap phases
+        phases = _as_json(roadmap.phases, [])
+        phase_nodes = []
+        for phase in phases:
+            for node in phase.get("nodes", []):
+                node_id = _normalize(node.get("id") or node.get("label") or "")
+                if node_id not in accepted_ids and node.get("status") != "mastered":
+                    phase_nodes.append({
+                        "id": node.get("id") or node_id,
+                        "node_id": node.get("id") or node_id,
+                        "type": "course",
+                        "title": node.get("label") or node.get("title") or node_id,
+                        "skill": node.get("skill_name") or node.get("label") or node_id,
+                        "description": node.get("description") or node.get("label") or "",
+                        "why_now": node.get("tech_twist") or "Next step in your learning roadmap.",
+                        "url": node.get("resource_url") or "",
+                        "source": "roadmap",
+                    })
+                    if len(phase_nodes) >= 2:
+                        break
+            if len(phase_nodes) >= 2:
+                break
+
+        primary_actions = recurring + phase_nodes + trend[:1]
+        if not primary_actions:
+            primary_actions = recurring + trend
+
+        existing_focus = _as_json(roadmap.weekly_focus, {})
+        new_focus = {
+            "phase_id": existing_focus.get("phase_id"),
+            "phase_name": existing_focus.get("phase_name"),
+            "primary_actions": primary_actions[:4],
+            "long_horizon_lanes": existing_focus.get("long_horizon_lanes") or _long_horizon_plan(profile, skills, user, market).get("lanes"),
+            "selection_reason": f"Week {week_number}: rule-based advancement using recurring habits, roadmap nodes, and market trend.",
+        }
+        roadmap.weekly_focus = _dump(new_focus)
+        roadmap.last_replanned_reason = f"Advanced to week {week_number} task set."
+        roadmap.updated_at = datetime.datetime.utcnow()
+        db.commit()
+        db.refresh(roadmap)
     event = log_journey_event(
         db=db,
         user_id=user_id,
@@ -1073,8 +1128,6 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     )
     context = compile_career_context(db, user_id)
     context["weekly_cycle_event"] = serialize_journey_event(event)
-    context["memory"] = serialize_memory(memory)
-    context["semantic_memory"] = serialize_semantic_memory(db, user_id)
     return context
 
 
