@@ -62,11 +62,6 @@ def startup():
     except Exception as e:
         print(f"[WARN] users column migration skipped: {e}")
     print("[OK] delta 2.0 API started - tables synced")
-    try:
-        from seed_guest import seed
-        seed()
-    except Exception as e:
-        print(f"[WARN] Auto-seeding guest user failed: {e}")
 
 
 @app.get("/")
