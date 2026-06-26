@@ -1,4 +1,25 @@
 # Delta — The Career Operating System
+### *by Alpha.Kore*
+
+---
+
+## Who We Are
+
+**Alpha.Kore** is a boutique AI and automation studio based in Vadodara, India, founded in 2024. The studio operates at the intersection of software engineering, AI, and automation — building high-precision, scalable systems that bridge the gap between bold ideas and working, automated products.
+
+We have already shipped multiple products from a shared infrastructure stack:
+
+| Product | What it does | Status |
+|---|---|---|
+| **Delta** | AI Career OS — intake, weekly roadmap, progress tracking, resume intelligence | Live — primary raise target |
+| **Lazycook AI** | AI agents terminal for workflow automation (`pip install lazycook`) | Live — secondary flagship |
+| **Rezum AI** | Minimalist AI-readable portfolio and resume builder with ATS optimization | Live |
+| **Prism** | AI workflow integration and pipeline orchestration | Live |
+| **3f1** | Professional digital deployment and web engineering | Live |
+
+We don't pitch ideas. We ship products, put them on Vercel, publish them on PyPI, and iterate. Delta is where we are placing our primary capital bet — and we are raising to turn a working product into a category.
+
+---
 
 ### *"Most students don't fail because they lack motivation. They fail because the future is invisible to them. Delta makes the invisible visible — and turns it into a weekly journey."*
 
@@ -138,21 +159,36 @@ We are not competing for course-completion minutes. We are competing to become *
 
 ## Business Model — Built to Compound
 
+**Delta (primary):**
 - **Freemium**: free intake + roadmap to get every student hooked on day one.
-- **Delta Pro (subscription)**: the weekly loop, market pulse, unlimited career chat, ATS resume engine, portfolio assessment.
+- **Delta Pro (subscription)**: the weekly loop, market pulse, unlimited Agent 2 chat, ATS resume engine, portfolio assessment. Target: ₹299–₹799/month (~$3.50–$9.50).
 - **Domain Packs**: premium verticals (Data/AI, Product, Finance, Design).
 - **B2B2C**: licensed to colleges, bootcamps, and universities as their career-intelligence layer — they look modern, we get distribution and data.
 - **Talent marketplace (future)**: once Delta knows who's genuinely job-ready (with *proof*), it becomes the most accurate hiring signal in the world. **That is a second, larger company hiding inside the first.**
 
-Every paying user makes the Vault deeper, the market model sharper, and the next user's experience better. **Classic data-network-effect flywheel.**
+**Lazycook AI (secondary flagship):**
+- **Developer tooling**: distributed via PyPI, monetized through Pro tiers and API access for teams running AI automation pipelines.
+- Cross-sells naturally to the same technical audience that uses Delta — one studio, compounding distribution.
+
+Every paying Delta user makes the Vault deeper, the market model sharper, and the next user's experience better. **Classic data-network-effect flywheel — and every Lazycook user is a warm lead for Delta.**
 
 ---
 
 ## Traction & Status
 
-- **Working end-to-end product**: adaptive intake, resume parsing, Career Memory Vault, roadmap, weekly plan, progress tracking, ATS resume engine, career chat, market pulse, and dossier — **all live in the codebase today.**
-- Secure multi-user auth, real LLM integration, and a cost-optimized dual-model intelligence layer already shipped.
-- Built lean by a founder who ships: **this is a working system, not a slide deck.**
+**Delta is a working product, not a concept:**
+- Adaptive intake, resume parsing, Career Memory Vault, living roadmap, weekly AI plan, Agent 2 chat (with real-time task control), progress tracking, ATS resume engine, and market pulse — **all live and deployed.**
+- Secure multi-user Supabase auth (Google OAuth + email/password), 5-key Gemini API rotation, cost-optimized dual-model intelligence layer (gemma-4-31b-it for all planning; gemini-2.5-flash for resume parsing) — fully shipped.
+- Agent 2 controls tasks in real time: users can trim, skip, replace, escalate, or request the next week entirely through natural conversation — and the task list on screen updates immediately.
+- Weekly roadmap generation uses the user's full personal context: onboarding profile, Agent 2 chat history, completed/skipped journey events, and live market snapshot — no generic plans.
+
+**Proof of execution from the studio:**
+- **Lazycook AI** — live AI agents terminal, distributed on PyPI (`pip install lazycook`), built on Gemini 2.5. Shows the team ships developer tools, not just web apps.
+- **Rezum AI** — live resume and portfolio builder with ATS optimization and JSON export. Shares the same resume-intelligence DNA as Delta's ATS engine.
+- **Prism** — live AI workflow orchestration product. Demonstrates the team's depth in multi-agent pipeline architecture.
+- **3f1** — live professional deployment. Demonstrates shipping discipline across different product categories.
+
+Alpha.Kore has shipped 5 products in under 12 months. **This is a team that builds, deploys, and iterates — not a team that decks.**
 
 ---
 
