@@ -76,3 +76,14 @@ The model setup is intentional and must never be silently changed:
 **Why:** Gemma-4-31b-it has unlimited calls and 15 RPM on the current Google AI Studio plan. Gemini-2.5-flash has very limited quota. Swapping the default model wastes quota and causes timeouts.
 
 **Rule:** If you are touching anything related to AI model selection — even to "optimize for speed" — stop and ask Hitarth first. Do not introduce any new model string (`gemini-2.0-flash`, `gemini-1.5-flash`, etc.) without explicit approval.
+
+---
+
+## 6. Git Workflow — Collaborative Repo
+
+A collaborator is actively co-developing on this repo alongside Hitarth. Follow this workflow strictly:
+
+1. **Always `git pull origin main` before making any changes.** Do not edit files on a stale local state.
+2. **Never push unless Hitarth explicitly says to.** Phrases like "push it", "go ahead and push", or "push" are required. Do not auto-push after commits.
+3. **Check `git status` before every session start** to detect uncommitted changes or merge conflicts before touching anything.
+4. **If a merge conflict is detected**, stop and surface it to Hitarth — do not auto-resolve or force push.
