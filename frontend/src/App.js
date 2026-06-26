@@ -21,6 +21,8 @@ import ContactPage from "./pages/ContactPage";
 import PartnersPage from "./pages/PartnersPage";
 import InvestorsPage from "./pages/InvestorsPage";
 import EarlyAccessPage from "./pages/EarlyAccessPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 // UI Layout Components
 import Navbar from "./components/ui/Navbar";
@@ -178,6 +180,8 @@ function AppContent() {
         <Route path="/partners" element={<PartnersPage />} />
         <Route path="/investors" element={<InvestorsPage />} />
         <Route path="/early-access" element={<EarlyAccessPage />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
         <Route path="/login" element={<LoginPage />} />
         
         {/* Onboarding & Intake are protected by auth but do not require completed onboarding */}

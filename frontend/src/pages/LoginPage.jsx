@@ -365,13 +365,13 @@ export default function LoginPage() {
           }}>
             By continuing, you agree to Delta's{' '}
             <span
-              onClick={() => toast.info('Terms of Service coming soon.')}
-              style={{ color: 'rgba(255,255,255,0.48)', cursor: 'pointer' }}
+              onClick={() => window.open('/terms', '_blank')}
+              style={{ color: 'rgba(255,255,255,0.65)', cursor: 'pointer', textDecoration: 'underline' }}
             >Terms</span>
             {' '}and{' '}
             <span
-              onClick={() => toast.info('Privacy Policy coming soon.')}
-              style={{ color: 'rgba(255,255,255,0.48)', cursor: 'pointer' }}
+              onClick={() => window.open('/privacy', '_blank')}
+              style={{ color: 'rgba(255,255,255,0.65)', cursor: 'pointer', textDecoration: 'underline' }}
             >Privacy Policy</span>
           </p>
 

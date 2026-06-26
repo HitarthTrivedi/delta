@@ -111,11 +111,11 @@ const Footer = () => {
         {/* Legal */}
         <div>
           <p style={colTitleStyle}>Legal</p>
-          <a href="#" style={linkStyle}
+          <a href="/privacy" style={linkStyle}
             onMouseEnter={e => e.target.style.color = '#fff'}
             onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
           >Privacy Policy</a>
-          <a href="#" style={linkStyle}
+          <a href="/terms" style={linkStyle}
             onMouseEnter={e => e.target.style.color = '#fff'}
             onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
           >Terms of Service</a>
