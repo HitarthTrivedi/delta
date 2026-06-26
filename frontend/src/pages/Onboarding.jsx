@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Paperclip, Send, CheckCircle2, X,
   FileText, Loader2, User, ClipboardList, Edit3, Save, Check
@@ -167,7 +169,21 @@ const Bubble = ({ msg }) => {
         fontSize: '0.9rem',
         lineHeight: 1.6,
       }}>
-        {msg.content}
+        {isAssistant ? (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
+              ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+              ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+              li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
+              strong: ({ children }) => <strong style={{ color: '#fff', fontWeight: 700 }}>{children}</strong>,
+              code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 5px', borderRadius: 3, fontSize: '0.8rem' }}>{children}</code>,
+            }}
+          >
+            {msg.content}
+          </ReactMarkdown>
+        ) : msg.content}
       </div>
 
       {!isAssistant && (

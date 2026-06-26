@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
@@ -469,7 +469,7 @@ export default function WeeklyPlan() {
               />
             )}
             <section style={chatPanelStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 }}>
                 <h2 style={{ margin: 0, fontSize: 20 }}>Talk to Agent 2</h2>
                 <button
                   type="button"
@@ -492,6 +492,13 @@ export default function WeeklyPlan() {
                   {chatExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
               </div>
+              <p style={{ margin: '0 0 14px', fontSize: 12, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+                Tell Agent 2 about exams, travel, or pace changes for this week.{' '}
+                <Link to="/chat" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'underline' }}>
+                  Open full AI Chat
+                </Link>{' '}
+                for deeper career questions.
+              </p>
               <div style={{ height: chatExpanded ? 'calc(100vh - 15rem)' : 330, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
                 {messages.map((message, index) => {
                   const isUser = message.role === 'user';
