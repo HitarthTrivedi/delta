@@ -45,6 +45,21 @@ app.include_router(feedback.router)
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    # Add profile_data column to existing users table (safe no-op if already present)
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            if str(engine.url).startswith("postgresql"):
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_data TEXT"))
+            else:
+                # SQLite doesn't support IF NOT EXISTS on ALTER TABLE
+                try:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN profile_data TEXT"))
+                except Exception:
+                    pass
+            conn.commit()
+    except Exception as e:
+        print(f"[WARN] profile_data column migration skipped: {e}")
     print("[OK] delta 2.0 API started - tables synced")
     try:
         from seed_guest import seed

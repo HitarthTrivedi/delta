@@ -1,9 +1,8 @@
 """
 Profile Store — the single source of truth for all delta agents.
 
-Every agent (intake, roadmap, brief, dossier) reads and writes through this module.
-Profiles are stored as JSON files at:
-    <project_root>/data/profiles/<user_id>.json
+Profiles are persisted as JSON in the `users.profile_data` column so they
+survive Render dyno restarts (ephemeral disk would wipe file-based storage).
 
 Schema (all fields optional — partial updates are safe):
     {
@@ -19,17 +18,17 @@ Schema (all fields optional — partial updates are safe):
       "exam_goal_detail": str,
       "known_exam_dates": [str],
       "current_role": str,
-      "education": str,           # e.g. "B.Tech CSE, 2nd year"
+      "education": str,
       "university": str,
       "location": str,
       "hours_per_week": int,
-      "learning_style": str,      # "practical" | "theoretical" | "mixed"
+      "learning_style": str,
       "skills": [str],
-      "skill_depths": {str: str}, # {"Python": "intermediate", ...}
+      "skill_depths": {str: str},
       "career_goals": [str],
       "short_term_targets": [str],
       "constraints": [str],
-      "resume_text": str,         # raw extracted resume text
+      "resume_text": str,
       "projects": [str],
       "certificates": [str],
       "study_pattern": str,
@@ -40,21 +39,17 @@ Schema (all fields optional — partial updates are safe):
       "agent1_search_sources": [dict],
       "confidence_score": float,
       "onboarding_complete": bool,
-      "last_updated": str         # ISO timestamp
+      "last_updated": str
     }
 """
 
 import json
-import pathlib
 import datetime
 import logging
 import re
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger("delta.profile_store")
-
-# Profile directory: delta/data/profiles/
-_PROFILES_DIR = pathlib.Path(__file__).resolve().parents[3] / "data" / "profiles"
 
 
 def _safe_user_id(user_id: str) -> str:
@@ -64,48 +59,91 @@ def _safe_user_id(user_id: str) -> str:
     return user_id
 
 
-def _profile_path(user_id: str) -> pathlib.Path:
-    _PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-    return _PROFILES_DIR / f"{_safe_user_id(user_id)}.json"
+def _get_user(db, user_id: str):
+    from app.models.user import User
+    return db.query(User).filter(User.id == user_id).first()
+
+
+def _open_db():
+    from app.database import SessionLocal
+    return SessionLocal()
 
 
 def load_profile(user_id: str) -> Dict[str, Any]:
-    """Load a user profile from disk. Returns {} if not found."""
-    path = _profile_path(user_id)
-    if not path.exists():
-        return {}
+    """Load a user profile from the database. Returns {} if not found."""
+    _safe_user_id(user_id)
+    db = _open_db()
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        from app.models.user import User
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.profile_data:
+            return {}
+        return json.loads(user.profile_data)
     except Exception as e:
         logger.error(f"Failed to load profile {user_id}: {e}")
         return {}
+    finally:
+        db.close()
 
 
 def save_profile(user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Merge `data` into the existing profile and persist to disk.
+    Merge `data` into the existing profile and persist to the database.
     Returns the merged profile.
     """
-    existing = load_profile(user_id)
-    merged = {**existing, **data}
-    merged["user_id"] = user_id
-    merged["last_updated"] = datetime.datetime.utcnow().isoformat() + "Z"
-
-    path = _profile_path(user_id)
+    _safe_user_id(user_id)
+    db = _open_db()
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(merged, f, indent=2, ensure_ascii=False)
-        logger.info(f"Profile saved → {path}")
+        from app.models.user import User
+        user = db.query(User).filter(User.id == user_id).first()
+        existing = {}
+        if user and user.profile_data:
+            try:
+                existing = json.loads(user.profile_data)
+            except Exception:
+                pass
+
+        merged = {**existing, **data}
+        merged["user_id"] = user_id
+        merged["last_updated"] = datetime.datetime.utcnow().isoformat() + "Z"
+
+        if user:
+            user.profile_data = json.dumps(merged, ensure_ascii=False)
+            db.commit()
+            logger.info(f"Profile saved to DB for user {user_id}")
+        else:
+            logger.warning(f"User {user_id} not found — profile not persisted")
+
+        return merged
     except Exception as e:
         logger.error(f"Failed to save profile {user_id}: {e}")
+        db.rollback()
+        return data
+    finally:
+        db.close()
 
-    return merged
+
+def clear_profile(user_id: str) -> None:
+    """Wipe the stored profile for a user (used by reset endpoint)."""
+    _safe_user_id(user_id)
+    db = _open_db()
+    try:
+        from app.models.user import User
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.profile_data = None
+            db.commit()
+            logger.info(f"Profile cleared for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to clear profile {user_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 def profile_exists(user_id: str) -> bool:
-    """Returns True if a profile file exists for the user."""
-    return _profile_path(user_id).exists()
+    """Returns True if a non-empty profile exists for the user."""
+    return bool(load_profile(user_id))
 
 
 def get_field(user_id: str, field: str, default=None):

@@ -15,7 +15,7 @@ logger = logging.getLogger("delta.ingestion_router")
 
 from app.database import get_db
 from app.services.ingestion_engine_v2 import engine
-from app.services.profile_store import load_profile, save_profile, profile_as_context_string
+from app.services.profile_store import load_profile, save_profile, profile_as_context_string, clear_profile
 from app.dependencies.auth import require_owner, verify_resource_owner
 
 router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
@@ -190,17 +190,12 @@ def reset_ingestion(user_id: str, db: Session = Depends(get_db), _: str = Depend
       2. Mark all existing IngestionSessions as 'reset' (closed).
       3. Start a brand-new session and return the opening question.
     """
-    import pathlib
-
-    # 1. Delete profile JSON
+    # 1. Clear profile from database
     try:
-        from app.services.profile_store import _profile_path
-        profile_path = _profile_path(user_id)
-        if profile_path.exists():
-            profile_path.unlink()
-            logger.info(f"[RESET] Deleted profile file for user {user_id}")
+        clear_profile(user_id)
+        logger.info(f"[RESET] Cleared profile for user {user_id}")
     except Exception as e:
-        logger.warning(f"[RESET] Could not delete profile file: {e}")
+        logger.warning(f"[RESET] Could not clear profile: {e}")
 
     # 2. Close existing sessions
     try:

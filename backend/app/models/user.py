@@ -14,6 +14,7 @@ class User(Base):
     target_role = Column(String, nullable=True)
     hours_per_week = Column(Integer, default=10)
     learning_style = Column(String, nullable=True)
+    profile_data = Column(Text, nullable=True)  # JSON blob of onboarding intake profile
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
