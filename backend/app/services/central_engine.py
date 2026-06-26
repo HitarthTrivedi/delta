@@ -1131,6 +1131,47 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     return context
 
 
+def refresh_roadmap_with_ai(user_id: str) -> None:
+    """
+    Background task: regenerate the roadmap phases with AI so the NEXT weekly
+    advancement gets genuinely personalised tasks rather than rule-based ones.
+    Runs after the response is already sent — user never waits for this.
+    Failures are logged but silently swallowed so they don't affect the user.
+    """
+    import logging as _logging
+    _bg_log = _logging.getLogger("delta.central_engine.bg")
+    try:
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return
+            market = db.query(MarketSnapshot).filter(
+                MarketSnapshot.user_id == user_id,
+            ).order_by(MarketSnapshot.created_at.desc()).first()
+            if not market:
+                return
+            roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+            if not roadmap:
+                return
+            skills = db.query(SkillNode).filter(SkillNode.user_id == user_id).all()
+            _bg_log.info("BG: regenerating roadmap phases for user %s", user_id)
+            roadmap_payload = generate_weekly_brief(user, skills, market)
+            phases = roadmap_payload.get("phases", [])
+            if phases:
+                roadmap.phases = _dump(phases)
+                roadmap.active_phase_id = _select_active_phase(phases).get("id") if phases else None
+                roadmap.updated_at = datetime.datetime.utcnow()
+                roadmap.last_replanned_reason = "AI phase refresh after weekly advancement."
+                db.commit()
+                _bg_log.info("BG: roadmap phases refreshed for user %s", user_id)
+        finally:
+            db.close()
+    except Exception as exc:
+        _bg_log.error("BG roadmap refresh failed for %s: %s", user_id, exc, exc_info=True)
+
+
 def run_memory_consolidation_cycle(db: Session, user_id: str) -> dict:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

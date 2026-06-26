@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 _log = logging.getLogger("delta.career_os")
 from pydantic import BaseModel, Field
@@ -21,6 +21,7 @@ from app.services.central_engine import (
     compile_career_context,
     initialize_career_os_for_user,
     log_journey_event,
+    refresh_roadmap_with_ai,
     run_memory_consolidation_cycle,
     run_weekly_career_cycle,
     serialize_journey_event,
@@ -136,9 +137,13 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
 
 
 @router.post("/user/{user_id}/weekly-cycle")
-def run_weekly_cycle(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+def run_weekly_cycle(user_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
-        return run_weekly_career_cycle(db, user_id)
+        result = run_weekly_career_cycle(db, user_id)
+        # After responding instantly with rule-based tasks, regenerate roadmap
+        # phases with AI in the background so the week after gets smarter tasks.
+        background_tasks.add_task(refresh_roadmap_with_ai, user_id)
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
