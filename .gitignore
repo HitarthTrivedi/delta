@@ -40,3 +40,6 @@ test_result.md
 # Local User Data
 data/
 
+# npm lockfile (project uses yarn)
+package-lock.json
+
