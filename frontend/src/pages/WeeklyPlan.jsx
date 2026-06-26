@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
+import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { careerOSAPI, chatAPI } from '../lib/api';
 import { getTaskProgress } from '../lib/taskProgress';
@@ -20,6 +20,13 @@ const fallbackActions = [
   { title: 'Report pace at week end', detail: 'Mark what was completed so Agent 2 can decide whether to increase, repeat, or pause next week.' },
 ];
 
+const SUGGESTIONS = [
+  'I have an exam next week, slow down',
+  'These tasks are too hard for me right now',
+  'I finished everything ahead of schedule',
+  'What should I focus on first this week?',
+];
+
 export default function WeeklyPlan() {
   const userId = useAuthStore((state) => state.userId);
   const location = useLocation();
@@ -30,15 +37,12 @@ export default function WeeklyPlan() {
   const [advanceStep, setAdvanceStep] = useState(0);
   const [checked, setChecked] = useState({});
   const [skipped, setSkipped] = useState({});
+  const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: 'Agent 2 is ready. Tell me if exams, deadlines, low energy, travel, or inactivity should change this week\'s plan.',
-    },
+    { role: 'assistant', content: 'Agent 2 is ready. Tell me if exams, deadlines, low energy, travel, or inactivity should change this week\'s plan.' },
   ]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [chatExpanded, setChatExpanded] = useState(false);
   const bottomRef = useRef(null);
 
   const loadContext = useCallback(async (regenerate = false) => {
@@ -49,16 +53,22 @@ export default function WeeklyPlan() {
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
-
-      if (regenerate) {
-        toast.success('Agent 2 loaded your first weekly plan.');
-      }
+      if (regenerate) toast.success('Agent 2 loaded your first weekly plan.');
     } catch (err) {
       console.error(err);
       toast.error('Unable to load Agent 2 plan. Using a safe starter week.');
     } finally {
       setLoading(false);
     }
+  }, [userId]);
+
+  // Load chat history for current week
+  useEffect(() => {
+    chatAPI.getHistory(userId).then((res) => {
+      if (res?.messages?.length) {
+        setMessages(res.messages);
+      }
+    }).catch(() => {});
   }, [userId]);
 
   useEffect(() => {
@@ -70,6 +80,13 @@ export default function WeeklyPlan() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
+  // Close drawer on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') setChatOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const memory = context?.memory || {};
   const roadmap = context?.roadmap || {};
   const weeklyFocus = useMemo(() => roadmap.weekly_focus || {}, [roadmap.weekly_focus]);
@@ -79,25 +96,10 @@ export default function WeeklyPlan() {
   const hoursPerWeek = memory.constraints?.hours_per_week || 10;
   const longHorizonPlan = roadmap.destination?.long_horizon_plan || {};
   const longHorizonLanes = longHorizonPlan.lanes || weeklyFocus.long_horizon_lanes || [];
-
-  const actions = useMemo(() => {
-    return getTaskProgress(context, fallbackActions).actions;
-  }, [context]);
-
   const opportunities = context?.opportunities || [];
   const nextQuestions = context?.next_questions || [];
-  const chatPanelStyle = chatExpanded
-    ? {
-        ...panelStyle,
-        position: 'fixed',
-        inset: '5.25rem 1.25rem 1.25rem',
-        zIndex: 60,
-        padding: 20,
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.72)',
-      }
-    : { ...panelStyle, padding: 20 };
+
+  const actions = useMemo(() => getTaskProgress(context, fallbackActions).actions, [context]);
 
   const refreshWeek = async () => {
     setRefreshing(true);
@@ -119,9 +121,8 @@ export default function WeeklyPlan() {
   const toggleTask = async (action, index) => {
     if (advancing) return;
     const nextValue = !checked[index];
-    const nextChecked = { ...checked, [index]: nextValue };
-      setChecked(nextChecked);
-      setSkipped(prev => ({ ...prev, [index]: false }));
+    setChecked(prev => ({ ...prev, [index]: nextValue }));
+    setSkipped(prev => ({ ...prev, [index]: false }));
     try {
       await careerOSAPI.logJourneyEvent(userId, {
         event_type: nextValue ? 'weekly_task_completed' : 'weekly_task_reopened',
@@ -131,7 +132,7 @@ export default function WeeklyPlan() {
       });
     } catch (err) {
       console.error(err);
-      setChecked({ ...checked, [index]: !nextValue });
+      setChecked(prev => ({ ...prev, [index]: !nextValue }));
       toast.error('Task saved locally, but could not sync with database.');
     }
   };
@@ -163,22 +164,14 @@ export default function WeeklyPlan() {
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'I have generated the next weekly plan for you. If the new week has exams, deadlines, or if you need to adjust the pace, let me know here!',
-      }]);
+      // Reset chat for new week
+      setMessages([{ role: 'assistant', content: 'New week loaded. Tell me if anything has changed — exams, pace, priorities.' }]);
       toast.success('Next week loaded — Agent 2 has updated your tasks.');
     } catch (err) {
       clearInterval(stepInterval);
       console.error(err);
-      const detail = err?.response?.data?.detail
-        || err?.message
-        || 'Something went wrong — Agent 2 could not generate next week. Try again in a moment.';
+      const detail = err?.response?.data?.detail || err?.message || 'Something went wrong — Agent 2 could not generate next week. Try again in a moment.';
       toast.error(detail);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: detail,
-      }]);
     } finally {
       setAdvancing(false);
       setAdvanceStep(0);
@@ -204,6 +197,11 @@ export default function WeeklyPlan() {
     }
   };
 
+  const openChatWithSuggestion = (text) => {
+    setInput(text);
+    setChatOpen(true);
+  };
+
   const sendMessage = async (e) => {
     e?.preventDefault();
     const text = input.trim();
@@ -219,8 +217,6 @@ export default function WeeklyPlan() {
         message: `Agent 2 weekly plan discussion. Current weekly actions: ${actions.map(a => a.title).join('; ')}. User update: ${text}`,
       });
       setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
-      // Single source of truth: if Agent 2 returned a task list, display EXACTLY that list.
-      // No separate re-derivation that could disagree with what the AI just said.
       if (Array.isArray(response.updated_actions)) {
         setContext(prev => ({
           ...(prev || {}),
@@ -233,7 +229,7 @@ export default function WeeklyPlan() {
             },
           },
         }));
-        setChecked({});   // list changed — reset progress marks
+        setChecked({});
         setSkipped({});
       } else {
         await loadContext();
@@ -242,7 +238,7 @@ export default function WeeklyPlan() {
       console.error(err);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Agent 2 could not reply right now. Try again in a few seconds, or ask directly to explain, replace, make easier, make tougher, assign one course, or skip a task.',
+        content: 'Agent 2 could not reply right now. Try again in a few seconds.',
       }]);
       await loadContext();
     } finally {
@@ -250,9 +246,20 @@ export default function WeeklyPlan() {
     }
   };
 
+  const mdComponents = {
+    p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
+    ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+    ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+    li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
+    strong: ({ children }) => <strong style={{ color: '#fff', fontWeight: 700 }}>{children}</strong>,
+    code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{children}</code>,
+  };
+
   return (
     <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1.5rem 3rem' }}>
-      <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+
+        {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 28 }}>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.46)', fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>
@@ -266,16 +273,10 @@ export default function WeeklyPlan() {
             onClick={refreshWeek}
             disabled={refreshing || advancing}
             style={{
-              background: '#fff',
-              color: '#000',
-              border: 'none',
-              borderRadius: 999,
-              padding: '11px 18px',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              cursor: refreshing ? 'not-allowed' : 'pointer',
+              background: '#fff', color: '#000', border: 'none', borderRadius: 999,
+              padding: '11px 18px', fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              cursor: refreshing ? 'not-allowed' : 'pointer', flexShrink: 0,
             }}
           >
             {refreshing || advancing ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={15} />}
@@ -283,13 +284,10 @@ export default function WeeklyPlan() {
           </button>
         </header>
 
+        {/* Stats bar */}
         <section style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 1,
-          background: 'rgba(255,255,255,0.1)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          marginBottom: 24,
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 1, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 24,
         }}>
           {[
             { icon: BookOpen, label: 'Student', value: `${studentName} · ${educationStage}` },
@@ -308,6 +306,7 @@ export default function WeeklyPlan() {
           })}
         </section>
 
+        {/* Long-horizon plan */}
         {longHorizonLanes.length > 0 && (
           <section style={{ ...panelStyle, padding: 20, marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
@@ -333,333 +332,294 @@ export default function WeeklyPlan() {
           </section>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)', gap: 22 }} className="agent2-grid">
-          <section style={{ ...panelStyle, padding: 22 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
-              <div>
-                <h2 style={{ margin: '0 0 8px', fontSize: 24, letterSpacing: 0 }}>Tasks for this week</h2>
-                <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.55 }}>
-                  Agent 2 should only assign new work after these are completed or after you say the plan needs to change.
-                </p>
-              </div>
-              {loading && <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'rgba(255,255,255,0.5)' }} />}
+        {/* Tasks */}
+        <section style={{ ...panelStyle, padding: 22, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+            <div>
+              <h2 style={{ margin: '0 0 8px', fontSize: 24, letterSpacing: 0 }}>Tasks for this week</h2>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.55 }}>
+                Agent 2 should only assign new work after these are completed or after you say the plan needs to change.
+              </p>
             </div>
+            {loading && <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'rgba(255,255,255,0.5)' }} />}
+          </div>
 
-            {advancing && (
-              <div style={{ display: 'grid', gap: 14, padding: '8px 0' }}>
-                {ADVANCE_STEPS.map((step, i) => {
-                  const done = i < advanceStep;
-                  const active = i === advanceStep;
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, opacity: i > advanceStep ? 0.25 : 1, transition: 'opacity 0.4s ease' }}>
-                      <span style={{
-                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: done ? 'rgba(255,255,255,0.15)' : active ? 'rgba(255,255,255,0.06)' : 'transparent',
-                        border: `1px solid ${done ? 'rgba(255,255,255,0.4)' : active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`,
-                      }}>
-                        {done
-                          ? <Check size={13} color="#fff" />
-                          : active
-                            ? <Loader2 size={13} color="rgba(255,255,255,0.8)" style={{ animation: 'spin 1s linear infinite' }} />
-                            : <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} />
-                        }
-                      </span>
-                      <span style={{ fontSize: 14, color: done ? 'rgba(255,255,255,0.55)' : active ? '#fff' : 'rgba(255,255,255,0.25)', fontWeight: active ? 600 : 400 }}>
-                        {step}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div style={{ display: advancing ? 'none' : 'grid', gap: 12 }}>
-              {actions.map((action, index) => {
-                const isDone = !!checked[index];
-                const isSkipped = !!skipped[index];
+          {/* Advance progress steps */}
+          {advancing && (
+            <div style={{ display: 'grid', gap: 14, padding: '8px 0' }}>
+              {ADVANCE_STEPS.map((step, i) => {
+                const done = i < advanceStep;
+                const active = i === advanceStep;
                 return (
-                  <button
-                    key={action.id}
-                    onClick={() => toggleTask(action, index)}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '34px minmax(0, 1fr)',
-                      gap: 14,
-                      textAlign: 'left',
-                      width: '100%',
-                      background: isDone ? 'rgba(255,255,255,0.1)' : isSkipped ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: 8,
-                      padding: 16,
-                      color: '#fff',
-                      cursor: advancing ? 'not-allowed' : 'pointer',
-                    }}
-                  >
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, opacity: i > advanceStep ? 0.25 : 1, transition: 'opacity 0.4s ease' }}>
                     <span style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 6,
-                      border: '1px solid rgba(255,255,255,0.22)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: isDone ? '#fff' : 'transparent',
-                      color: '#000',
+                      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: done ? 'rgba(255,255,255,0.15)' : active ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      border: `1px solid ${done ? 'rgba(255,255,255,0.4)' : active ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`,
                     }}>
-                      {isDone && <Check size={16} />}
+                      {done
+                        ? <Check size={13} color="#fff" />
+                        : active
+                          ? <Loader2 size={13} color="rgba(255,255,255,0.8)" style={{ animation: 'spin 1s linear infinite' }} />
+                          : <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} />
+                      }
                     </span>
-                    <span>
-                      <span style={{ display: 'block', fontSize: 16, fontWeight: 700, marginBottom: 6, textDecoration: isDone ? 'line-through' : 'none' }}>
-                        {action.title}
-                        {isSkipped ? <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>Skipped</span> : null}
-                      </span>
-                      <span style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.55 }}>
-                        {action.detail}
-                      </span>
-                      {(action.source || action.url) && (
-                        <span style={{ display: 'block', marginTop: 8, color: 'rgba(255,255,255,0.44)', fontSize: 13 }}>
-                          Source: {action.source || 'Open resource'}
-                          {action.url ? (
-                            <>
-                              {' · '}
-                              <a
-                                href={action.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(event) => event.stopPropagation()}
-                                style={{ color: '#fff', textDecoration: 'underline' }}
-                              >
-                                Open
-                              </a>
-                            </>
-                          ) : null}
-                        </span>
-                      )}
-                      {!isDone && !isSkipped && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(event) => skipTask(event, action, index)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') skipTask(event, action, index);
-                          }}
-                          style={{ display: 'inline-block', marginTop: 10, color: 'rgba(255,255,255,0.64)', fontSize: 13, textDecoration: 'underline' }}
-                        >
-                          Skip this task
-                        </span>
-                      )}
+                    <span style={{ fontSize: 14, color: done ? 'rgba(255,255,255,0.55)' : active ? '#fff' : 'rgba(255,255,255,0.25)', fontWeight: active ? 600 : 400 }}>
+                      {step}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
+          )}
 
-            {actions.length > 0 && actions.every((_, actionIndex) => checked[actionIndex] || skipped[actionIndex]) && (
-              <div style={{ marginTop: 20, padding: '16px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 1.5 }}>
-                  <strong>All current tasks are checked.</strong> Request the next week only after you have genuinely finished the work and proof.
-                </p>
+          {/* Task list */}
+          <div style={{ display: advancing ? 'none' : 'grid', gap: 12 }}>
+            {actions.map((action, index) => {
+              const isDone = !!checked[index];
+              const isSkipped = !!skipped[index];
+              return (
                 <button
-                  onClick={requestNextWeek}
-                  disabled={advancing}
+                  key={action.id}
+                  onClick={() => toggleTask(action, index)}
                   style={{
-                    width: '100%',
-                    background: '#fff',
-                    color: '#000',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '14px',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 10,
-                    cursor: advancing ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!advancing) {
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,255,255,0.2)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = 'none';
+                    display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: 14,
+                    textAlign: 'left', width: '100%',
+                    background: isDone ? 'rgba(255,255,255,0.1)' : isSkipped ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
+                    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: 16,
+                    color: '#fff', cursor: advancing ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {advancing ? (
-                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                  ) : (
-                    <Check size={18} />
-                  )}
-                  Request Next Week's Activities
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 6,
+                    border: '1px solid rgba(255,255,255,0.22)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isDone ? '#fff' : 'transparent', color: '#000',
+                  }}>
+                    {isDone && <Check size={16} />}
+                  </span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: 16, fontWeight: 700, marginBottom: 6, textDecoration: isDone ? 'line-through' : 'none' }}>
+                      {action.title}
+                      {isSkipped ? <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>Skipped</span> : null}
+                    </span>
+                    <span style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.55 }}>{action.detail}</span>
+                    {(action.source || action.url) && (
+                      <span style={{ display: 'block', marginTop: 8, color: 'rgba(255,255,255,0.44)', fontSize: 13 }}>
+                        Source: {action.source || 'Open resource'}
+                        {action.url ? (
+                          <> · <a href={action.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#fff', textDecoration: 'underline' }}>Open</a></>
+                        ) : null}
+                      </span>
+                    )}
+                    {!isDone && !isSkipped && (
+                      <span
+                        role="button" tabIndex={0}
+                        onClick={(e) => skipTask(e, action, index)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') skipTask(e, action, index); }}
+                        style={{ display: 'inline-block', marginTop: 10, color: 'rgba(255,255,255,0.64)', fontSize: 13, textDecoration: 'underline' }}
+                      >
+                        Skip this task
+                      </span>
+                    )}
+                  </span>
                 </button>
-              </div>
-            )}
+              );
+            })}
+          </div>
 
-            <div style={{ marginTop: 22, display: 'grid', gap: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 17 }}>Signals Agent 2 may use</h3>
-              {(nextQuestions.length ? nextQuestions.slice(0, 2) : [
-                'Are there exams or deadlines that should pause normal learning?',
-                ...(context?.week_number > 1 ? ['Was last week too easy, too hard, or just right?'] : ['What do you want to focus on first this week?']),
-              ]).map((question, index) => (
-                <div key={index} style={{ display: 'flex', gap: 10, color: 'rgba(255,255,255,0.52)', fontSize: 14, lineHeight: 1.5 }}>
-                  <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 2 }} />
-                  {question}
+          {/* Request next week */}
+          {!advancing && actions.length > 0 && actions.every((_, i) => checked[i] || skipped[i]) && (
+            <div style={{ marginTop: 20, padding: 16, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 1.5 }}>
+                <strong>All current tasks are checked.</strong> Request the next week only after you have genuinely finished the work and proof.
+              </p>
+              <button
+                onClick={requestNextWeek}
+                disabled={advancing}
+                style={{
+                  width: '100%', background: '#fff', color: '#000', border: 'none',
+                  borderRadius: 6, padding: 14, fontWeight: 700, fontSize: 15,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  cursor: 'pointer', transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,255,255,0.2)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+              >
+                <Check size={18} /> Request Next Week's Activities
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Agent 2 compact box */}
+        <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Agent 2</h2>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: 13 }}>
+                Chat resets each week · DB keeps last 2 weeks for context
+              </p>
+            </div>
+            <button
+              onClick={() => setChatOpen(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: '#fff', color: '#000', border: 'none',
+                borderRadius: 8, padding: '10px 16px', fontWeight: 700, fontSize: 13,
+                cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <MessageSquare size={14} /> Talk to Agent 2
+            </button>
+          </div>
+          <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>Things you can ask:</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {(nextQuestions.length ? nextQuestions.slice(0, 4) : SUGGESTIONS).map((s, i) => (
+              <button
+                key={i}
+                onClick={() => openChatWithSuggestion(s)}
+                style={{
+                  background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.75)',
+                  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999,
+                  padding: '7px 14px', fontSize: 13, cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Opportunities */}
+        {opportunities.length > 0 && (
+          <section style={{ ...panelStyle, padding: 20 }}>
+            <h2 style={{ margin: '0 0 14px', fontSize: 18 }}>Opportunities</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              {opportunities.slice(0, 4).map((item, i) => (
+                <div key={i} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 14 }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>{item.title || item.name}</p>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>
+                    {item.platform}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
+                  </p>
                 </div>
               ))}
             </div>
           </section>
-
-          <aside style={{ display: 'grid', gap: 22 }}>
-            {chatExpanded && (
-              <div
-                onClick={() => setChatExpanded(false)}
-                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 50 }}
-              />
-            )}
-            <section style={chatPanelStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                <h2 style={{ margin: 0, fontSize: 20 }}>Talk to Agent 2</h2>
-                <button
-                  type="button"
-                  onClick={() => setChatExpanded(prev => !prev)}
-                  title={chatExpanded ? 'Minimize chat' : 'Maximize chat'}
-                  aria-label={chatExpanded ? 'Minimize Agent 2 chat' : 'Maximize Agent 2 chat'}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 8,
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    background: 'rgba(255,255,255,0.06)',
-                    color: '#fff',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {chatExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                </button>
-              </div>
-              <p style={{ margin: '0 0 14px', fontSize: 12, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
-                Tell Agent 2 about exams, travel, or pace changes for this week.{' '}
-                <Link to="/chat" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'underline' }}>
-                  Open full AI Chat
-                </Link>{' '}
-                for deeper career questions.
-              </p>
-              <div style={{ height: chatExpanded ? 'calc(100vh - 15rem)' : 330, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
-                {messages.map((message, index) => {
-                  const isUser = message.role === 'user';
-                  return (
-                    <div
-                      key={index}
-                      style={{
-                        alignSelf: isUser ? 'flex-end' : 'flex-start',
-                        maxWidth: '88%',
-                        background: isUser ? '#fff' : 'rgba(255,255,255,0.06)',
-                        color: isUser ? '#000' : 'rgba(255,255,255,0.86)',
-                        border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: isUser ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
-                        padding: '10px 12px',
-                        fontSize: 14,
-                        lineHeight: 1.55,
-                      }}
-                    >
-                      {isUser ? message.content : (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
-                            ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
-                            ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
-                            li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
-                            strong: ({ children }) => <strong style={{ color: '#fff', fontWeight: 700 }}>{children}</strong>,
-                            code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{children}</code>,
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                      )}
-                    </div>
-                  );
-                })}
-                {sending && (
-                  <div style={{ color: 'rgba(255,255,255,0.45)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                    Agent 2 is replying...
-                  </div>
-                )}
-                <div ref={bottomRef} />
-              </div>
-              <form onSubmit={sendMessage} style={{ display: 'flex', gap: 8, marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 14 }}>
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Exam in 2 weeks, slow down..."
-                  style={{
-                    flex: 1,
-                    background: '#0a0a0a',
-                    color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    borderRadius: 8,
-                    padding: '11px 12px',
-                    outline: 'none',
-                    fontSize: 14,
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || sending}
-                  style={{
-                    width: 42,
-                    borderRadius: 8,
-                    border: 'none',
-                    background: input.trim() && !sending ? '#fff' : 'rgba(255,255,255,0.12)',
-                    color: '#000',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: input.trim() && !sending ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  <Send size={16} />
-                </button>
-              </form>
-            </section>
-
-            <section style={{ ...panelStyle, padding: 20 }}>
-              <h2 style={{ margin: '0 0 14px', fontSize: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <MessageSquare size={18} /> Opportunities
-              </h2>
-              <div style={{ display: 'grid', gap: 10 }}>
-                {opportunities.length ? opportunities.slice(0, 4).map((item, index) => (
-                  <div key={index} style={{ borderTop: index ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingTop: index ? 10 : 0 }}>
-                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>{item.title || item.name}</p>
-                    <p style={{ margin: 0, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>
-                      {item.platform}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
-                    </p>
-                  </div>
-                )) : (
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: 13, lineHeight: 1.5 }}>
-                    Delta will surface relevant opportunities once your roadmap is further along.
-                  </p>
-                )}
-              </div>
-            </section>
-          </aside>
-        </div>
+        )}
       </div>
+
+      {/* Half-screen chat drawer */}
+      {chatOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setChatOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 55 }}
+          />
+          {/* Drawer */}
+          <div style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0,
+            width: 'min(50vw, 600px)', minWidth: 340,
+            background: '#050505', borderLeft: '1px solid rgba(255,255,255,0.1)',
+            zIndex: 60, display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Drawer header */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Agent 2</p>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: 12 }}>
+                  Week {context?.week_number || 1} · chat resets on new week
+                </p>
+              </div>
+              <button
+                onClick={() => setChatOpen(false)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.05)', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {messages.map((msg, i) => {
+                const isUser = msg.role === 'user';
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      alignSelf: isUser ? 'flex-end' : 'flex-start',
+                      maxWidth: '88%',
+                      background: isUser ? '#fff' : 'rgba(255,255,255,0.06)',
+                      color: isUser ? '#000' : 'rgba(255,255,255,0.86)',
+                      border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: isUser ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
+                      padding: '10px 12px', fontSize: 14, lineHeight: 1.55,
+                    }}
+                  >
+                    {isUser ? msg.content : (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                );
+              })}
+              {sending && (
+                <div style={{ color: 'rgba(255,255,255,0.45)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Agent 2 is replying...
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            {/* Input */}
+            <form
+              onSubmit={sendMessage}
+              style={{ padding: '12px 20px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8 }}
+            >
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Exam in 2 weeks, slow down..."
+                autoFocus
+                style={{
+                  flex: 1, background: '#0a0a0a', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8,
+                  padding: '11px 12px', outline: 'none', fontSize: 14,
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || sending}
+                style={{
+                  width: 42, borderRadius: 8, border: 'none',
+                  background: input.trim() && !sending ? '#fff' : 'rgba(255,255,255,0.12)',
+                  color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: input.trim() && !sending ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <Send size={16} />
+              </button>
+            </form>
+          </div>
+        </>
+      )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @media (max-width: 900px) {
-          .agent2-grid { grid-template-columns: 1fr !important; }
-        }
       `}</style>
     </main>
   );

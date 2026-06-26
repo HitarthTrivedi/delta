@@ -194,7 +194,7 @@ function AppContent() {
         <Route path="/progress-report" element={<RequireAuth><ProtectedRoute><ProgressReport /></ProtectedRoute></RequireAuth>} />
         <Route path="/resume" element={<RequireAuth><ProtectedRoute><ResumePage /></ProtectedRoute></RequireAuth>} />
         <Route path="/dashboard" element={<RequireAuth><ProtectedRoute><Dashboard /></ProtectedRoute></RequireAuth>} />
-        <Route path="/chat" element={<RequireAuth><ProtectedRoute><CareerChat /></ProtectedRoute></RequireAuth>} />
+        <Route path="/chat" element={<Navigate to="/roadmap" replace />} />
         <Route path="/ledger" element={<RequireAuth><ProtectedRoute><Ledger /></ProtectedRoute></RequireAuth>} />
         <Route path="/briefs" element={<RequireAuth><ProtectedRoute><Briefs /></ProtectedRoute></RequireAuth>} />
         <Route path="/pulse" element={<RequireAuth><ProtectedRoute><Pulse /></ProtectedRoute></RequireAuth>} />
