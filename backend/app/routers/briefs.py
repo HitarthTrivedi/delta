@@ -196,8 +196,13 @@ def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db)
         skill_snapshot=json.dumps([{"name": s.name, "proficiency": s.proficiency} for s in skills]),
     )
     db.add(score_entry)
-    db.commit()
-    db.refresh(brief)
+    try:
+        db.commit()
+        db.refresh(brief)
+    except Exception as exc:
+        db.rollback()
+        _log.error("generate_brief DB commit failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Brief saved in memory but could not be persisted: {exc}") from exc
     return brief
 
 

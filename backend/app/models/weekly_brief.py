@@ -8,7 +8,7 @@ class WeeklyBrief(Base):
     __tablename__ = "weekly_briefs"
 
     id = Column(String, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     week_start = Column(Date, default=datetime.date.today)
     delta_score_start = Column(Float, default=0.0)
     delta_score_end = Column(Float, nullable=True)

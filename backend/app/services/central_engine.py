@@ -974,7 +974,8 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         week_number = max(1, (elapsed_days // 7) + 1)
         current_week_start = user.created_at + datetime.timedelta(days=(week_number - 1) * 7)
     else:
-        current_week_start = datetime.datetime.utcnow()
+        # Treat account as started yesterday so the time gate doesn't permanently block
+        current_week_start = datetime.datetime.utcnow() - datetime.timedelta(days=1)
     current_actions = []
     if roadmap_before:
         current_actions = (_as_json(roadmap_before.weekly_focus, {}) or {}).get("primary_actions") or []
@@ -1163,7 +1164,7 @@ def compile_career_context(db: Session, user_id: str) -> dict:
         current_week_start = user.created_at + datetime.timedelta(days=(week_number - 1) * 7)
     else:
         week_number = 1
-        current_week_start = datetime.datetime.utcnow()
+        current_week_start = datetime.datetime.utcnow() - datetime.timedelta(days=1)
 
     progress_summary = build_progress_summary(db, user_id, valid_cycles, current_week_start)
     context = {

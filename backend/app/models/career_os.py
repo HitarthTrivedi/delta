@@ -30,7 +30,7 @@ class JourneyEvent(Base):
     __tablename__ = "journey_events"
 
     id = Column(String, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     event_type = Column(String, nullable=False)
     summary = Column(Text, nullable=False)
     evidence = Column(Text, nullable=True)  # JSON

@@ -7,7 +7,7 @@ class SkillNode(Base):
     __tablename__ = "skill_nodes"
 
     id = Column(String, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     category = Column(String, nullable=True)
     proficiency = Column(Integer, default=1)

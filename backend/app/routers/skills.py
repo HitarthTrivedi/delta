@@ -41,9 +41,13 @@ def create_skill(
         evidence_weight=data.evidence_weight if data.evidence_weight is not None else EVIDENCE_WEIGHTS.get(data.evidence_type, 0.4),
         evidence_url=data.evidence_url,
     )
-    db.add(skill)
-    db.commit()
-    db.refresh(skill)
+    try:
+        db.add(skill)
+        db.commit()
+        db.refresh(skill)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Could not save skill: {exc}") from exc
     return skill
 
 

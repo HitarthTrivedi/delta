@@ -7,8 +7,8 @@ class Recommendation(Base):
     __tablename__ = "recommendations"
 
     id = Column(String, primary_key=True)
-    brief_id = Column(String, ForeignKey("weekly_briefs.id"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    brief_id = Column(String, ForeignKey("weekly_briefs.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     skill = Column(String, nullable=False)
     resource_title = Column(String, nullable=True)
     resource_url = Column(String, nullable=True)
