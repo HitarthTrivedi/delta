@@ -307,7 +307,7 @@ export default function WeeklyPlan() {
           </section>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(320px, 0.85fr)', gap: 22 }} className="agent2-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)', gap: 22 }} className="agent2-grid">
           <section style={{ ...panelStyle, padding: 22 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
               <div>

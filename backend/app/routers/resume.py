@@ -23,7 +23,9 @@ from app.services.resume_service import (
     serialize_resume,
     suggestions_are_due,
 )
-from app.dependencies.auth import require_owner
+from typing import Optional
+from fastapi import Header
+from app.dependencies.auth import require_owner, verify_resource_owner
 
 logger = logging.getLogger("delta.resume")
 router = APIRouter(prefix="/api/resume", tags=["resume"])
@@ -238,7 +240,14 @@ def ats_optimize(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
 # ── Legacy upload endpoint (keep for backward compat) ────────────────────────
 
 @router.post("/upload")
-async def upload_resume_legacy(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_resume_legacy(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    x_user_id: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
+    if not x_user_id and not authorization:
+        raise HTTPException(status_code=401, detail="Authentication required.")
     content = await file.read()
     filename = file.filename or "resume.pdf"
     parsed = parse_resume(content, filename)

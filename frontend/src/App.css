@@ -389,3 +389,13 @@ body {
     padding: 0;
   }
 }
+
+/* WeeklyPlan + ProgressReport mobile stacking */
+@media (max-width: 767px) {
+  .agent2-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .simple-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

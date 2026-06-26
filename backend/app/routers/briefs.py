@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 import uuid, datetime, json
 from app.database import get_db
@@ -10,7 +11,7 @@ from app.services.central_engine import log_journey_event
 from app.services.delta_score import compute_delta_score
 from app.services.portfolio_engine import assess_portfolio
 from app.services.project_engine import recommend_proof_projects
-from app.dependencies.auth import require_owner
+from app.dependencies.auth import require_owner, verify_resource_owner
 from app.limiter import limiter
 
 router = APIRouter(prefix="/api/briefs", tags=["briefs"])
@@ -206,10 +207,18 @@ def get_score_history(user_id: str, limit: int = 12, db: Session = Depends(get_d
 
 
 @router.post("/recommendations/{rec_id}/complete", response_model=BriefResponse)
-def complete_recommendation(rec_id: str, data: RecommendationComplete, db: Session = Depends(get_db)):
+def complete_recommendation(
+    rec_id: str,
+    data: RecommendationComplete,
+    db: Session = Depends(get_db),
+    x_user_id: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
     rec = db.query(Recommendation).filter(Recommendation.id == rec_id).first()
     if not rec:
         raise HTTPException(status_code=404, detail="Recommendation not found")
+
+    verify_resource_owner(rec.user_id, x_user_id=x_user_id, authorization=authorization)
 
     rec.status = "completed"
     rec.completed_at = datetime.datetime.utcnow()
