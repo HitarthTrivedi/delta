@@ -50,6 +50,8 @@ def startup():
         from sqlalchemy import text
         with engine.connect() as conn:
             if str(engine.url).startswith("postgresql"):
+                # Override Supabase's short default statement_timeout for this transaction only
+                conn.execute(text("SET LOCAL statement_timeout = '30s'"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_data TEXT"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS agent2_memory_data TEXT"))
             else:
