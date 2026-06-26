@@ -542,11 +542,48 @@ class IngestionEngineV2:
         }
         return save_profile(user_id, enrichment)
 
+    def _recover_profile_from_session(self, user_id: str, session: "IngestionSession") -> dict:
+        """Re-extract profile fields from a completed session's conversation_log."""
+        try:
+            conv = json.loads(session.conversation_log or "[]")
+            if not conv:
+                return {}
+            conv_text = "\n".join(
+                f"{'Advisor' if m['role'] == 'assistant' else 'User'}: {m['content']}"
+                for m in conv if m.get("content")
+            )
+            prompt = EXTRACT_PROMPT.format(conversation=conv_text[:10000])
+            recovered = self._safe_generate_json(prompt, conv)
+            if recovered:
+                recovered["onboarding_complete"] = True
+                save_profile(user_id, recovered)
+                logger.info(f"[RECOVERY] Restored profile for user {user_id} from session {session.id}")
+            return recovered
+        except Exception as e:
+            logger.warning(f"[RECOVERY] Profile extraction from session failed: {e}")
+            return {}
+
     def start_session(self, db: Session, user_id: str, journey_type: str = "general"):
         """
         Start or resume an intake session.
+        If the user's profile_data is empty but completed sessions exist in the DB,
+        auto-recovers the profile before starting a new session.
         Returns the IngestionSession DB row.
         """
+        # If profile_data is empty, try recovering from most recently completed session
+        existing_profile = load_profile(user_id)
+        if not existing_profile or not existing_profile.get("onboarding_complete"):
+            completed = db.query(IngestionSession).filter(
+                IngestionSession.user_id == user_id,
+                IngestionSession.status.in_(["completed", "reset"])
+            ).order_by(IngestionSession.created_at.desc()).first()
+            if completed and completed.status == "completed":
+                recovered = self._recover_profile_from_session(user_id, completed)
+                if recovered:
+                    # Restore the completed session as active so frontend skips onboarding
+                    completed.status = "completed"
+                    db.commit()
+
         # Resume existing active session if any
         existing = db.query(IngestionSession).filter(
             IngestionSession.user_id == user_id,

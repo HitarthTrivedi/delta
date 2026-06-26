@@ -42,6 +42,10 @@ def _database_url() -> str:
 class Settings(BaseSettings):
     DATABASE_URL: str = _database_url()
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_API_KEY_2: str = os.getenv("GEMINI_API_KEY_2", "")
+    GEMINI_API_KEY_3: str = os.getenv("GEMINI_API_KEY_3", "")
+    GEMINI_API_KEY_4: str = os.getenv("GEMINI_API_KEY_4", "")
+    GEMINI_API_KEY_5: str = os.getenv("GEMINI_API_KEY_5", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     SERPER_API_KEY: str = os.getenv("SERPER_API_KEY", "")

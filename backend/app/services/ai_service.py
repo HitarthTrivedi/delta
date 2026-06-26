@@ -1,63 +1,92 @@
 """
 AI Service — unified LLM client for all delta agents.
-Uses google-genai SDK (new API style) with gemma-4-31b-it.
-Falls back gracefully if the key or model is unavailable.
+Uses google-genai SDK with Gemini. Supports up to 5 API keys in round-robin
+rotation — on quota exhaustion (429) it immediately retries with the next key.
 """
 
 import os
 import json
 import re
 import logging
+import itertools
 
 logger = logging.getLogger("delta.ai_service")
 
-# ─── lazy-initialise the google-genai client ───────────────────────────────
-_genai_client = None
+# ─── Key rotation pool ────────────────────────────────────────────────────────
+_clients: list = []          # list of google.genai.Client objects
+_client_cycle = None         # itertools.cycle over _clients
+_clients_initialised = False
 
-def _get_client():
-    global _genai_client
-    if _genai_client is not None:
-        return _genai_client
+
+def _build_clients():
+    global _clients, _client_cycle, _clients_initialised
+    if _clients_initialised:
+        return
+    _clients_initialised = True
     try:
         from google import genai
         from app.config import settings
-        key = (settings.GEMINI_API_KEY or "").strip().strip('"').strip("'")
-        if key and not key.startswith("your_"):
-            _genai_client = genai.Client(api_key=key)
-            logger.info("google-genai client initialised")
-        else:
-            logger.warning("GEMINI_API_KEY not set — AI calls will use mock fallback")
+        raw_keys = [
+            settings.GEMINI_API_KEY,
+            settings.GEMINI_API_KEY_2,
+            settings.GEMINI_API_KEY_3,
+            settings.GEMINI_API_KEY_4,
+            settings.GEMINI_API_KEY_5,
+        ]
+        keys = [k.strip().strip('"').strip("'") for k in raw_keys if k and not k.strip().startswith("your_")]
+        if not keys:
+            logger.warning("No valid GEMINI_API_KEY found — AI calls will use mock fallback")
+            return
+        for key in keys:
+            try:
+                _clients.append(genai.Client(api_key=key))
+            except Exception as e:
+                logger.warning(f"Failed to init genai client for a key: {e}")
+        if _clients:
+            _client_cycle = itertools.cycle(_clients)
+            logger.info(f"google-genai initialised with {len(_clients)} API key(s)")
     except Exception as e:
-        logger.warning(f"Failed to init google-genai client: {e}")
-    return _genai_client
+        logger.warning(f"Failed to init google-genai: {e}")
 
+
+def _next_client():
+    _build_clients()
+    if not _client_cycle:
+        return None
+    return next(_client_cycle)
+
+
+# ─── Public API ───────────────────────────────────────────────────────────────
 
 def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None) -> str:
     """
-    Send a prompt to a Gemini model and return the response text.
-
-    `model` overrides the globally configured GEMINI_MODEL for this single call —
-    used so the intake agent can run on a stronger model than the rest of the app.
+    Send a prompt to Gemini and return the response text.
+    Retries across all available API keys on 429/quota errors before failing.
+    `model` overrides the globally configured GEMINI_MODEL for this call.
     """
-    if model:
-        model_name = model
-    else:
+    _build_clients()
+    if not model:
         try:
             from app.config import settings
-            model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"
+            model = settings.GEMINI_MODEL or "gemini-2.5-flash"
         except Exception:
-            model_name = "gemini-2.5-flash"
+            model = "gemini-2.5-flash"
 
-    print(f"\n=================== [LLM REQUEST - {model_name}] ===================")
-    print(f"Temp: {temperature} | Max Tokens: {max_tokens}")
-    print(f"Prompt preview (last 300 chars):\n...{prompt[-300:] if len(prompt) > 300 else prompt}")
-    print(f"===========================================================")
-    
-    client = _get_client()
-    if client:
+    logger.info(f"[LLM] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
+
+    if not _clients:
+        logger.warning("No API clients available — using mock fallback")
+        return _mock_structured_response(prompt)
+
+    last_error = None
+    # Try every client once before giving up
+    for _ in range(len(_clients)):
+        client = _next_client()
+        if client is None:
+            break
         try:
             response = client.models.generate_content(
-                model=model_name,
+                model=model,
                 contents=prompt,
                 config={
                     "temperature": temperature,
@@ -66,50 +95,46 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
             )
             text = response.text
             if text:
-                print(f"\n=================== [LLM RESPONSE SUCCESS] ===================")
-                print(f"Length: {len(text)} chars | Model: {model_name}")
-                print(f"Response preview:\n{text[:250]}...")
-                print(f"==============================================================")
+                logger.info(f"[LLM] success | response_len={len(text)}")
                 return text.strip()
         except Exception as e:
-            print(f"\n❌ [LLM RESPONSE ERROR] Model {model_name} call failed: {e}")
-            import traceback
-            traceback.print_exc()
-            print(f"==============================================================")
+            err_str = str(e).lower()
+            last_error = e
+            if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or "rate" in err_str:
+                logger.warning(f"[LLM] quota hit on key, rotating to next key: {type(e).__name__}")
+                continue  # try next key
+            # Non-quota error — raise immediately
+            logger.error(f"[LLM] non-quota error: {e}")
             raise ValueError("The tasks are not being loaded right now. Can you please try again some time later?")
 
-    logger.warning("API unavailable — using mock fallback")
+    if last_error:
+        logger.error(f"[LLM] All {len(_clients)} keys exhausted. Last error: {last_error}")
+        raise ValueError("All API quota limits reached. Please try again in a few minutes.")
+
     return _mock_structured_response(prompt)
 
 
 def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None) -> dict | list:
     """
     Generate a JSON response. Strips markdown fences and parses automatically.
-
-    `model` overrides the globally configured GEMINI_MODEL for this single call.
     """
     raw = generate_response(prompt, temperature=temperature, model=model)
-    
-    # Strip markdown fences
-    clean_raw = raw
-    if "```json" in clean_raw:
-        clean_raw = clean_raw.split("```json")[1].split("```")[0]
-    elif "```" in clean_raw:
-        clean_raw = clean_raw.split("```")[1].split("```")[0]
-    clean_raw = clean_raw.strip()
-    
+
+    clean = raw
+    if "```json" in clean:
+        clean = clean.split("```json")[1].split("```")[0]
+    elif "```" in clean:
+        clean = clean.split("```")[1].split("```")[0]
+    clean = clean.strip()
+
     try:
-        parsed = json.loads(clean_raw)
-        print(f"\n✅ [JSON PARSER SUCCESS] Successfully parsed raw response into structure: {type(parsed)}")
-        return parsed
+        return json.loads(clean)
     except Exception as e:
-        print(f"\n❌ [JSON PARSER ERROR] Failed to parse JSON: {e}")
-        print(f"Raw response content that failed parsing:\n{raw}")
-        print(f"==============================================================")
+        logger.warning(f"[JSON] parse failed: {e} | raw[:200]={raw[:200]}")
         return {}
 
 
-# ─── Mock fallback (used when API key is missing / quota exceeded) ──────────
+# ─── Mock fallback (used when all keys are missing or exhausted) ──────────────
 
 def _mock_structured_response(prompt: str) -> str:
     prompt_lower = prompt.lower()
@@ -128,32 +153,28 @@ def _mock_structured_response(prompt: str) -> str:
             "If you want, ask me for exact steps or resume wording."
         )
 
-    # Onboarding opening
     if "intake agent" in prompt_lower or "opening question" in prompt_lower or "welcome them" in prompt_lower:
         return (
             "Hi! I'm your delta AI advisor. I'm here to build your personalized career roadmap. "
             "Let's start simple — what's your name, and what field or role are you working toward?"
         )
 
-    # Next question fallback (MUST come before profile extraction fallback to prevent false matches on 'extract' in prompt context)
     if "missing fields:" in prompt_lower or "follow-up question" in prompt_lower or "intake advisor" in prompt_lower:
         if "hours_per_week" in prompt_lower or "hours" in prompt_lower:
-            return "How many hours per week do you think you can dedicate to this learning path? I want to make sure the pace is just right for you!"
+            return "How many hours per week do you think you can dedicate to this learning path?"
         elif "planning_horizon" in prompt_lower:
-            return "What is your target timeline or planning horizon for these career goals? Are we looking at the next year, or a longer-term plan?"
+            return "What is your target timeline for these career goals?"
         elif "relocation" in prompt_lower:
-            return "Are you open to relocation, or do you prefer to look for remote and local opportunities?"
+            return "Are you open to relocation, or do you prefer remote and local opportunities?"
         elif "study_year" in prompt_lower:
-            return "Could you tell me what year of study you are currently in, or if you've already graduated?"
+            return "What year of study are you currently in, or have you already graduated?"
         elif "university" in prompt_lower or "college" in prompt_lower:
-            return "Which college or university do you attend? I'd love to know where you are studying!"
-        return "Could you tell me a little more about your target career timeline and how many hours you can dedicate each week?"
+            return "Which college or university do you attend?"
+        return "Could you tell me a little more about your target career timeline and available weekly hours?"
 
-    # Profile extraction
     if "extract" in prompt_lower and ("name" in prompt_lower or "target_role" in prompt_lower):
         return json.dumps({})
 
-    # Roadmap generation
     if "roadmap" in prompt_lower and "phases" in prompt_lower:
         return json.dumps({
             "phases": [
@@ -173,7 +194,6 @@ def _mock_structured_response(prompt: str) -> str:
             "active_phase_id": "phase_1"
         })
 
-    # Weekly brief
     if "weekly" in prompt_lower and "brief" in prompt_lower:
         return json.dumps({
             "delta_score_start": 20,
@@ -186,7 +206,6 @@ def _mock_structured_response(prompt: str) -> str:
             "questions_for_user": ["What specific skill do you want to master first?"]
         })
 
-    # Encouragement / completion
     if "inspiring" in prompt_lower or "onboarding wrap" in prompt_lower or "welcome them officially" in prompt_lower:
         return (
             "Welcome to delta Career OS! Your profile has been compiled. "
@@ -195,5 +214,4 @@ def _mock_structured_response(prompt: str) -> str:
             "Head to your dashboard to see your personalized roadmap!"
         )
 
-    # Generic chat
     return "I'm here to help with your career journey. Tell me more about your goals or current progress."

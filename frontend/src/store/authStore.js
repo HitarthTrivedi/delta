@@ -8,10 +8,8 @@ export const useAuthStore = create((set) => ({
   loading: true,
 
   setUserId: (id) => {
-    const remember = localStorage.getItem('delta_remember_me') === 'true';
-    const storage = remember ? localStorage : sessionStorage;
     if (id) {
-      storage.setItem('delta_user_id', id);
+      localStorage.setItem('delta_user_id', id);
     } else {
       localStorage.removeItem('delta_user_id');
       sessionStorage.removeItem('delta_user_id');
@@ -20,10 +18,8 @@ export const useAuthStore = create((set) => ({
   },
 
   setToken: (token) => {
-    const remember = localStorage.getItem('delta_remember_me') === 'true';
-    const storage = remember ? localStorage : sessionStorage;
     if (token) {
-      storage.setItem('delta_access_token', token);
+      localStorage.setItem('delta_access_token', token);
     } else {
       localStorage.removeItem('delta_access_token');
       sessionStorage.removeItem('delta_access_token');
@@ -41,14 +37,14 @@ export const useAuthStore = create((set) => ({
     const storage = remember ? localStorage : sessionStorage;
     
     if (session) {
-      set({ 
+      set({
         userId: session.user.id,
         token: session.access_token,
         user: session.user,
         loading: false
       });
-      storage.setItem('delta_user_id', session.user.id);
-      storage.setItem('delta_access_token', session.access_token);
+      localStorage.setItem('delta_user_id', session.user.id);
+      localStorage.setItem('delta_access_token', session.access_token);
     } else {
       set({ userId: null, token: null, user: null, loading: false });
       localStorage.removeItem('delta_user_id');
@@ -59,17 +55,15 @@ export const useAuthStore = create((set) => ({
 
     // Listen for auth state changes (login, logout, token refresh, etc)
     supabase.auth.onAuthStateChange((_event, session) => {
-      const remember = localStorage.getItem('delta_remember_me') === 'true';
-      const storage = remember ? localStorage : sessionStorage;
       if (session) {
-        set({ 
+        set({
           userId: session.user.id,
           token: session.access_token,
           user: session.user,
           loading: false
         });
-        storage.setItem('delta_user_id', session.user.id);
-        storage.setItem('delta_access_token', session.access_token);
+        localStorage.setItem('delta_user_id', session.user.id);
+        localStorage.setItem('delta_access_token', session.access_token);
       } else {
         set({ userId: null, token: null, user: null, loading: false });
         localStorage.removeItem('delta_user_id');
@@ -92,16 +86,14 @@ export const useAuthStore = create((set) => ({
       throw error;
     }
     if (data?.session) {
-      const remember = localStorage.getItem('delta_remember_me') === 'true';
-      const storage = remember ? localStorage : sessionStorage;
-      set({ 
-        userId: data.session.user.id, 
+      set({
+        userId: data.session.user.id,
         token: data.session.access_token,
         user: data.session.user,
-        loading: false 
+        loading: false
       });
-      storage.setItem('delta_user_id', data.session.user.id);
-      storage.setItem('delta_access_token', data.session.access_token);
+      localStorage.setItem('delta_user_id', data.session.user.id);
+      localStorage.setItem('delta_access_token', data.session.access_token);
     }
     return data;
   },
