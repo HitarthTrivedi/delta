@@ -1,8 +1,11 @@
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 import uuid, datetime, json
 from app.database import get_db
+
+_log = logging.getLogger("delta.briefs")
 from app.models import WeeklyBrief, Recommendation, DeltaScore, SkillNode, MarketSnapshot, User
 from app.schemas.brief import BriefResponse, RecommendationComplete
 from app.schemas.delta import DeltaScoreResponse
@@ -75,12 +78,22 @@ def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db)
 
     current_score = compute_delta_score(skills, market_demands, completed_count)
 
-    # 2. Invoke rich roadmap compiler
-    roadmap_res = generate_weekly_brief(user, skills, market)
+    try:
+        emerging_skills = json.loads(market.emerging_skills or "[]")
+    except Exception:
+        emerging_skills = []
+
+    try:
+        # 2. Invoke rich roadmap compiler
+        roadmap_res = generate_weekly_brief(user, skills, market)
+    except Exception as exc:
+        _log.error("generate_weekly_brief failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Brief generation failed: {exc}") from exc
+
     market_context = {
         "target_role": market.target_role,
         "top_demanded_skills": market_demands,
-        "emerging_skills": json.loads(market.emerging_skills or "[]"),
+        "emerging_skills": emerging_skills,
         "confidence_score": market.confidence_score,
     }
     memory_context = {

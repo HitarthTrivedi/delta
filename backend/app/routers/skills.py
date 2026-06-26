@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 import uuid, datetime
-from typing import Annotated
+from typing import Annotated, Optional
 from app.database import get_db
 from app.models import SkillNode
 from app.schemas.skill import SkillCreate, SkillUpdate, SkillResponse, SkillVerify
-from app.dependencies.auth import require_owner
+from app.dependencies.auth import require_owner, verify_resource_owner
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
@@ -24,7 +24,13 @@ def get_skills(user_id: str, db: Session = Depends(get_db), _: str = Depends(req
 
 
 @router.post("", response_model=SkillResponse)
-def create_skill(data: SkillCreate, db: Session = Depends(get_db)):
+def create_skill(
+    data: SkillCreate,
+    db: Session = Depends(get_db),
+    x_user_id: Annotated[Optional[str], Header()] = None,
+    authorization: Annotated[Optional[str], Header()] = None,
+):
+    verify_resource_owner(data.user_id, x_user_id=x_user_id, authorization=authorization)
     skill = SkillNode(
         id=str(uuid.uuid4()),
         user_id=data.user_id,
