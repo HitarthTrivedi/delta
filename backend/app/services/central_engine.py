@@ -963,9 +963,6 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     if not user:
         raise ValueError("User not found")
 
-
-    consolidation_report = consolidate_user_memory(db, user_id)
-
     roadmap_before = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
     valid_cycles = _valid_weekly_cycle_events(db, user_id)
     if user.created_at:
@@ -1019,32 +1016,45 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         raise ValueError(f"Please wait about {minutes} more minute(s) before requesting the next week.")
 
     memory = refresh_career_memory_from_user_state(db, user)
-    pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
-    opportunity_feed = collect_opportunities([skill.name for skill in skills], user.target_role)
-    opportunity_signals = summarize_opportunity_signals(opportunity_feed)
-    market = MarketSnapshot(
-        id=str(uuid.uuid4()),
-        user_id=user.id,
-        target_role=user.target_role or "AI Developer / Software Engineer",
-        snapshot_date=datetime.date.today(),
-        top_demanded_skills=_dump(pulse.get("top_demanded_skills", [])),
-        emerging_skills=_dump(pulse.get("emerging_skills", [])),
-        raw_data=_dump({
-            "recruiter_language": pulse.get("recruiter_language", []),
-            "project_patterns": pulse.get("project_patterns", []),
-            "certifications": pulse.get("certifications", []),
-            "market_warnings": pulse.get("market_warnings", []),
-            "sources": pulse.get("sources", []),
-            "domain_pack": pulse.get("domain_pack", {}),
-            "opportunities": opportunity_feed[:8],
-            "opportunity_signals": opportunity_signals,
-        }),
-        confidence_score=pulse.get("confidence_score", 0.6),
-    )
-    db.add(market)
-    db.commit()
-    db.refresh(market)
+
+    # Reuse a recent market snapshot if one was created in the last 12 hours — skips
+    # web scraping and opportunity fetching which together can take 30+ seconds and
+    # cause Render's proxy to cut the connection before we respond.
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=12)
+    recent_market = db.query(MarketSnapshot).filter(
+        MarketSnapshot.user_id == user.id,
+        MarketSnapshot.created_at >= cutoff,
+    ).order_by(MarketSnapshot.created_at.desc()).first()
+
+    if recent_market:
+        market = recent_market
+    else:
+        pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
+        opportunity_feed = collect_opportunities([skill.name for skill in skills], user.target_role)
+        opportunity_signals = summarize_opportunity_signals(opportunity_feed)
+        market = MarketSnapshot(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            target_role=user.target_role or "AI Developer / Software Engineer",
+            snapshot_date=datetime.date.today(),
+            top_demanded_skills=_dump(pulse.get("top_demanded_skills", [])),
+            emerging_skills=_dump(pulse.get("emerging_skills", [])),
+            raw_data=_dump({
+                "recruiter_language": pulse.get("recruiter_language", []),
+                "project_patterns": pulse.get("project_patterns", []),
+                "certifications": pulse.get("certifications", []),
+                "market_warnings": pulse.get("market_warnings", []),
+                "sources": pulse.get("sources", []),
+                "domain_pack": pulse.get("domain_pack", {}),
+                "opportunities": opportunity_feed[:8],
+                "opportunity_signals": opportunity_signals,
+            }),
+            confidence_score=pulse.get("confidence_score", 0.6),
+        )
+        db.add(market)
+        db.commit()
+        db.refresh(market)
 
     roadmap = get_or_create_roadmap_state(db, user, market, regenerate=True)
     event = log_journey_event(
@@ -1063,7 +1073,6 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
     )
     context = compile_career_context(db, user_id)
     context["weekly_cycle_event"] = serialize_journey_event(event)
-    context["memory_consolidation"] = consolidation_report
     context["memory"] = serialize_memory(memory)
     context["semantic_memory"] = serialize_semantic_memory(db, user_id)
     return context
