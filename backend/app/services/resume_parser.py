@@ -76,7 +76,7 @@ Return ONLY a JSON object with this exact structure:
   "certifications": ["Certification name 1", ...]
 }}
 """
-    result = generate_json(prompt, temperature=0.1)
+    result = generate_json(prompt, temperature=0.1, model="gemini-2.5-flash")
     if isinstance(result, dict) and result.get("contact"):
         return result
     raise ValueError("LLM failed to return valid structured resume object")

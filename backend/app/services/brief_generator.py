@@ -4,9 +4,7 @@ import uuid
 import re
 from app.services.ai_service import generate_response
 
-# Use a fast model for roadmap generation — gemini-2.0-flash is significantly
-# quicker than 2.5-flash for structured JSON output while still being capable.
-ROADMAP_MODEL = "gemini-2.0-flash"
+RESUME_MODEL = "gemini-2.5-flash"
 
 def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> dict:
     """
@@ -176,7 +174,7 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
     print(f"=========================================================================")
 
     try:
-        response_text = generate_response(prompt, model=ROADMAP_MODEL).strip()
+        response_text = generate_response(prompt).strip()
         
         # Clean potential markdown wrapping
         if "```json" in response_text:

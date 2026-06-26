@@ -68,9 +68,9 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
     if not model:
         try:
             from app.config import settings
-            model = settings.GEMINI_MODEL or "gemini-2.5-flash"
+            model = settings.GEMINI_MODEL or "gemma-4-31b-it"
         except Exception:
-            model = "gemini-2.5-flash"
+            model = "gemma-4-31b-it"
 
     logger.info(f"[LLM] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
 

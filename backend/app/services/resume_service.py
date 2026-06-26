@@ -209,7 +209,7 @@ Rewrite the content so that:
 
 Return ONLY a JSON object with keys: summary, achievements (array), projects (array of {{title, description}}), skills (array).
 """
-    result = generate_json(prompt, temperature=0.3)
+    result = generate_json(prompt, temperature=0.3, model="gemini-2.5-flash")
 
     if isinstance(result, dict):
         if result.get("summary"):
