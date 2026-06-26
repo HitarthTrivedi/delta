@@ -331,7 +331,7 @@ export default function Onboarding() {
       console.error(e);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: "Got it. Could you tell me a bit more about your background and goals?",
+        content: "Sorry, something went wrong on my end. Could you try sending that again?",
       }]);
     } finally {
       setIsThinking(false);
@@ -729,18 +729,25 @@ export default function Onboarding() {
             </button>
             
             <button
-              onClick={async () => {
-                if (window.confirm("Are you sure you want to reset your intake profile and start over? All collected data will be cleared.")) {
-                  try {
-                    await ingestionAPI.resetProfile(userId);
-                    queryClient.invalidateQueries({ queryKey: ['user', userId] });
-                    queryClient.invalidateQueries({ queryKey: ['user-with-skills', userId] });
-                    window.location.reload();
-                  } catch (e) {
-                    console.error('Reset error:', e);
-                    toast.error("Failed to reset profile. Please try again.");
-                  }
-                }
+              onClick={() => {
+                toast('This will clear all your profile data and start over. Are you sure?', {
+                  action: {
+                    label: 'Yes, reset',
+                    onClick: async () => {
+                      try {
+                        await ingestionAPI.resetProfile(userId);
+                        queryClient.invalidateQueries({ queryKey: ['user', userId] });
+                        queryClient.invalidateQueries({ queryKey: ['user-with-skills', userId] });
+                        window.location.reload();
+                      } catch (e) {
+                        console.error('Reset error:', e);
+                        toast.error('Failed to reset profile. Please try again.');
+                      }
+                    },
+                  },
+                  cancel: { label: 'Cancel' },
+                  duration: 8000,
+                });
               }}
               style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -794,10 +801,10 @@ export default function Onboarding() {
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
-              PROFILE INGESTION SOCKET
+              Profile setup
             </span>
             <span style={{ fontSize: '0.72rem', color: '#fff', fontFamily: 'monospace', fontWeight: 700 }}>
-              {progress}% COMPILING
+              {progress}% complete
             </span>
           </div>
           {/* Progress Bar track */}
@@ -871,7 +878,7 @@ export default function Onboarding() {
                 <ClipboardList size={22} style={{ color: '#000' }} />
               </div>
               <h1 style={{ color: '#fff', fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>
-                Part 1: Ingesting Ingestion Protocol
+                Part 1: Tell us about yourself
               </h1>
               <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.9rem', lineHeight: 1.6 }}>
                 Upload your resume first if you have one. I will extract what I can,

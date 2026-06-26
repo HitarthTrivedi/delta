@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, AlertCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { careerOSAPI, chatAPI } from '../lib/api';
@@ -447,7 +449,10 @@ export default function WeeklyPlan() {
 
             <div style={{ marginTop: 22, display: 'grid', gap: 12 }}>
               <h3 style={{ margin: 0, fontSize: 17 }}>Signals Agent 2 may use</h3>
-              {(nextQuestions.length ? nextQuestions.slice(0, 2) : ['Are there exams or deadlines that should pause normal learning?', 'Was last week too easy, too hard, or just right?']).map((question, index) => (
+              {(nextQuestions.length ? nextQuestions.slice(0, 2) : [
+                'Are there exams or deadlines that should pause normal learning?',
+                ...(context?.week_number > 1 ? ['Was last week too easy, too hard, or just right?'] : ['What do you want to focus on first this week?']),
+              ]).map((question, index) => (
                 <div key={index} style={{ display: 'flex', gap: 10, color: 'rgba(255,255,255,0.52)', fontSize: 14, lineHeight: 1.5 }}>
                   <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 2 }} />
                   {question}
@@ -505,7 +510,21 @@ export default function WeeklyPlan() {
                         lineHeight: 1.55,
                       }}
                     >
-                      {message.content}
+                      {isUser ? message.content : (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
+                            ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+                            ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+                            li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
+                            strong: ({ children }) => <strong style={{ color: '#fff', fontWeight: 700 }}>{children}</strong>,
+                            code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{children}</code>,
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   );
                 })}
@@ -558,14 +577,18 @@ export default function WeeklyPlan() {
                 <MessageSquare size={18} /> Opportunities
               </h2>
               <div style={{ display: 'grid', gap: 10 }}>
-                {(opportunities.length ? opportunities.slice(0, 4) : [{ title: 'No live opportunity selected yet', platform: 'Delta', match_percentage: 0 }]).map((item, index) => (
+                {opportunities.length ? opportunities.slice(0, 4).map((item, index) => (
                   <div key={index} style={{ borderTop: index ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingTop: index ? 10 : 0 }}>
-                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>{item.title || item.name || String(item)}</p>
+                    <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>{item.title || item.name}</p>
                     <p style={{ margin: 0, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>
-                      {item.platform || 'Opportunity'}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
+                      {item.platform}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
                     </p>
                   </div>
-                ))}
+                )) : (
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: 13, lineHeight: 1.5 }}>
+                    Delta will surface relevant opportunities once your roadmap is further along.
+                  </p>
+                )}
               </div>
             </section>
           </aside>

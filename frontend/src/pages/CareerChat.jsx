@@ -96,18 +96,12 @@ export default function CareerChat() {
   };
 
   const autofillChip = (skill) => {
-    const questions = [
-      `How do I build a strong project in ${skill} that I can put on my resume?`,
-      `What are the most common mistakes beginners make when learning ${skill}?`,
-      `What should an intermediate ${skill} developer know that beginners often miss?`,
-      `Give me a practical weekly plan to get job-ready with ${skill}.`,
-    ];
-    setInput(questions[Math.floor(Math.random() * questions.length)]);
+    setInput(`How do I build a strong project in ${skill} that I can put on my resume?`);
   };
 
   const proofProjects = careerContext?.proof_projects || [];
   const portfolio = careerContext?.portfolio_assessment || {};
-  const targetRole = careerContext?.memory?.ambitions?.target_role || 'Your career goal';
+  const targetRole = careerContext?.memory?.ambitions?.target_role || '';
   const activePhase = careerContext?.roadmap?.weekly_focus?.phase_name || 'Building skills';
 
   return (
@@ -130,9 +124,11 @@ export default function CareerChat() {
               <p className="text-[10px] font-bold uppercase text-slate-500 tracking-widest flex items-center gap-1 mb-2">
                 <BookOpen size={10} /> Context
               </p>
-              <p className="text-xs text-slate-400">
-                <span className="text-white font-medium">{targetRole}</span>
-              </p>
+              {targetRole && (
+                <p className="text-xs text-slate-400">
+                  <span className="text-white font-medium">{targetRole}</span>
+                </p>
+              )}
               <p className="text-[11px] text-slate-500 mt-0.5">{activePhase}</p>
             </div>
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Loader2, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
+import supabase from '../lib/supabaseClient';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -29,6 +30,9 @@ export default function LoginPage() {
         await signUp(email, password, name);
         toast.success('Account created! Please sign in.');
         setIsSignUp(false);
+        setEmail('');
+        setPassword('');
+        setName('');
       } else {
         await login(email, password);
         toast.success('Welcome back!');
@@ -251,7 +255,18 @@ export default function LoginPage() {
               {!isSignUp && (
                 <button
                   type="button"
-                  onClick={() => toast.info('Reset password via your Supabase dashboard.')}
+                  onClick={async () => {
+                    if (!email) { toast.error('Enter your email above first.'); return; }
+                    try {
+                      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: window.location.origin + '/login',
+                      });
+                      if (error) throw error;
+                      toast.success('Password reset email sent — check your inbox.');
+                    } catch (err) {
+                      toast.error(err.message || 'Could not send reset email.');
+                    }
+                  }}
                   style={{ ...linkStyle, fontSize: '13px' }}
                 >
                   Forgot password?
@@ -349,9 +364,15 @@ export default function LoginPage() {
             lineHeight: '1.6',
           }}>
             By continuing, you agree to Delta's{' '}
-            <span style={{ color: 'rgba(255,255,255,0.48)', cursor: 'pointer' }}>Terms</span>
+            <span
+              onClick={() => toast.info('Terms of Service coming soon.')}
+              style={{ color: 'rgba(255,255,255,0.48)', cursor: 'pointer' }}
+            >Terms</span>
             {' '}and{' '}
-            <span style={{ color: 'rgba(255,255,255,0.48)', cursor: 'pointer' }}>Privacy Policy</span>
+            <span
+              onClick={() => toast.info('Privacy Policy coming soon.')}
+              style={{ color: 'rgba(255,255,255,0.48)', cursor: 'pointer' }}
+            >Privacy Policy</span>
           </p>
 
         </div>
@@ -414,27 +435,11 @@ export default function LoginPage() {
               marginBottom: '14px',
               letterSpacing: '-0.2px',
             }}>
-              "Delta transformed how I approach my career — it's like having a personal strategist available 24/7."
+              Your personal career strategist — builds a roadmap from your story, not just your resume.
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: '#f4f4f4',
-                border: '1.5px solid rgba(255,255,255,0.28)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '13px',
-                color: '#050505',
-                fontWeight: '700',
-              }}>A</div>
-              <div>
-                <p style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>Arjun M.</p>
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>Product Manager, Bangalore</p>
-              </div>
-            </div>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.42)', lineHeight: 1.6 }}>
+              Delta learns your goals, skills, and constraints, then gives you a weekly plan that actually fits your life.
+            </p>
           </div>
         </div>
       </div>

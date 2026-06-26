@@ -176,7 +176,7 @@ export default function ProgressReport() {
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 22 }}>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.46)', fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>
-              Part 3 Progress · Week {weekNumber}
+              Progress report · Week {weekNumber}
             </p>
             <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0 }}>
               {studentName}'s progress
@@ -234,7 +234,7 @@ export default function ProgressReport() {
               <BarRow label="Done this week" value={doneCount} total={chartTotal} />
               <BarRow label="Still left this week" value={leftCount} total={chartTotal} />
               <BarRow label="Skipped this week" value={skippedCount} total={chartTotal} />
-              <BarRow label="Changed back" value={changedCount} total={chartTotal} />
+              <BarRow label="Reopened" value={changedCount} total={chartTotal} />
             </div>
           </section>
         </div>
@@ -288,7 +288,7 @@ export default function ProgressReport() {
           </section>
 
           <section style={{ ...panel, padding: 18 }}>
-            <h2 style={{ margin: '0 0 14px', fontSize: 22 }}>Changed back</h2>
+            <h2 style={{ margin: '0 0 14px', fontSize: 22 }}>Reopened tasks</h2>
             <div style={{ display: 'grid', gap: 10 }}>
               {progress.changed.length ? progress.changed.map(task => (
                 <TaskRow key={task.id} task={task} tone="changed" />
@@ -300,7 +300,7 @@ export default function ProgressReport() {
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 18, marginTop: 18 }} className="progress-grid">
           <section style={{ ...panel, padding: 18 }}>
             <h2 style={{ margin: '0 0 14px', fontSize: 22, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Signal size={18} /> Field updates
+              <Signal size={18} /> Skills in demand
             </h2>
             <div style={{ display: 'grid', gap: 14, marginBottom: fieldSignals.length ? 18 : 0 }}>
               <BarRow label="Completed lifetime" value={totalCompleted} total={lifetimeChartTotal} />
