@@ -159,56 +159,46 @@ class TaskDetailRequest(BaseModel):
 def get_task_detail(user_id: str, payload: TaskDetailRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Generate a detailed how-to breakdown for a specific task using AI."""
     try:
-        from app.services.ai_service import generate_response
+        from app.services.ai_service import generate_json
         user = db.query(User).filter(User.id == user_id).first()
         target_role = (user.target_role if user else None) or "Software Engineer"
 
-        prompt = f"""You are Delta's task execution guide. A student needs a specific, actionable breakdown to complete this career task.
+        prompt = f"""You are Delta's task execution guide. Return a JSON object only — no markdown, no explanation.
 
 TASK: {payload.task_title}
 CONTEXT: {payload.task_description}
-SKILL FOCUS: {payload.skill or "General"}
-USER'S TARGET ROLE: {target_role}
+SKILL: {payload.skill or "General"}
+ROLE: {target_role}
 
-Return ONLY a raw JSON object (no markdown, no code fences, no explanation):
+JSON structure to return:
 {{
-  "how_to_start": "One specific sentence: what to open, install, or do in the next 5 minutes",
-  "steps": [
-    "Step 1: exact action with a tool/platform/command",
-    "Step 2: ...",
-    "Step 3: ...",
-    "Step 4: ..."
-  ],
+  "how_to_start": "One sentence: exactly what to open or do right now",
+  "steps": ["Step 1", "Step 2", "Step 3", "Step 4"],
   "resources": [
     {{
-      "title": "Exact resource name",
+      "title": "Resource name",
       "url": "https://real-url.com",
-      "type": "course|docs|video|practice|tool",
-      "duration": "e.g. 8 hours, 3 weeks, 2 months",
-      "why": "One sentence on why this resource for this task"
+      "type": "course",
+      "duration": "e.g. 8 hours or 3 weeks",
+      "why": "One sentence why this resource"
     }}
   ],
   "estimated_hours": 6,
-  "timeline_note": "If any resource is long (weeks/months), specify exactly which sections or modules to complete THIS week. E.g. 'This course is 8 weeks — complete Week 1 and 2 only (approx 6 hours).'",
-  "proof_output": "Exactly what should exist when this task is done: a file, a GitHub repo, a running app, a written note, etc.",
-  "pro_tip": "One non-obvious expert insight specific to this task that most beginners miss"
+  "timeline_note": "If a resource takes weeks, say which part to do THIS week only",
+  "proof_output": "What exists when this task is done",
+  "pro_tip": "One non-obvious insight most beginners miss"
 }}
 
-Critical rules:
-- ALL resource URLs must be real and specific (coursera.org, roadmap.sh, docs.python.org, leetcode.com, neetcode.io, kaggle.com, etc.)
-- If a course takes more than 2 weeks, set timeline_note to tell the student exactly which part to do this week
-- Steps must be concrete (what to type, what to click, what to build) not vague
-- estimated_hours should reflect one week of honest work at the stated skill level"""
+Rules: real URLs only (coursera.org, leetcode.com, docs.python.org, roadmap.sh, etc). Steps must be concrete actions not vague advice."""
 
-        raw = generate_response(prompt, temperature=0.4, max_tokens=1500)
-        clean = raw.strip()
-        # Strip markdown code fences if the model adds them
-        clean = re.sub(r"^```[a-z]*\n?", "", clean)
-        clean = re.sub(r"\n?```$", "", clean.strip())
-        return json.loads(clean.strip())
-    except json.JSONDecodeError as exc:
-        _log.warning("task-detail JSON parse error for %s: %s", user_id, exc)
-        raise HTTPException(status_code=500, detail="AI returned malformed detail. Try again.") from exc
+        detail = generate_json(prompt, temperature=0.3)
+
+        if not detail or not isinstance(detail, dict):
+            raise HTTPException(status_code=500, detail="AI returned an empty response. Try again.")
+
+        return detail
+    except HTTPException:
+        raise
     except Exception as exc:
         _log.error("task-detail failed for %s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not generate task detail: {exc}") from exc
