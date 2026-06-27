@@ -261,19 +261,107 @@ def _break_week_actions(profile: dict, user: User, reason: str = "") -> list[dic
 
 
 LEETCODE_SEQUENCE = [
-    ("Arrays and Hashing", "4 problems (2 Easy + 2 Medium)", "Focus on frequency maps, sets, and duplicate detection. Write down the pattern and one reusable template after each problem."),
-    ("Two Pointers", "3 problems", "Valid palindrome style, sorted two-sum style, and container/window boundary reasoning. Note when to use two pointers vs a hash map."),
-    ("Sliding Window", "3 problems", "Fixed window, variable window, and longest substring/pattern tracking. Identify the expand/shrink condition for each."),
-    ("Stack", "3 problems", "Valid parentheses, monotonic stack, and expression/min-stack style reasoning. Draw the stack state for one problem by hand."),
-    ("Binary Search", "4 problems (2 Easy + 2 Medium)", "Classic search, lower/upper bound, search rotated array, and answer-space binary search. Memorise the lo/hi/mid update pattern."),
-    ("Linked List", "3 problems", "Reverse, fast/slow pointer, and merge/reorder style. Draw the pointer reassignment before writing code."),
-    ("Trees", "4 problems (2 Easy + 2 Medium)", "DFS traversal, BFS level order, path/depth, and lowest common ancestor style. Practice both recursive and iterative DFS."),
-    ("Heap / Priority Queue", "3 problems", "Top-k, streaming median/kth, and scheduling/merge pattern. Know when to use a min-heap vs max-heap."),
-    ("Backtracking", "3 problems", "Subsets, permutations/combinations, and constraint pruning. Write the decision tree before coding the recursion."),
-    ("Graphs", "4 problems (2 Easy + 2 Medium)", "BFS/DFS traversal, connected components, topological sort, and shortest path basics. Track visited nodes explicitly."),
-    ("Dynamic Programming 1D", "3 problems", "Climbing/house-robber, coin/change style, and LIS-style recurrence. Write the recurrence relation in plain English first."),
-    ("Dynamic Programming 2D", "3 problems", "Grid path, LCS/edit-distance style, and knapsack-style state design. Fill a small example table by hand before coding."),
+    ("Arrays and Hashing", "Focus on frequency maps and sets. After each problem write down the pattern and one reusable template."),
+    ("Two Pointers", "Note when to use two pointers vs a hash map. Draw pointer positions before coding."),
+    ("Sliding Window", "Identify the expand/shrink condition for each problem. Track the window invariant explicitly."),
+    ("Stack", "Draw the stack state by hand for at least one problem. Know when to use a monotonic stack."),
+    ("Binary Search", "Memorise the lo/hi/mid update pattern. Practice both value-space and index-space binary search."),
+    ("Linked List", "Draw the pointer reassignment before writing code. Practice in-place reversal without extra space."),
+    ("Trees", "Practice both recursive and iterative DFS. Level-order traversal with a queue is the BFS template."),
+    ("Heap / Priority Queue", "Know when to use a min-heap vs max-heap. Practice the push/pop pattern for streaming problems."),
+    ("Backtracking", "Write the decision tree before coding the recursion. Identify the base case and pruning condition first."),
+    ("Graphs", "Track visited nodes explicitly. Know BFS for shortest path and DFS for connected components."),
+    ("Dynamic Programming 1D", "Write the recurrence relation in plain English before coding. Verify with a small example by hand."),
+    ("Dynamic Programming 2D", "Fill a small example table by hand before coding. Identify what each cell represents."),
 ]
+
+LEETCODE_PROBLEMS: dict[str, list[dict]] = {
+    "Arrays and Hashing": [
+        {"id": 217, "title": "Contains Duplicate", "difficulty": "Easy", "url": "https://leetcode.com/problems/contains-duplicate/"},
+        {"id": 242, "title": "Valid Anagram", "difficulty": "Easy", "url": "https://leetcode.com/problems/valid-anagram/"},
+        {"id": 1, "title": "Two Sum", "difficulty": "Easy", "url": "https://leetcode.com/problems/two-sum/"},
+        {"id": 49, "title": "Group Anagrams", "difficulty": "Medium", "url": "https://leetcode.com/problems/group-anagrams/"},
+        {"id": 347, "title": "Top K Frequent Elements", "difficulty": "Medium", "url": "https://leetcode.com/problems/top-k-frequent-elements/"},
+        {"id": 238, "title": "Product of Array Except Self", "difficulty": "Medium", "url": "https://leetcode.com/problems/product-of-array-except-self/"},
+        {"id": 128, "title": "Longest Consecutive Sequence", "difficulty": "Hard", "url": "https://leetcode.com/problems/longest-consecutive-sequence/"},
+    ],
+    "Two Pointers": [
+        {"id": 125, "title": "Valid Palindrome", "difficulty": "Easy", "url": "https://leetcode.com/problems/valid-palindrome/"},
+        {"id": 167, "title": "Two Sum II - Input Array Is Sorted", "difficulty": "Easy", "url": "https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/"},
+        {"id": 15, "title": "3Sum", "difficulty": "Medium", "url": "https://leetcode.com/problems/3sum/"},
+        {"id": 11, "title": "Container With Most Water", "difficulty": "Medium", "url": "https://leetcode.com/problems/container-with-most-water/"},
+        {"id": 42, "title": "Trapping Rain Water", "difficulty": "Hard", "url": "https://leetcode.com/problems/trapping-rain-water/"},
+    ],
+    "Sliding Window": [
+        {"id": 121, "title": "Best Time to Buy and Sell Stock", "difficulty": "Easy", "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/"},
+        {"id": 3, "title": "Longest Substring Without Repeating Characters", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-substring-without-repeating-characters/"},
+        {"id": 424, "title": "Longest Repeating Character Replacement", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-repeating-character-replacement/"},
+        {"id": 567, "title": "Permutation in String", "difficulty": "Medium", "url": "https://leetcode.com/problems/permutation-in-string/"},
+        {"id": 76, "title": "Minimum Window Substring", "difficulty": "Hard", "url": "https://leetcode.com/problems/minimum-window-substring/"},
+    ],
+    "Stack": [
+        {"id": 20, "title": "Valid Parentheses", "difficulty": "Easy", "url": "https://leetcode.com/problems/valid-parentheses/"},
+        {"id": 155, "title": "Min Stack", "difficulty": "Easy", "url": "https://leetcode.com/problems/min-stack/"},
+        {"id": 150, "title": "Evaluate Reverse Polish Notation", "difficulty": "Medium", "url": "https://leetcode.com/problems/evaluate-reverse-polish-notation/"},
+        {"id": 22, "title": "Generate Parentheses", "difficulty": "Medium", "url": "https://leetcode.com/problems/generate-parentheses/"},
+        {"id": 739, "title": "Daily Temperatures", "difficulty": "Medium", "url": "https://leetcode.com/problems/daily-temperatures/"},
+        {"id": 84, "title": "Largest Rectangle in Histogram", "difficulty": "Hard", "url": "https://leetcode.com/problems/largest-rectangle-in-histogram/"},
+    ],
+    "Binary Search": [
+        {"id": 704, "title": "Binary Search", "difficulty": "Easy", "url": "https://leetcode.com/problems/binary-search/"},
+        {"id": 74, "title": "Search a 2D Matrix", "difficulty": "Medium", "url": "https://leetcode.com/problems/search-a-2d-matrix/"},
+        {"id": 875, "title": "Koko Eating Bananas", "difficulty": "Medium", "url": "https://leetcode.com/problems/koko-eating-bananas/"},
+        {"id": 153, "title": "Find Minimum in Rotated Sorted Array", "difficulty": "Medium", "url": "https://leetcode.com/problems/find-minimum-in-rotated-sorted-array/"},
+        {"id": 33, "title": "Search in Rotated Sorted Array", "difficulty": "Medium", "url": "https://leetcode.com/problems/search-in-rotated-sorted-array/"},
+    ],
+    "Linked List": [
+        {"id": 206, "title": "Reverse Linked List", "difficulty": "Easy", "url": "https://leetcode.com/problems/reverse-linked-list/"},
+        {"id": 21, "title": "Merge Two Sorted Lists", "difficulty": "Easy", "url": "https://leetcode.com/problems/merge-two-sorted-lists/"},
+        {"id": 141, "title": "Linked List Cycle", "difficulty": "Easy", "url": "https://leetcode.com/problems/linked-list-cycle/"},
+        {"id": 143, "title": "Reorder List", "difficulty": "Medium", "url": "https://leetcode.com/problems/reorder-list/"},
+        {"id": 19, "title": "Remove Nth Node From End of List", "difficulty": "Medium", "url": "https://leetcode.com/problems/remove-nth-node-from-end-of-list/"},
+    ],
+    "Trees": [
+        {"id": 226, "title": "Invert Binary Tree", "difficulty": "Easy", "url": "https://leetcode.com/problems/invert-binary-tree/"},
+        {"id": 104, "title": "Maximum Depth of Binary Tree", "difficulty": "Easy", "url": "https://leetcode.com/problems/maximum-depth-of-binary-tree/"},
+        {"id": 235, "title": "Lowest Common Ancestor of a Binary Search Tree", "difficulty": "Easy", "url": "https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-search-tree/"},
+        {"id": 102, "title": "Binary Tree Level Order Traversal", "difficulty": "Medium", "url": "https://leetcode.com/problems/binary-tree-level-order-traversal/"},
+        {"id": 98, "title": "Validate Binary Search Tree", "difficulty": "Medium", "url": "https://leetcode.com/problems/validate-binary-search-tree/"},
+    ],
+    "Heap / Priority Queue": [
+        {"id": 703, "title": "Kth Largest Element in a Stream", "difficulty": "Easy", "url": "https://leetcode.com/problems/kth-largest-element-in-a-stream/"},
+        {"id": 1046, "title": "Last Stone Weight", "difficulty": "Easy", "url": "https://leetcode.com/problems/last-stone-weight/"},
+        {"id": 973, "title": "K Closest Points to Origin", "difficulty": "Medium", "url": "https://leetcode.com/problems/k-closest-points-to-origin/"},
+        {"id": 295, "title": "Find Median from Data Stream", "difficulty": "Hard", "url": "https://leetcode.com/problems/find-median-from-data-stream/"},
+    ],
+    "Backtracking": [
+        {"id": 78, "title": "Subsets", "difficulty": "Medium", "url": "https://leetcode.com/problems/subsets/"},
+        {"id": 39, "title": "Combination Sum", "difficulty": "Medium", "url": "https://leetcode.com/problems/combination-sum/"},
+        {"id": 46, "title": "Permutations", "difficulty": "Medium", "url": "https://leetcode.com/problems/permutations/"},
+        {"id": 17, "title": "Letter Combinations of a Phone Number", "difficulty": "Medium", "url": "https://leetcode.com/problems/letter-combinations-of-a-phone-number/"},
+        {"id": 79, "title": "Word Search", "difficulty": "Medium", "url": "https://leetcode.com/problems/word-search/"},
+    ],
+    "Graphs": [
+        {"id": 200, "title": "Number of Islands", "difficulty": "Medium", "url": "https://leetcode.com/problems/number-of-islands/"},
+        {"id": 133, "title": "Clone Graph", "difficulty": "Medium", "url": "https://leetcode.com/problems/clone-graph/"},
+        {"id": 695, "title": "Max Area of Island", "difficulty": "Medium", "url": "https://leetcode.com/problems/max-area-of-island/"},
+        {"id": 207, "title": "Course Schedule", "difficulty": "Medium", "url": "https://leetcode.com/problems/course-schedule/"},
+        {"id": 417, "title": "Pacific Atlantic Water Flow", "difficulty": "Medium", "url": "https://leetcode.com/problems/pacific-atlantic-water-flow/"},
+    ],
+    "Dynamic Programming 1D": [
+        {"id": 70, "title": "Climbing Stairs", "difficulty": "Easy", "url": "https://leetcode.com/problems/climbing-stairs/"},
+        {"id": 198, "title": "House Robber", "difficulty": "Medium", "url": "https://leetcode.com/problems/house-robber/"},
+        {"id": 322, "title": "Coin Change", "difficulty": "Medium", "url": "https://leetcode.com/problems/coin-change/"},
+        {"id": 300, "title": "Longest Increasing Subsequence", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-increasing-subsequence/"},
+        {"id": 139, "title": "Word Break", "difficulty": "Medium", "url": "https://leetcode.com/problems/word-break/"},
+    ],
+    "Dynamic Programming 2D": [
+        {"id": 62, "title": "Unique Paths", "difficulty": "Medium", "url": "https://leetcode.com/problems/unique-paths/"},
+        {"id": 1143, "title": "Longest Common Subsequence", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-common-subsequence/"},
+        {"id": 72, "title": "Edit Distance", "difficulty": "Hard", "url": "https://leetcode.com/problems/edit-distance/"},
+        {"id": 494, "title": "Target Sum", "difficulty": "Medium", "url": "https://leetcode.com/problems/target-sum/"},
+    ],
+}
 
 
 def _week_number_from_user(user: User) -> int:
@@ -283,27 +371,54 @@ def _week_number_from_user(user: User) -> int:
     return max(1, (elapsed_days // 7) + 1)
 
 
+def _is_cs_engineering_user(profile: dict, skills: list[SkillNode], user: User) -> bool:
+    role = str(user.target_role or "").lower()
+    major = str(
+        profile.get("education", {}).get("major", "")
+        or profile.get("major", "")
+        or profile.get("field_of_study", "")
+    ).lower()
+    cs_keywords = {
+        "software", "developer", "engineer", "computer science", "cs", "cse",
+        "data scientist", "machine learning", "ml engineer", "ai", "backend",
+        "frontend", "fullstack", "sde", "swe", "programmer", "data engineer",
+    }
+    combined = f"{role} {major}"
+    return any(kw in combined for kw in cs_keywords)
+
+
 def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User, cycle_count: int = 0) -> list[dict]:
-    domain = _profile_domain(profile, skills, user)
-    actions = []
-    if domain in {"ai_agents", "general"} or "software" in str(user.target_role or "").lower() or "engineer" in str(user.target_role or "").lower():
-        topic, count_label, detail = LEETCODE_SEQUENCE[cycle_count % len(LEETCODE_SEQUENCE)]
-        actions.append({
-            "id": f"recurring-leetcode-cycle-{cycle_count}-{topic.lower().replace(' ', '-').replace('/', '-')}",
-            "node_id": f"recurring-leetcode-cycle-{cycle_count}",
-            "type": "practice",
-            "title": f"LeetCode — {topic}: {count_label}",
-            "skill": "DSA interview consistency",
-            "description": (
-                f"Recurring weekly habit. {detail}"
-            ),
-            "why_now": "Interview readiness compounds through small weekly practice, not short bursts.",
-            "source": "LeetCode topic rotation",
-            "url": "https://leetcode.com/problemset/",
-            "cadence": "weekly",
-            "recurring": True,
-        })
-    return actions
+    if not _is_cs_engineering_user(profile, skills, user):
+        return []
+    topic, tip = LEETCODE_SEQUENCE[cycle_count % len(LEETCODE_SEQUENCE)]
+    problems = LEETCODE_PROBLEMS.get(topic, [])
+    count = len(problems)
+    easy = sum(1 for p in problems if p["difficulty"] == "Easy")
+    medium = sum(1 for p in problems if p["difficulty"] == "Medium")
+    hard = sum(1 for p in problems if p["difficulty"] == "Hard")
+    parts = []
+    if easy:
+        parts.append(f"{easy}E")
+    if medium:
+        parts.append(f"{medium}M")
+    if hard:
+        parts.append(f"{hard}H")
+    count_label = f"{count} problems ({'+'.join(parts)})" if parts else f"{count} problems"
+    slug = topic.lower().replace(" ", "-").replace("/", "-")
+    return [{
+        "id": f"recurring-leetcode-cycle-{cycle_count}-{slug}",
+        "node_id": f"recurring-leetcode-cycle-{cycle_count}",
+        "type": "practice",
+        "title": f"LeetCode — {topic}: {count_label}",
+        "skill": "DSA interview consistency",
+        "description": tip,
+        "problems": problems,
+        "why_now": "Interview readiness compounds through small weekly practice, not short bursts.",
+        "source": "LeetCode — NeetCode 150",
+        "url": "https://leetcode.com/problemset/",
+        "cadence": "weekly",
+        "recurring": True,
+    }]
 
 
 def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, market: MarketSnapshot) -> list[dict]:

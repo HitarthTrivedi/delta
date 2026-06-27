@@ -444,14 +444,37 @@ export default function WeeklyPlan() {
                       {isSkipped ? <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>Skipped</span> : null}
                     </span>
                     <span style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.55 }}>{action.detail}</span>
-                    {(action.source || action.url) && (
+                    {action.problems?.length > 0 ? (
+                      <span style={{ display: 'block', marginTop: 10 }}>
+                        <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12, display: 'block', marginBottom: 6 }}>Problems this week:</span>
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          {action.problems.map((p) => (
+                            <a
+                              key={p.id}
+                              href={p.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none', fontSize: 13 }}
+                            >
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                                background: p.difficulty === 'Easy' ? 'rgba(74,222,128,0.15)' : p.difficulty === 'Medium' ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
+                                color: p.difficulty === 'Easy' ? '#4ade80' : p.difficulty === 'Medium' ? '#fbbf24' : '#f87171',
+                              }}>{p.difficulty}</span>
+                              <span style={{ color: '#fff', textDecoration: 'underline' }}>#{p.id} {p.title}</span>
+                            </a>
+                          ))}
+                        </span>
+                      </span>
+                    ) : (action.source || action.url) ? (
                       <span style={{ display: 'block', marginTop: 8, color: 'rgba(255,255,255,0.44)', fontSize: 13 }}>
                         {action.source || 'Resource'}
                         {action.url ? (
                           <> · <a href={action.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#fff', textDecoration: 'underline' }}>Open</a></>
                         ) : null}
                       </span>
-                    )}
+                    ) : null}
                     <span style={{ display: 'flex', gap: 14, marginTop: 12, alignItems: 'center' }}>
                       {!isDone && !isSkipped && (
                         <span
