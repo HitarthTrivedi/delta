@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     UNSTOP_SOURCE_MODE: str = os.getenv("UNSTOP_SOURCE_MODE", "")
     HACKATHON_SOURCE_MODE: str = os.getenv("HACKATHON_SOURCE_MODE", "")
     JOBPOSTS_SOURCE_MODE: str = os.getenv("JOBPOSTS_SOURCE_MODE", "")
+    REMINDER_FROM_EMAIL: str = os.getenv("REMINDER_FROM_EMAIL", "")
+    REMINDER_FROM_PASSWORD: str = os.getenv("REMINDER_FROM_PASSWORD", "")
+    REMINDER_SECRET: str = os.getenv("REMINDER_SECRET", "")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://delta-ai.vercel.app")
 
     class Config:
         env_file = ".env"
