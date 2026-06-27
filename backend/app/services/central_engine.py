@@ -261,18 +261,18 @@ def _break_week_actions(profile: dict, user: User, reason: str = "") -> list[dic
 
 
 LEETCODE_SEQUENCE = [
-    ("Arrays and Hashing", "Solve 4 problems: 2 easy + 2 medium. Focus on frequency maps, sets, and duplicate detection."),
-    ("Two Pointers", "Solve 3 problems: valid palindrome style, sorted two-sum style, and container/window boundary reasoning."),
-    ("Sliding Window", "Solve 3 problems: fixed window, variable window, and longest substring/pattern tracking."),
-    ("Stack", "Solve 3 problems: valid parentheses, monotonic stack, and expression/min-stack style reasoning."),
-    ("Binary Search", "Solve 4 problems: classic search, lower/upper bound, search rotated array, and answer-space binary search."),
-    ("Linked List", "Solve 3 problems: reverse, fast/slow pointer, and merge/reorder style."),
-    ("Trees", "Solve 4 problems: DFS traversal, BFS level order, path/depth, and lowest common ancestor style."),
-    ("Heap / Priority Queue", "Solve 3 problems: top-k, streaming median/kth, and scheduling/merge pattern."),
-    ("Backtracking", "Solve 3 problems: subsets, permutations/combinations, and constraint pruning."),
-    ("Graphs", "Solve 4 problems: BFS/DFS traversal, connected components, topological sort, and shortest path basics."),
-    ("Dynamic Programming 1D", "Solve 3 problems: climbing/house-robber, coin/change style, and LIS-style recurrence."),
-    ("Dynamic Programming 2D", "Solve 3 problems: grid path, LCS/edit-distance style, and knapsack-style state design."),
+    ("Arrays and Hashing", "4 problems (2 Easy + 2 Medium)", "Focus on frequency maps, sets, and duplicate detection. Write down the pattern and one reusable template after each problem."),
+    ("Two Pointers", "3 problems", "Valid palindrome style, sorted two-sum style, and container/window boundary reasoning. Note when to use two pointers vs a hash map."),
+    ("Sliding Window", "3 problems", "Fixed window, variable window, and longest substring/pattern tracking. Identify the expand/shrink condition for each."),
+    ("Stack", "3 problems", "Valid parentheses, monotonic stack, and expression/min-stack style reasoning. Draw the stack state for one problem by hand."),
+    ("Binary Search", "4 problems (2 Easy + 2 Medium)", "Classic search, lower/upper bound, search rotated array, and answer-space binary search. Memorise the lo/hi/mid update pattern."),
+    ("Linked List", "3 problems", "Reverse, fast/slow pointer, and merge/reorder style. Draw the pointer reassignment before writing code."),
+    ("Trees", "4 problems (2 Easy + 2 Medium)", "DFS traversal, BFS level order, path/depth, and lowest common ancestor style. Practice both recursive and iterative DFS."),
+    ("Heap / Priority Queue", "3 problems", "Top-k, streaming median/kth, and scheduling/merge pattern. Know when to use a min-heap vs max-heap."),
+    ("Backtracking", "3 problems", "Subsets, permutations/combinations, and constraint pruning. Write the decision tree before coding the recursion."),
+    ("Graphs", "4 problems (2 Easy + 2 Medium)", "BFS/DFS traversal, connected components, topological sort, and shortest path basics. Track visited nodes explicitly."),
+    ("Dynamic Programming 1D", "3 problems", "Climbing/house-robber, coin/change style, and LIS-style recurrence. Write the recurrence relation in plain English first."),
+    ("Dynamic Programming 2D", "3 problems", "Grid path, LCS/edit-distance style, and knapsack-style state design. Fill a small example table by hand before coding."),
 ]
 
 
@@ -283,21 +283,19 @@ def _week_number_from_user(user: User) -> int:
     return max(1, (elapsed_days // 7) + 1)
 
 
-def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User) -> list[dict]:
+def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User, cycle_count: int = 0) -> list[dict]:
     domain = _profile_domain(profile, skills, user)
-    week_number = _week_number_from_user(user)
     actions = []
     if domain in {"ai_agents", "general"} or "software" in str(user.target_role or "").lower() or "engineer" in str(user.target_role or "").lower():
-        topic, detail = LEETCODE_SEQUENCE[(week_number - 1) % len(LEETCODE_SEQUENCE)]
+        topic, count_label, detail = LEETCODE_SEQUENCE[cycle_count % len(LEETCODE_SEQUENCE)]
         actions.append({
-            "id": f"recurring-leetcode-week-{week_number}-{topic.lower().replace(' ', '-').replace('/', '-')}",
-            "node_id": "recurring-leetcode",
+            "id": f"recurring-leetcode-cycle-{cycle_count}-{topic.lower().replace(' ', '-').replace('/', '-')}",
+            "node_id": f"recurring-leetcode-cycle-{cycle_count}",
             "type": "practice",
-            "title": f"LeetCode habit: {topic}",
+            "title": f"LeetCode — {topic}: {count_label}",
             "skill": "DSA interview consistency",
             "description": (
-                f"This is a recurring weekly habit, not a one-time course. {detail} "
-                "Write down the pattern, the mistake you made, and one reusable template."
+                f"Recurring weekly habit. {detail}"
             ),
             "why_now": "Interview readiness compounds through small weekly practice, not short bursts.",
             "source": "LeetCode topic rotation",
@@ -1390,6 +1388,10 @@ def log_journey_event(
 
 def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> RoadmapState:
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
+    cycle_count = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user.id,
+        JourneyEvent.event_type == "weekly_cycle_completed",
+    ).count()
     try:
         from app.services.profile_store import load_profile
         profile = load_profile(user.id)
@@ -1422,7 +1424,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             elif profile_says_advanced and low_level_start:
                 proof_actions = _domain_proof_actions(profile, skills_for_profile, user, db)
                 if proof_actions:
-                    recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user)
+                    recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
                     trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
                     long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
                     weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
@@ -1438,7 +1440,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                     db.commit()
                     db.refresh(roadmap)
             elif not weekly_focus.get("long_horizon_lanes"):
-                recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user)
+                recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
                 trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
                 existing_ids = {str(action.get("id")) for action in actions}
                 durable_actions = [
@@ -1486,7 +1488,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         "planning_horizon_months": destination["planning_horizon_months"],
         "long_horizon_lanes": long_plan["lanes"],
     }
-    recurring_actions = _recurring_habit_actions(profile, skills, user)
+    recurring_actions = _recurring_habit_actions(profile, skills, user, cycle_count)
     trend_actions = _trend_response_actions(profile, skills, user, market)
     if recurring_actions:
         weekly_focus["primary_actions"] = recurring_actions + weekly_focus["primary_actions"][:2]
