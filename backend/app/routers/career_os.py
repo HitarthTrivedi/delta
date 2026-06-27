@@ -163,33 +163,16 @@ def get_task_detail(user_id: str, payload: TaskDetailRequest, db: Session = Depe
         user = db.query(User).filter(User.id == user_id).first()
         target_role = (user.target_role if user else None) or "Software Engineer"
 
-        prompt = f"""You are Delta's task execution guide. Return a JSON object only — no markdown, no explanation.
-
-TASK: {payload.task_title}
-CONTEXT: {payload.task_description}
-SKILL: {payload.skill or "General"}
-ROLE: {target_role}
-
-JSON structure to return:
-{{
-  "how_to_start": "One sentence: exactly what to open or do right now",
-  "steps": ["Step 1", "Step 2", "Step 3", "Step 4"],
-  "resources": [
-    {{
-      "title": "Resource name",
-      "url": "https://real-url.com",
-      "type": "course",
-      "duration": "e.g. 8 hours or 3 weeks",
-      "why": "One sentence why this resource"
-    }}
-  ],
-  "estimated_hours": 6,
-  "timeline_note": "If a resource takes weeks, say which part to do THIS week only",
-  "proof_output": "What exists when this task is done",
-  "pro_tip": "One non-obvious insight most beginners miss"
-}}
-
-Rules: real URLs only (coursera.org, leetcode.com, docs.python.org, roadmap.sh, etc). Steps must be concrete actions not vague advice."""
+        context = f"{payload.task_description[:300]}" if payload.task_description else ""
+        prompt = (
+            f"Task: {payload.task_title}. Skill: {payload.skill or 'General'}. Role: {target_role}. {context}\n\n"
+            "Return ONLY this JSON, no markdown:\n"
+            '{"how_to_start":"one sentence","steps":["s1","s2","s3"],'
+            '"resources":[{"title":"name","url":"https://real.com","type":"course","duration":"Xh","why":"reason"}],'
+            '"estimated_hours":5,"timeline_note":"which part this week if long","proof_output":"what exists when done",'
+            '"pro_tip":"expert insight"}\n\n'
+            "Use real URLs (leetcode.com, coursera.org, roadmap.sh, docs.python.org). Steps must be concrete actions."
+        )
 
         detail = generate_json(prompt, temperature=0.3)
 

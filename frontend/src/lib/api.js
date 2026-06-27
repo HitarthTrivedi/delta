@@ -113,7 +113,7 @@ export const careerOSAPI = {
   runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`, {}, { timeout: 300000 }).then(r => r.data),
   consolidateMemory: (userId) => api.post(`/career-os/user/${userId}/consolidate-memory`).then(r => r.data),
   logJourneyEvent: (userId, data) => api.post(`/career-os/user/${userId}/journey`, data).then(r => r.data),
-  getTaskDetail: (userId, data) => api.post(`/career-os/user/${userId}/task-detail`, data, { timeout: 30000 }).then(r => r.data),
+  getTaskDetail: (userId, data) => api.post(`/career-os/user/${userId}/task-detail`, data, { timeout: 60000 }).then(r => r.data),
 };
 
 // ── Ingestion API ──
