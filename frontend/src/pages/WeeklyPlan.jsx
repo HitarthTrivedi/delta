@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CalendarDays, Check, ChevronDown, ChevronUp, ExternalLink, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, Bell, X } from 'lucide-react';
+import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, Bell, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { careerOSAPI, chatAPI } from '../lib/api';
 import { getTaskProgress } from '../lib/taskProgress';
@@ -44,13 +44,6 @@ export default function WeeklyPlan() {
   ]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-
-  // Task expansion state
-  const [expandedTask, setExpandedTask] = useState(null);
-  const [taskDetails, setTaskDetails] = useState({});
-  const [loadingDetail, setLoadingDetail] = useState(null);
-
-  // Notification permission state
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'unsupported'
   );
@@ -109,7 +102,6 @@ export default function WeeklyPlan() {
 
   const actions = useMemo(() => getTaskProgress(context, fallbackActions).actions, [context]);
 
-  // Daily reminder — fires once per day if there are pending tasks
   useReminder(actions, checked);
 
   const refreshWeek = async () => {
@@ -167,96 +159,11 @@ export default function WeeklyPlan() {
     }
   };
 
-  const toggleTaskDetail = async (e, action, index) => {
-    e.stopPropagation();
-    if (expandedTask === index) {
-      setExpandedTask(null);
-      return;
-    }
-    setExpandedTask(index);
-    if (taskDetails[index]) return; // already cached
-
-    setLoadingDetail(index);
-    try {
-      const detail = await careerOSAPI.getTaskDetail(userId, {
-        task_title: action.title,
-        task_description: action.detail || action.description || '',
-        skill: action.skill || '',
-      });
-      setTaskDetails(prev => ({ ...prev, [index]: detail }));
-    } catch (err) {
-      console.error(err);
-      toast.error('Could not load task details right now.');
-      setExpandedTask(null);
-    } finally {
-      setLoadingDetail(null);
-    }
-  };
-
-  const handleEnableReminders = async (e) => {
-    e.stopPropagation();
-    const perm = await requestNotificationPermission();
-    setNotifPermission(perm);
-    if (perm === 'granted') toast.success('Reminders enabled — Delta will notify you once a day.');
-    else if (perm === 'denied') toast.error('Browser blocked notifications. Enable them in your browser settings.');
-  };
-
-  const ADVANCE_STEPS = [
-    'Reading your profile and past activity...',
-    'Checking your Agent 2 conversations...',
-    'Analysing completed and skipped tasks...',
-    'Scanning market signals for your role...',
-    'Agent 2 is curating your next week...',
-    'Finalising your personalised task list...',
-  ];
-
-  const requestNextWeek = async () => {
-    setAdvancing(true);
-    setAdvanceStep(0);
-    const stepInterval = setInterval(() => {
-      setAdvanceStep(prev => {
-        if (prev < ADVANCE_STEPS.length - 2) return prev + 1;
-        clearInterval(stepInterval);
-        return prev;
-      });
-    }, 4000);
-    try {
-      const data = await careerOSAPI.runWeeklyCycle(userId);
-      clearInterval(stepInterval);
-      setAdvanceStep(ADVANCE_STEPS.length - 1);
-      setContext(data);
-      const progress = getTaskProgress(data, fallbackActions);
-      setChecked(progress.checkedByIndex);
-      setSkipped(progress.skippedByIndex);
-      setExpandedTask(null);
-      setTaskDetails({});
-      setMessages([{ role: 'assistant', content: 'New week loaded. Tell me if anything has changed — exams, pace, priorities.' }]);
-      toast.success('Next week loaded — Agent 2 has updated your tasks.');
-    } catch (err) {
-      clearInterval(stepInterval);
-      console.error(err);
-      const detail = err?.response?.data?.detail || err?.message || 'Something went wrong — Agent 2 could not generate next week. Try again in a moment.';
-      toast.error(detail);
-    } finally {
-      setAdvancing(false);
-      setAdvanceStep(0);
-    }
-  };
-
-  const openChatWithSuggestion = (text) => {
-    setInput(text);
-    setChatOpen(true);
-  };
-
-  const sendMessage = async (e) => {
-    e?.preventDefault();
-    const text = input.trim();
+  // Core send — accepts text directly so it can be called programmatically
+  const sendMessageText = async (text) => {
     if (!text || sending) return;
-
-    setInput('');
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setSending(true);
-
     try {
       const response = await chatAPI.send({
         user_id: userId,
@@ -292,6 +199,76 @@ export default function WeeklyPlan() {
     }
   };
 
+  const sendMessage = async (e) => {
+    e?.preventDefault();
+    const text = input.trim();
+    if (!text) return;
+    setInput('');
+    await sendMessageText(text);
+  };
+
+  // "How to do this" — opens Agent 2 and auto-asks about this specific task
+  const askAgent2AboutTask = (e, action) => {
+    e.stopPropagation();
+    const prompt = `How do I complete this task: "${action.title}"? ${action.detail ? action.detail + ' ' : ''}Give me exact step-by-step instructions, the best resources with specific links, how long each will take, and if any course is involved tell me which modules or weeks to focus on this week specifically.`;
+    setChatOpen(true);
+    // Small delay so drawer is open and visible before the message fires
+    setTimeout(() => sendMessageText(prompt), 150);
+  };
+
+  const openChatWithSuggestion = (text) => {
+    setInput(text);
+    setChatOpen(true);
+  };
+
+  const handleEnableReminders = async (e) => {
+    e.stopPropagation();
+    const perm = await requestNotificationPermission();
+    setNotifPermission(perm);
+    if (perm === 'granted') toast.success('Reminders enabled.');
+    else if (perm === 'denied') toast.error('Browser blocked notifications. Enable them in browser settings.');
+  };
+
+  const ADVANCE_STEPS = [
+    'Reading your profile and past activity...',
+    'Checking your Agent 2 conversations...',
+    'Analysing completed and skipped tasks...',
+    'Scanning market signals for your role...',
+    'Agent 2 is curating your next week...',
+    'Finalising your personalised task list...',
+  ];
+
+  const requestNextWeek = async () => {
+    setAdvancing(true);
+    setAdvanceStep(0);
+    const stepInterval = setInterval(() => {
+      setAdvanceStep(prev => {
+        if (prev < ADVANCE_STEPS.length - 2) return prev + 1;
+        clearInterval(stepInterval);
+        return prev;
+      });
+    }, 4000);
+    try {
+      const data = await careerOSAPI.runWeeklyCycle(userId);
+      clearInterval(stepInterval);
+      setAdvanceStep(ADVANCE_STEPS.length - 1);
+      setContext(data);
+      const progress = getTaskProgress(data, fallbackActions);
+      setChecked(progress.checkedByIndex);
+      setSkipped(progress.skippedByIndex);
+      setMessages([{ role: 'assistant', content: 'New week loaded. Tell me if anything has changed — exams, pace, priorities.' }]);
+      toast.success('Next week loaded — Agent 2 has updated your tasks.');
+    } catch (err) {
+      clearInterval(stepInterval);
+      console.error(err);
+      const detail = err?.response?.data?.detail || err?.message || 'Something went wrong. Try again in a moment.';
+      toast.error(detail);
+    } finally {
+      setAdvancing(false);
+      setAdvanceStep(0);
+    }
+  };
+
   const mdComponents = {
     p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
     ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
@@ -299,6 +276,7 @@ export default function WeeklyPlan() {
     li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
     strong: ({ children }) => <strong style={{ color: '#fff', fontWeight: 700 }}>{children}</strong>,
     code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{children}</code>,
+    a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" style={{ color: '#fff', textDecoration: 'underline' }}>{children}</a>,
   };
 
   return (
@@ -319,7 +297,6 @@ export default function WeeklyPlan() {
             {notifPermission !== 'granted' && notifPermission !== 'unsupported' && (
               <button
                 onClick={handleEnableReminders}
-                title="Enable daily task reminders"
                 style={{
                   background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
                   border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999,
@@ -441,179 +418,65 @@ export default function WeeklyPlan() {
             {actions.map((action, index) => {
               const isDone = !!checked[index];
               const isSkipped = !!skipped[index];
-              const isExpanded = expandedTask === index;
-              const detail = taskDetails[index];
-              const isLoadingThis = loadingDetail === index;
-
               return (
-                <div key={action.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                  {/* Task card row */}
-                  <button
-                    onClick={() => toggleTask(action, index)}
-                    style={{
-                      display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: 14,
-                      textAlign: 'left', width: '100%',
-                      background: isDone ? 'rgba(255,255,255,0.1)' : isSkipped ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: isExpanded ? '8px 8px 0 0' : 8,
-                      padding: 16, color: '#fff',
-                      cursor: advancing ? 'not-allowed' : 'pointer',
-                      borderBottom: isExpanded ? '1px solid rgba(255,255,255,0.06)' : undefined,
-                    }}
-                  >
-                    <span style={{
-                      width: 28, height: 28, borderRadius: 6,
-                      border: '1px solid rgba(255,255,255,0.22)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: isDone ? '#fff' : 'transparent', color: '#000', flexShrink: 0,
-                    }}>
-                      {isDone && <Check size={16} />}
+                <button
+                  key={action.id}
+                  onClick={() => toggleTask(action, index)}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: 14,
+                    textAlign: 'left', width: '100%',
+                    background: isDone ? 'rgba(255,255,255,0.1)' : isSkipped ? 'rgba(255,255,255,0.04)' : '#0a0a0a',
+                    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: 16,
+                    color: '#fff', cursor: advancing ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 6,
+                    border: '1px solid rgba(255,255,255,0.22)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isDone ? '#fff' : 'transparent', color: '#000', flexShrink: 0,
+                  }}>
+                    {isDone && <Check size={16} />}
+                  </span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: 16, fontWeight: 700, marginBottom: 6, textDecoration: isDone ? 'line-through' : 'none' }}>
+                      {action.title}
+                      {isSkipped ? <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>Skipped</span> : null}
                     </span>
-                    <span>
-                      <span style={{ display: 'block', fontSize: 16, fontWeight: 700, marginBottom: 6, textDecoration: isDone ? 'line-through' : 'none' }}>
-                        {action.title}
-                        {isSkipped ? <span style={{ marginLeft: 8, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>Skipped</span> : null}
+                    <span style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.55 }}>{action.detail}</span>
+                    {(action.source || action.url) && (
+                      <span style={{ display: 'block', marginTop: 8, color: 'rgba(255,255,255,0.44)', fontSize: 13 }}>
+                        {action.source || 'Resource'}
+                        {action.url ? (
+                          <> · <a href={action.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#fff', textDecoration: 'underline' }}>Open</a></>
+                        ) : null}
                       </span>
-                      <span style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.55 }}>{action.detail}</span>
-                      {(action.source || action.url) && (
-                        <span style={{ display: 'block', marginTop: 8, color: 'rgba(255,255,255,0.44)', fontSize: 13 }}>
-                          {action.source || 'Resource'}
-                          {action.url ? (
-                            <> · <a href={action.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#fff', textDecoration: 'underline' }}>Open</a></>
-                          ) : null}
-                        </span>
-                      )}
-                      {/* Action row: skip + how-to-do */}
-                      <span style={{ display: 'flex', gap: 14, marginTop: 12, alignItems: 'center' }}>
-                        {!isDone && !isSkipped && (
-                          <span
-                            role="button" tabIndex={0}
-                            onClick={(e) => skipTask(e, action, index)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') skipTask(e, action, index); }}
-                            style={{ color: 'rgba(255,255,255,0.44)', fontSize: 13, textDecoration: 'underline', cursor: 'pointer' }}
-                          >
-                            Skip this task
-                          </span>
-                        )}
+                    )}
+                    <span style={{ display: 'flex', gap: 14, marginTop: 12, alignItems: 'center' }}>
+                      {!isDone && !isSkipped && (
                         <span
                           role="button" tabIndex={0}
-                          onClick={(e) => toggleTaskDetail(e, action, index)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') toggleTaskDetail(e, action, index); }}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            color: isExpanded ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.5)',
-                            fontSize: 13, cursor: 'pointer',
-                            fontWeight: isExpanded ? 600 : 400,
-                          }}
+                          onClick={(e) => skipTask(e, action, index)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') skipTask(e, action, index); }}
+                          style={{ color: 'rgba(255,255,255,0.44)', fontSize: 13, textDecoration: 'underline', cursor: 'pointer' }}
                         >
-                          {isLoadingThis
-                            ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Loading guide...</>
-                            : isExpanded
-                              ? <><ChevronUp size={13} /> Hide guide</>
-                              : <><ChevronDown size={13} /> How to do this</>
-                          }
+                          Skip this task
                         </span>
+                      )}
+                      <span
+                        role="button" tabIndex={0}
+                        onClick={(e) => askAgent2AboutTask(e, action)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') askAgent2AboutTask(e, action); }}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                          color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer',
+                        }}
+                      >
+                        <MessageSquare size={12} /> How to do this
                       </span>
                     </span>
-                  </button>
-
-                  {/* Expansion panel */}
-                  {isExpanded && detail && (
-                    <div style={{
-                      background: '#050505',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderTop: 'none',
-                      borderRadius: '0 0 8px 8px',
-                      padding: '20px 20px 20px 62px',
-                    }}>
-                      {/* Start here */}
-                      <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(255,255,255,0.04)', borderRadius: 6, borderLeft: '2px solid rgba(255,255,255,0.3)' }}>
-                        <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Start here</p>
-                        <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>{detail.how_to_start}</p>
-                      </div>
-
-                      {/* Steps */}
-                      {detail.steps?.length > 0 && (
-                        <div style={{ marginBottom: 20 }}>
-                          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Steps</p>
-                          <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {detail.steps.map((step, si) => (
-                              <li key={si} style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>{step}</li>
-                            ))}
-                          </ol>
-                        </div>
-                      )}
-
-                      {/* Resources */}
-                      {detail.resources?.length > 0 && (
-                        <div style={{ marginBottom: 20 }}>
-                          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Resources</p>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {detail.resources.map((r, ri) => (
-                              <div key={ri} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '12px 14px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 4 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                                    <span style={{
-                                      fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-                                      background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)',
-                                      padding: '2px 7px', borderRadius: 4, flexShrink: 0,
-                                    }}>
-                                      {r.type || 'resource'}
-                                    </span>
-                                    <a
-                                      href={r.url} target="_blank" rel="noreferrer"
-                                      style={{ fontSize: 14, fontWeight: 600, color: '#fff', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                    >
-                                      {r.title}
-                                    </a>
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                                    {r.duration && (
-                                      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>{r.duration}</span>
-                                    )}
-                                    <a href={r.url} target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,0.4)', display: 'flex' }}>
-                                      <ExternalLink size={13} />
-                                    </a>
-                                  </div>
-                                </div>
-                                {r.why && <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>{r.why}</p>}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Timeline note */}
-                      {detail.timeline_note && (
-                        <div style={{ marginBottom: 20, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                          <Clock size={14} style={{ color: 'rgba(255,255,255,0.3)', marginTop: 2, flexShrink: 0 }} />
-                          <div>
-                            <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                              Timeline · ~{detail.estimated_hours}h this week
-                            </p>
-                            <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.55 }}>{detail.timeline_note}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Proof output */}
-                      {detail.proof_output && (
-                        <div style={{ marginBottom: 20 }}>
-                          <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Done when</p>
-                          <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>{detail.proof_output}</p>
-                        </div>
-                      )}
-
-                      {/* Pro tip */}
-                      {detail.pro_tip && (
-                        <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6 }}>
-                          <p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Pro tip</p>
-                          <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, fontStyle: 'italic' }}>{detail.pro_tip}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                  </span>
+                </button>
               );
             })}
           </div>
@@ -631,10 +494,8 @@ export default function WeeklyPlan() {
                   width: '100%', background: '#fff', color: '#000', border: 'none',
                   borderRadius: 6, padding: 14, fontWeight: 700, fontSize: 15,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                  cursor: 'pointer', transition: 'all 0.2s ease',
+                  cursor: 'pointer',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,255,255,0.2)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 <Check size={18} /> Request Next Week's Activities
               </button>
@@ -673,7 +534,6 @@ export default function WeeklyPlan() {
                   background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.75)',
                   border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999,
                   padding: '7px 14px', fontSize: 13, cursor: 'pointer',
-                  transition: 'background 0.15s',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
@@ -705,10 +565,7 @@ export default function WeeklyPlan() {
       {/* Half-screen chat drawer */}
       {chatOpen && (
         <>
-          <div
-            onClick={() => setChatOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 55 }}
-          />
+          <div onClick={() => setChatOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 55 }} />
           <div style={{
             position: 'fixed', top: 0, right: 0, bottom: 0,
             width: 'min(50vw, 600px)', minWidth: 340,
@@ -742,18 +599,15 @@ export default function WeeklyPlan() {
               {messages.map((msg, i) => {
                 const isUser = msg.role === 'user';
                 return (
-                  <div
-                    key={i}
-                    style={{
-                      alignSelf: isUser ? 'flex-end' : 'flex-start',
-                      maxWidth: '88%',
-                      background: isUser ? '#fff' : 'rgba(255,255,255,0.06)',
-                      color: isUser ? '#000' : 'rgba(255,255,255,0.86)',
-                      border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: isUser ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
-                      padding: '10px 12px', fontSize: 14, lineHeight: 1.55,
-                    }}
-                  >
+                  <div key={i} style={{
+                    alignSelf: isUser ? 'flex-end' : 'flex-start',
+                    maxWidth: '88%',
+                    background: isUser ? '#fff' : 'rgba(255,255,255,0.06)',
+                    color: isUser ? '#000' : 'rgba(255,255,255,0.86)',
+                    border: isUser ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: isUser ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
+                    padding: '10px 12px', fontSize: 14, lineHeight: 1.55,
+                  }}>
                     {isUser ? msg.content : (
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                         {msg.content}
@@ -770,10 +624,7 @@ export default function WeeklyPlan() {
               <div ref={bottomRef} />
             </div>
 
-            <form
-              onSubmit={sendMessage}
-              style={{ padding: '12px 20px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8 }}
-            >
+            <form onSubmit={sendMessage} style={{ padding: '12px 20px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 8 }}>
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
