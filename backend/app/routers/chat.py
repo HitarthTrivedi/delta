@@ -671,7 +671,7 @@ def _agent2_intent(text: str) -> str:
         "revert", "tasks you gave me before", "tasks you gave me",
     ]):
         return "restore"
-    if re.search(r"\b(next week|new week|generate next|give next|advance week)\b", lowered):
+    if re.search(r"\b(give me next week|generate next week|advance to next week|next week('s)? tasks|next week('s)? plan|new week now|start next week|move to next week)\b", lowered):
         return "next_week"
     if any(phrase in lowered for phrase in [
         "too many task", "too many", "these many task", "these many", "cant do these",
