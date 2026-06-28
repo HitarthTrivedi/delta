@@ -261,19 +261,107 @@ def _break_week_actions(profile: dict, user: User, reason: str = "") -> list[dic
 
 
 LEETCODE_SEQUENCE = [
-    ("Arrays and Hashing", "Solve 4 problems: 2 easy + 2 medium. Focus on frequency maps, sets, and duplicate detection."),
-    ("Two Pointers", "Solve 3 problems: valid palindrome style, sorted two-sum style, and container/window boundary reasoning."),
-    ("Sliding Window", "Solve 3 problems: fixed window, variable window, and longest substring/pattern tracking."),
-    ("Stack", "Solve 3 problems: valid parentheses, monotonic stack, and expression/min-stack style reasoning."),
-    ("Binary Search", "Solve 4 problems: classic search, lower/upper bound, search rotated array, and answer-space binary search."),
-    ("Linked List", "Solve 3 problems: reverse, fast/slow pointer, and merge/reorder style."),
-    ("Trees", "Solve 4 problems: DFS traversal, BFS level order, path/depth, and lowest common ancestor style."),
-    ("Heap / Priority Queue", "Solve 3 problems: top-k, streaming median/kth, and scheduling/merge pattern."),
-    ("Backtracking", "Solve 3 problems: subsets, permutations/combinations, and constraint pruning."),
-    ("Graphs", "Solve 4 problems: BFS/DFS traversal, connected components, topological sort, and shortest path basics."),
-    ("Dynamic Programming 1D", "Solve 3 problems: climbing/house-robber, coin/change style, and LIS-style recurrence."),
-    ("Dynamic Programming 2D", "Solve 3 problems: grid path, LCS/edit-distance style, and knapsack-style state design."),
+    ("Arrays and Hashing", "Focus on frequency maps and sets. After each problem write down the pattern and one reusable template."),
+    ("Two Pointers", "Note when to use two pointers vs a hash map. Draw pointer positions before coding."),
+    ("Sliding Window", "Identify the expand/shrink condition for each problem. Track the window invariant explicitly."),
+    ("Stack", "Draw the stack state by hand for at least one problem. Know when to use a monotonic stack."),
+    ("Binary Search", "Memorise the lo/hi/mid update pattern. Practice both value-space and index-space binary search."),
+    ("Linked List", "Draw the pointer reassignment before writing code. Practice in-place reversal without extra space."),
+    ("Trees", "Practice both recursive and iterative DFS. Level-order traversal with a queue is the BFS template."),
+    ("Heap / Priority Queue", "Know when to use a min-heap vs max-heap. Practice the push/pop pattern for streaming problems."),
+    ("Backtracking", "Write the decision tree before coding the recursion. Identify the base case and pruning condition first."),
+    ("Graphs", "Track visited nodes explicitly. Know BFS for shortest path and DFS for connected components."),
+    ("Dynamic Programming 1D", "Write the recurrence relation in plain English before coding. Verify with a small example by hand."),
+    ("Dynamic Programming 2D", "Fill a small example table by hand before coding. Identify what each cell represents."),
 ]
+
+LEETCODE_PROBLEMS: dict[str, list[dict]] = {
+    "Arrays and Hashing": [
+        {"id": 217, "title": "Contains Duplicate", "difficulty": "Easy", "url": "https://leetcode.com/problems/contains-duplicate/"},
+        {"id": 242, "title": "Valid Anagram", "difficulty": "Easy", "url": "https://leetcode.com/problems/valid-anagram/"},
+        {"id": 1, "title": "Two Sum", "difficulty": "Easy", "url": "https://leetcode.com/problems/two-sum/"},
+        {"id": 49, "title": "Group Anagrams", "difficulty": "Medium", "url": "https://leetcode.com/problems/group-anagrams/"},
+        {"id": 347, "title": "Top K Frequent Elements", "difficulty": "Medium", "url": "https://leetcode.com/problems/top-k-frequent-elements/"},
+        {"id": 238, "title": "Product of Array Except Self", "difficulty": "Medium", "url": "https://leetcode.com/problems/product-of-array-except-self/"},
+        {"id": 128, "title": "Longest Consecutive Sequence", "difficulty": "Hard", "url": "https://leetcode.com/problems/longest-consecutive-sequence/"},
+    ],
+    "Two Pointers": [
+        {"id": 125, "title": "Valid Palindrome", "difficulty": "Easy", "url": "https://leetcode.com/problems/valid-palindrome/"},
+        {"id": 167, "title": "Two Sum II - Input Array Is Sorted", "difficulty": "Easy", "url": "https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/"},
+        {"id": 15, "title": "3Sum", "difficulty": "Medium", "url": "https://leetcode.com/problems/3sum/"},
+        {"id": 11, "title": "Container With Most Water", "difficulty": "Medium", "url": "https://leetcode.com/problems/container-with-most-water/"},
+        {"id": 42, "title": "Trapping Rain Water", "difficulty": "Hard", "url": "https://leetcode.com/problems/trapping-rain-water/"},
+    ],
+    "Sliding Window": [
+        {"id": 121, "title": "Best Time to Buy and Sell Stock", "difficulty": "Easy", "url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/"},
+        {"id": 3, "title": "Longest Substring Without Repeating Characters", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-substring-without-repeating-characters/"},
+        {"id": 424, "title": "Longest Repeating Character Replacement", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-repeating-character-replacement/"},
+        {"id": 567, "title": "Permutation in String", "difficulty": "Medium", "url": "https://leetcode.com/problems/permutation-in-string/"},
+        {"id": 76, "title": "Minimum Window Substring", "difficulty": "Hard", "url": "https://leetcode.com/problems/minimum-window-substring/"},
+    ],
+    "Stack": [
+        {"id": 20, "title": "Valid Parentheses", "difficulty": "Easy", "url": "https://leetcode.com/problems/valid-parentheses/"},
+        {"id": 155, "title": "Min Stack", "difficulty": "Easy", "url": "https://leetcode.com/problems/min-stack/"},
+        {"id": 150, "title": "Evaluate Reverse Polish Notation", "difficulty": "Medium", "url": "https://leetcode.com/problems/evaluate-reverse-polish-notation/"},
+        {"id": 22, "title": "Generate Parentheses", "difficulty": "Medium", "url": "https://leetcode.com/problems/generate-parentheses/"},
+        {"id": 739, "title": "Daily Temperatures", "difficulty": "Medium", "url": "https://leetcode.com/problems/daily-temperatures/"},
+        {"id": 84, "title": "Largest Rectangle in Histogram", "difficulty": "Hard", "url": "https://leetcode.com/problems/largest-rectangle-in-histogram/"},
+    ],
+    "Binary Search": [
+        {"id": 704, "title": "Binary Search", "difficulty": "Easy", "url": "https://leetcode.com/problems/binary-search/"},
+        {"id": 74, "title": "Search a 2D Matrix", "difficulty": "Medium", "url": "https://leetcode.com/problems/search-a-2d-matrix/"},
+        {"id": 875, "title": "Koko Eating Bananas", "difficulty": "Medium", "url": "https://leetcode.com/problems/koko-eating-bananas/"},
+        {"id": 153, "title": "Find Minimum in Rotated Sorted Array", "difficulty": "Medium", "url": "https://leetcode.com/problems/find-minimum-in-rotated-sorted-array/"},
+        {"id": 33, "title": "Search in Rotated Sorted Array", "difficulty": "Medium", "url": "https://leetcode.com/problems/search-in-rotated-sorted-array/"},
+    ],
+    "Linked List": [
+        {"id": 206, "title": "Reverse Linked List", "difficulty": "Easy", "url": "https://leetcode.com/problems/reverse-linked-list/"},
+        {"id": 21, "title": "Merge Two Sorted Lists", "difficulty": "Easy", "url": "https://leetcode.com/problems/merge-two-sorted-lists/"},
+        {"id": 141, "title": "Linked List Cycle", "difficulty": "Easy", "url": "https://leetcode.com/problems/linked-list-cycle/"},
+        {"id": 143, "title": "Reorder List", "difficulty": "Medium", "url": "https://leetcode.com/problems/reorder-list/"},
+        {"id": 19, "title": "Remove Nth Node From End of List", "difficulty": "Medium", "url": "https://leetcode.com/problems/remove-nth-node-from-end-of-list/"},
+    ],
+    "Trees": [
+        {"id": 226, "title": "Invert Binary Tree", "difficulty": "Easy", "url": "https://leetcode.com/problems/invert-binary-tree/"},
+        {"id": 104, "title": "Maximum Depth of Binary Tree", "difficulty": "Easy", "url": "https://leetcode.com/problems/maximum-depth-of-binary-tree/"},
+        {"id": 235, "title": "Lowest Common Ancestor of a Binary Search Tree", "difficulty": "Easy", "url": "https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-search-tree/"},
+        {"id": 102, "title": "Binary Tree Level Order Traversal", "difficulty": "Medium", "url": "https://leetcode.com/problems/binary-tree-level-order-traversal/"},
+        {"id": 98, "title": "Validate Binary Search Tree", "difficulty": "Medium", "url": "https://leetcode.com/problems/validate-binary-search-tree/"},
+    ],
+    "Heap / Priority Queue": [
+        {"id": 703, "title": "Kth Largest Element in a Stream", "difficulty": "Easy", "url": "https://leetcode.com/problems/kth-largest-element-in-a-stream/"},
+        {"id": 1046, "title": "Last Stone Weight", "difficulty": "Easy", "url": "https://leetcode.com/problems/last-stone-weight/"},
+        {"id": 973, "title": "K Closest Points to Origin", "difficulty": "Medium", "url": "https://leetcode.com/problems/k-closest-points-to-origin/"},
+        {"id": 295, "title": "Find Median from Data Stream", "difficulty": "Hard", "url": "https://leetcode.com/problems/find-median-from-data-stream/"},
+    ],
+    "Backtracking": [
+        {"id": 78, "title": "Subsets", "difficulty": "Medium", "url": "https://leetcode.com/problems/subsets/"},
+        {"id": 39, "title": "Combination Sum", "difficulty": "Medium", "url": "https://leetcode.com/problems/combination-sum/"},
+        {"id": 46, "title": "Permutations", "difficulty": "Medium", "url": "https://leetcode.com/problems/permutations/"},
+        {"id": 17, "title": "Letter Combinations of a Phone Number", "difficulty": "Medium", "url": "https://leetcode.com/problems/letter-combinations-of-a-phone-number/"},
+        {"id": 79, "title": "Word Search", "difficulty": "Medium", "url": "https://leetcode.com/problems/word-search/"},
+    ],
+    "Graphs": [
+        {"id": 200, "title": "Number of Islands", "difficulty": "Medium", "url": "https://leetcode.com/problems/number-of-islands/"},
+        {"id": 133, "title": "Clone Graph", "difficulty": "Medium", "url": "https://leetcode.com/problems/clone-graph/"},
+        {"id": 695, "title": "Max Area of Island", "difficulty": "Medium", "url": "https://leetcode.com/problems/max-area-of-island/"},
+        {"id": 207, "title": "Course Schedule", "difficulty": "Medium", "url": "https://leetcode.com/problems/course-schedule/"},
+        {"id": 417, "title": "Pacific Atlantic Water Flow", "difficulty": "Medium", "url": "https://leetcode.com/problems/pacific-atlantic-water-flow/"},
+    ],
+    "Dynamic Programming 1D": [
+        {"id": 70, "title": "Climbing Stairs", "difficulty": "Easy", "url": "https://leetcode.com/problems/climbing-stairs/"},
+        {"id": 198, "title": "House Robber", "difficulty": "Medium", "url": "https://leetcode.com/problems/house-robber/"},
+        {"id": 322, "title": "Coin Change", "difficulty": "Medium", "url": "https://leetcode.com/problems/coin-change/"},
+        {"id": 300, "title": "Longest Increasing Subsequence", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-increasing-subsequence/"},
+        {"id": 139, "title": "Word Break", "difficulty": "Medium", "url": "https://leetcode.com/problems/word-break/"},
+    ],
+    "Dynamic Programming 2D": [
+        {"id": 62, "title": "Unique Paths", "difficulty": "Medium", "url": "https://leetcode.com/problems/unique-paths/"},
+        {"id": 1143, "title": "Longest Common Subsequence", "difficulty": "Medium", "url": "https://leetcode.com/problems/longest-common-subsequence/"},
+        {"id": 72, "title": "Edit Distance", "difficulty": "Hard", "url": "https://leetcode.com/problems/edit-distance/"},
+        {"id": 494, "title": "Target Sum", "difficulty": "Medium", "url": "https://leetcode.com/problems/target-sum/"},
+    ],
+}
 
 
 def _week_number_from_user(user: User) -> int:
@@ -283,29 +371,54 @@ def _week_number_from_user(user: User) -> int:
     return max(1, (elapsed_days // 7) + 1)
 
 
-def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User) -> list[dict]:
-    domain = _profile_domain(profile, skills, user)
-    week_number = _week_number_from_user(user)
-    actions = []
-    if domain in {"ai_agents", "general"} or "software" in str(user.target_role or "").lower() or "engineer" in str(user.target_role or "").lower():
-        topic, detail = LEETCODE_SEQUENCE[(week_number - 1) % len(LEETCODE_SEQUENCE)]
-        actions.append({
-            "id": f"recurring-leetcode-week-{week_number}-{topic.lower().replace(' ', '-').replace('/', '-')}",
-            "node_id": "recurring-leetcode",
-            "type": "practice",
-            "title": f"LeetCode habit: {topic}",
-            "skill": "DSA interview consistency",
-            "description": (
-                f"This is a recurring weekly habit, not a one-time course. {detail} "
-                "Write down the pattern, the mistake you made, and one reusable template."
-            ),
-            "why_now": "Interview readiness compounds through small weekly practice, not short bursts.",
-            "source": "LeetCode topic rotation",
-            "url": "https://leetcode.com/problemset/",
-            "cadence": "weekly",
-            "recurring": True,
-        })
-    return actions
+def _is_cs_engineering_user(profile: dict, skills: list[SkillNode], user: User) -> bool:
+    role = str(user.target_role or "").lower()
+    major = str(
+        profile.get("education", {}).get("major", "")
+        or profile.get("major", "")
+        or profile.get("field_of_study", "")
+    ).lower()
+    cs_keywords = {
+        "software", "developer", "engineer", "computer science", "cs", "cse",
+        "data scientist", "machine learning", "ml engineer", "ai", "backend",
+        "frontend", "fullstack", "sde", "swe", "programmer", "data engineer",
+    }
+    combined = f"{role} {major}"
+    return any(kw in combined for kw in cs_keywords)
+
+
+def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User, cycle_count: int = 0) -> list[dict]:
+    if not _is_cs_engineering_user(profile, skills, user):
+        return []
+    topic, tip = LEETCODE_SEQUENCE[cycle_count % len(LEETCODE_SEQUENCE)]
+    problems = LEETCODE_PROBLEMS.get(topic, [])
+    count = len(problems)
+    easy = sum(1 for p in problems if p["difficulty"] == "Easy")
+    medium = sum(1 for p in problems if p["difficulty"] == "Medium")
+    hard = sum(1 for p in problems if p["difficulty"] == "Hard")
+    parts = []
+    if easy:
+        parts.append(f"{easy}E")
+    if medium:
+        parts.append(f"{medium}M")
+    if hard:
+        parts.append(f"{hard}H")
+    count_label = f"{count} problems ({'+'.join(parts)})" if parts else f"{count} problems"
+    slug = topic.lower().replace(" ", "-").replace("/", "-")
+    return [{
+        "id": f"recurring-leetcode-cycle-{cycle_count}-{slug}",
+        "node_id": f"recurring-leetcode-cycle-{cycle_count}",
+        "type": "practice",
+        "title": f"LeetCode — {topic}: {count_label}",
+        "skill": "DSA interview consistency",
+        "description": tip,
+        "problems": problems,
+        "why_now": "Interview readiness compounds through small weekly practice, not short bursts.",
+        "source": "LeetCode — NeetCode 150",
+        "url": "https://leetcode.com/problemset/",
+        "cadence": "weekly",
+        "recurring": True,
+    }]
 
 
 def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, market: MarketSnapshot) -> list[dict]:
@@ -1071,6 +1184,22 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         for e in recent_events
     ]
 
+    # Archive the closing week and promote next-week requests before generating new tasks
+    try:
+        from app.services.user_context_store import (
+            end_week, promote_next_week_requests, update_profile_with_completed_tasks
+        )
+        week_label = f"Week {week_number}" if 'week_number' in dir() else "Previous Week"
+        completed_tasks_for_profile = [
+            a for a in current_actions
+            if _normalize(a.get("id") or a.get("title")) in accepted_ids
+        ]
+        update_profile_with_completed_tasks(user_id, completed_tasks_for_profile, week_label)
+        promote_next_week_requests(user_id)
+        end_week(user_id, week_label)
+    except Exception as _ctx_err:
+        logger.warning(f"[ctx_store] week transition failed (non-fatal): {_ctx_err}")
+
     roadmap = get_or_create_roadmap_state(
         db, user, market, regenerate=True,
         agent2_memory=agent2_memory,
@@ -1390,6 +1519,10 @@ def log_journey_event(
 
 def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> RoadmapState:
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
+    cycle_count = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user.id,
+        JourneyEvent.event_type == "weekly_cycle_completed",
+    ).count()
     try:
         from app.services.profile_store import load_profile
         profile = load_profile(user.id)
@@ -1422,7 +1555,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             elif profile_says_advanced and low_level_start:
                 proof_actions = _domain_proof_actions(profile, skills_for_profile, user, db)
                 if proof_actions:
-                    recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user)
+                    recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
                     trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
                     long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
                     weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
@@ -1438,7 +1571,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                     db.commit()
                     db.refresh(roadmap)
             elif not weekly_focus.get("long_horizon_lanes"):
-                recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user)
+                recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
                 trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
                 existing_ids = {str(action.get("id")) for action in actions}
                 durable_actions = [
@@ -1461,11 +1594,42 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             return roadmap
     skills = _sync_profile_skills_to_db(db, user)
 
+    # Gather all completed task titles to pass to the brief generator (no repeats)
+    all_completed_events = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user.id,
+        JourneyEvent.event_type == "weekly_task_completed",
+    ).all()
+    completed_task_titles = list({
+        (_event_json(ev, "evidence", {}).get("title") or "")
+        for ev in all_completed_events
+        if _event_json(ev, "evidence", {}).get("title")
+    })
+
+    # Determine cycle-based break week cadence (54 weeks/year assumed)
+    horizon_months = _planning_horizon_months(profile)
+    if horizon_months >= 24:
+        break_interval = 8   # 2+ years: break every 8 weeks
+    elif horizon_months >= 12:
+        break_interval = 6   # 1-2 years: break every 6 weeks
+    else:
+        break_interval = 0   # < 1 year: no auto-break (they're in a sprint)
+
+    should_cycle_break = (
+        regenerate
+        and not blocking_events
+        and break_interval > 0
+        and cycle_count > 0
+        and cycle_count % break_interval == 0
+    )
+
     roadmap_payload = generate_weekly_brief(
         user, skills, market,
         agent2_memory=agent2_memory or {},
         onboarding_profile=onboarding_profile or {},
         recent_events=recent_events or [],
+        completed_task_titles=completed_task_titles,
+        cycle_count=cycle_count,
+        horizon_months=horizon_months,
     )
 
     phases = roadmap_payload.get("phases", [])
@@ -1486,7 +1650,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         "planning_horizon_months": destination["planning_horizon_months"],
         "long_horizon_lanes": long_plan["lanes"],
     }
-    recurring_actions = _recurring_habit_actions(profile, skills, user)
+    recurring_actions = _recurring_habit_actions(profile, skills, user, cycle_count)
     trend_actions = _trend_response_actions(profile, skills, user, market)
     if recurring_actions:
         weekly_focus["primary_actions"] = recurring_actions + weekly_focus["primary_actions"][:2]
@@ -1497,7 +1661,26 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             weekly_focus["phase_name"] = "Profile-based proof sprint"
             weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
             weekly_focus["selection_reason"] = "Matched against resume/project evidence and current skill depth."
-    if regenerate and not blocking_events and _should_assign_break_week(db, user, profile, roadmap):
+    if should_cycle_break:
+        # Check we haven't had a break too recently (< 14 days)
+        dest_so_far = _as_json(roadmap.destination if roadmap else "{}", {})
+        last_break = dest_so_far.get("last_break_week_at")
+        _too_recent = False
+        if last_break:
+            try:
+                _too_recent = (datetime.datetime.utcnow() - datetime.datetime.fromisoformat(last_break)).days < 14
+            except Exception:
+                pass
+        if not _too_recent:
+            weekly_focus["phase_name"] = "Break week"
+            weekly_focus["is_break_week"] = True
+            weekly_focus["primary_actions"] = _break_week_actions(
+                profile, user,
+                f"Scheduled recovery week — you've completed {cycle_count} weeks. Rest, reflect, and prepare."
+            )
+            weekly_focus["selection_reason"] = f"Cycle-based break week (every {break_interval} weeks for your {horizon_months}-month plan)."
+            destination["last_break_week_at"] = datetime.datetime.utcnow().isoformat()
+    elif regenerate and not blocking_events and _should_assign_break_week(db, user, profile, roadmap):
         weekly_focus["phase_name"] = "Break week"
         weekly_focus["is_break_week"] = True
         weekly_focus["primary_actions"] = _break_week_actions(
@@ -1506,7 +1689,6 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             "You have already completed or skipped enough tasks this month."
         )
         weekly_focus["selection_reason"] = "Monthly pacing guard assigned recovery instead of extra work."
-        # Record when this break was given so we don't re-trigger another one for ~3 weeks.
         destination["last_break_week_at"] = datetime.datetime.utcnow().isoformat()
     if blocking_events:
         weekly_focus["phase_name"] = "Event-focused week"

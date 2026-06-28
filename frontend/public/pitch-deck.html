@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delta — Pitch Deck | Alpha.Kore</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #000;
+      color: #fff;
+    }
+
+    .slide {
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 5rem 7rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: relative;
+    }
+
+    .slide-number {
+      position: absolute;
+      top: 2.5rem;
+      right: 3rem;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 0.1em;
+    }
+
+    .studio-tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 { font-size: clamp(3rem, 7vw, 5.5rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; }
+    h2 { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; margin-bottom: 1.5rem; }
+    h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+
+    .subtitle {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: rgba(255,255,255,0.48);
+      line-height: 1.65;
+      max-width: 680px;
+      margin-top: 1.25rem;
+    }
+
+    .label {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.28);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .divider {
+      width: 40px;
+      height: 1px;
+      background: rgba(255,255,255,0.2);
+      margin: 2rem 0;
+    }
+
+    /* Grid layouts */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2.5rem; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-top: 2.5rem; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; margin-top: 2.5rem; }
+
+    .card {
+      background: #0a0a0a;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 1.75rem;
+    }
+
+    .card p { font-size: 14px; color: rgba(255,255,255,0.52); line-height: 1.65; margin-top: 0.5rem; }
+
+    /* Stat blocks */
+    .stat { padding: 1.75rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: #050505; }
+    .stat .number { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .stat .desc { font-size: 13px; color: rgba(255,255,255,0.42); margin-top: 0.5rem; line-height: 1.5; }
+
+    /* Problem list */
+    .problem-list { list-style: none; margin-top: 2rem; display: flex; flex-direction: column; gap: 1rem; }
+    .problem-list li {
+      display: grid; grid-template-columns: 24px 1fr; gap: 1rem;
+      font-size: 1.1rem; color: rgba(255,255,255,0.7); line-height: 1.55;
+      padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .problem-list li:last-child { border-bottom: none; }
+    .problem-list li .x { color: rgba(255,255,255,0.2); font-weight: 700; }
+
+    /* Agent blocks */
+    .agent-block { display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem; }
+    .agent {
+      display: grid; grid-template-columns: 120px 1fr; gap: 1.5rem;
+      padding: 1.5rem; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+      align-items: start;
+    }
+    .agent .agent-label { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.3); letter-spacing: 0.08em; text-transform: uppercase; }
+    .agent .agent-title { font-size: 1rem; font-weight: 700; margin: 0.25rem 0; }
+    .agent .agent-desc { font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.6; }
+
+    /* What's live */
+    .live-list { list-style: none; margin-top: 2rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .live-list li {
+      display: flex; align-items: flex-start; gap: 12px;
+      font-size: 15px; color: rgba(255,255,255,0.75); padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .live-list li:last-child { border-bottom: none; }
+    .check { color: #fff; font-size: 13px; margin-top: 2px; flex-shrink: 0; }
+
+    /* Gap list */
+    .gap-list { list-style: none; margin-top: 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
+    .gap-list li { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 1.25rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .gap-list li:last-child { border-bottom: none; }
+    .gap-now { font-size: 13px; color: rgba(255,255,255,0.4); line-height: 1.55; }
+    .gap-with { font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.55; }
+    .gap-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.22); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.4rem; }
+
+    /* Use of funds bar */
+    .fund-bar { margin-top: 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
+    .fund-row { display: grid; grid-template-columns: 220px 1fr 60px; gap: 1rem; align-items: center; }
+    .fund-row .bar-track { background: rgba(255,255,255,0.06); border-radius: 999px; height: 6px; }
+    .fund-row .bar-fill { background: #fff; border-radius: 999px; height: 6px; }
+    .fund-row .pct { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.6); text-align: right; }
+    .fund-row .fund-label { font-size: 14px; color: rgba(255,255,255,0.7); }
+
+    /* Portfolio table */
+    .portfolio { margin-top: 2rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+    .portfolio-row { display: grid; grid-template-columns: 160px 1fr 140px; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.07); align-items: center; gap: 1.5rem; }
+    .portfolio-row:last-child { border-bottom: none; }
+    .portfolio-row.header { background: rgba(255,255,255,0.03); }
+    .portfolio-row.header span { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.25); letter-spacing: 0.08em; text-transform: uppercase; }
+    .portfolio-row .name { font-size: 14px; font-weight: 700; }
+    .portfolio-row .desc { font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.5; }
+    .portfolio-row .status { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55); text-align: right; }
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.5); }
+    .badge.primary { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+    /* Vision timeline */
+    .timeline { margin-top: 2.5rem; display: flex; flex-direction: column; gap: 0; }
+    .tl-row { display: grid; grid-template-columns: 100px 1fr; gap: 2rem; padding: 1.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .tl-row:last-child { border-bottom: none; }
+    .tl-year { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.25); padding-top: 2px; }
+    .tl-content h3 { font-size: 16px; margin-bottom: 0.35rem; }
+    .tl-content p { font-size: 13px; color: rgba(255,255,255,0.48); line-height: 1.6; }
+
+    /* Quote slide */
+    .quote { font-size: clamp(1.5rem, 3.5vw, 2.4rem); font-weight: 700; line-height: 1.3; max-width: 820px; color: rgba(255,255,255,0.9); }
+    .quote-attr { margin-top: 1.5rem; font-size: 13px; color: rgba(255,255,255,0.3); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+
+    /* Cover accent */
+    .cover-rule { width: 60px; height: 3px; background: #fff; margin: 2rem 0; }
+
+    /* Print */
+    @media print {
+      body { background: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .slide { page-break-after: always; min-height: 100vh; padding: 4rem 5rem; }
+    }
+
+    @media (max-width: 900px) {
+      .slide { padding: 3rem 2rem; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .agent { grid-template-columns: 1fr; }
+      .gap-list li { grid-template-columns: 1fr; }
+      .fund-row { grid-template-columns: 1fr 1fr 50px; }
+      .portfolio-row { grid-template-columns: 1fr 1fr; }
+      .portfolio-row .status { display: none; }
+      .tl-row { grid-template-columns: 70px 1fr; gap: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 01 COVER -->
+  <div class="slide" style="justify-content: flex-end; padding-bottom: 6rem; min-height: 100vh; background: #000;">
+    <span class="slide-number">01 / 12</span>
+    <div style="position: absolute; top: 5rem; left: 7rem;">
+      <span class="studio-tag">Alpha.Kore · 2025</span>
+    </div>
+    <div style="max-width: 820px;">
+      <h1>Delta</h1>
+      <div class="cover-rule"></div>
+      <p class="subtitle" style="font-size: 1.35rem; max-width: 580px;">
+        The career OS every ambitious student was supposed to have but nobody built.
+      </p>
+      <p style="margin-top: 3rem; font-size: 13px; color: rgba(255,255,255,0.22); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;">
+        Confidential · Seed Round
+      </p>
+    </div>
+  </div>
+
+  <!-- 02 THE PROBLEM -->
+  <div class="slide">
+    <span class="slide-number">02 / 12</span>
+    <span class="label">The Problem</span>
+    <h2>A generation that is busy<br />but not progressing.</h2>
+    <ul class="problem-list">
+      <li><span class="x">—</span><span>They Google "best skills 2026" and get listicles written for nobody.</span></li>
+      <li><span class="x">—</span><span>They buy a ₹50,000 course and finish it with no idea if it mattered.</span></li>
+      <li><span class="x">—</span><span>They ask ChatGPT for a roadmap and get a plan that forgets them the moment they close the tab.</span></li>
+      <li><span class="x">—</span><span>They pay career counselors who haven't looked at a live job posting in a decade.</span></li>
+      <li><span class="x">—</span><span>Nobody connects the three things that must be connected: <strong>who you are, what the market wants right now, and what you should do this week.</strong></span></li>
+    </ul>
+    <p style="margin-top: 2.5rem; font-size: 1.1rem; color: rgba(255,255,255,0.5); max-width: 640px; line-height: 1.6;">
+      The career-services, EdTech, and upskilling markets represent a <strong style="color:#fff;">$300B+ global opportunity</strong> — and every dollar of it is spent on content and credentials, not intelligence and direction.
+    </p>
+  </div>
+
+  <!-- 03 THE SOLUTION -->
+  <div class="slide">
+    <span class="slide-number">03 / 12</span>
+    <span class="label">The Solution</span>
+    <h2>One brain. Three agents.<br />A loop that never stops.</h2>
+    <div class="agent-block">
+      <div class="agent">
+        <div>
+          <span class="agent-label">Agent 1</span>
+          <p class="agent-title">Intake & Resume Intelligence</p>
+        </div>
+        <p class="agent-desc">A warm, adaptive AI conversation — not a form. It reads your resume, understands your goals, constraints, weekly hours, exam pressure, and learning style. Output is structured career intelligence, not a transcript. Works for a 12th grader, a dropout, a career-switcher, and a master's candidate equally.</p>
+      </div>
+      <div class="agent">
+        <div>
+          <span class="agent-label">Agent 2</span>
+          <p class="agent-title">Weekly Roadmap Strategist</p>
+        </div>
+        <p class="agent-desc">Builds only the next week. Chooses between a course, a project, a paper, a language class, a revision block, or a full exam pause — based on pace, deadlines, what you finished, and what the market demands right now. Talk to it mid-week and it rewrites the plan immediately. No generic checklist. No forgetting.</p>
+      </div>
+      <div class="agent">
+        <div>
+          <span class="agent-label">Agent 3</span>
+          <p class="agent-title">Progress & Opportunity Controller</p>
+        </div>
+        <p class="agent-desc">Studies all completed work, keeps the dashboard current, surfaces internships and live signals, improves resume positioning, and turns completed proof into a clear visual career record. It grades your portfolio honestly — what's strong, what's weak, what to fix before you apply.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 WHAT'S LIVE TODAY -->
+  <div class="slide">
+    <span class="slide-number">04 / 12</span>
+    <span class="label">Product · What's Live Today</span>
+    <h2>Not a prototype.<br />A working system.</h2>
+    <div class="grid-2" style="margin-top: 2rem;">
+      <ul class="live-list">
+        <li><span class="check">✓</span><span>Adaptive AI intake — conversational, not a form. Works for any domain.</span></li>
+        <li><span class="check">✓</span><span>Resume parsing with high-accuracy LLM extraction (skills, projects, evidence).</span></li>
+        <li><span class="check">✓</span><span>Career Memory Vault — 8-profile structured user model, durable across sessions.</span></li>
+        <li><span class="check">✓</span><span>Living roadmap with long-horizon plan and one-week focus slice.</span></li>
+        <li><span class="check">✓</span><span>Market Pulse — rising skills, dying skills, recruiter signals, live opportunities.</span></li>
+      </ul>
+      <ul class="live-list">
+        <li><span class="check">✓</span><span>Agent 2 chat — controls tasks in real time. Skip, replace, escalate, or get next week without leaving the chat.</span></li>
+        <li><span class="check">✓</span><span>ATS Resume Engine — generates and updates itself from your Delta profile.</span></li>
+        <li><span class="check">✓</span><span>Progress tracking — weeks completed, tasks finished, skills gained.</span></li>
+        <li><span class="check">✓</span><span>Multi-user auth (Google OAuth + email), 5-key AI rotation, cost-optimized dual-model layer.</span></li>
+        <li><span class="check">✓</span><span>Full production deployment on Vercel + Render + Supabase.</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 05 THE STUDIO -->
+  <div class="slide">
+    <span class="slide-number">05 / 12</span>
+    <span class="label">Who We Are · Alpha.Kore</span>
+    <h2>11 builders. 7 shipped products.<br />Under a year.</h2>
+    <p class="subtitle">We're not a team that decks. We're a studio that ships.</p>
+    <div class="portfolio" style="margin-top: 2.5rem;">
+      <div class="portfolio-row header">
+        <span>Product</span>
+        <span>What it does</span>
+        <span style="text-align:right;">Role</span>
+      </div>
+      <div class="portfolio-row">
+        <div><span class="name">Delta</span></div>
+        <div><span class="desc">AI Career OS — intake, weekly roadmap, resume intelligence, Agent 2 chat</span></div>
+        <div class="status"><span class="badge primary">Primary</span></div>
+      </div>
+      <div class="portfolio-row">
+        <div><span class="name">Lazycook AI</span></div>
+        <div><span class="desc">AI agents terminal for workflow automation · <code style="font-size:11px;color:rgba(255,255,255,0.4);">pip install lazycook</code></span></div>
+        <div class="status"><span class="badge primary">Secondary</span></div>
+      </div>
+      <div class="portfolio-row">
+        <div><span class="name">Rezum AI</span></div>
+        <div><span class="desc">Minimalist AI-readable portfolio and resume builder with ATS optimization</span></div>
+        <div class="status"><span class="badge">Live</span></div>
+      </div>
+      <div class="portfolio-row">
+        <div><span class="name">Prism</span></div>
+        <div><span class="desc">AI workflow orchestration and multi-agent pipeline integration</span></div>
+        <div class="status"><span class="badge">Live</span></div>
+      </div>
+      <div class="portfolio-row">
+        <div><span class="name">+ 3 more</span></div>
+        <div><span class="desc">3f1 and additional shipped tools across web engineering and automation</span></div>
+        <div class="status"><span class="badge">Live</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 WHERE WE'RE LACKING -->
+  <div class="slide">
+    <span class="slide-number">06 / 12</span>
+    <span class="label">The Honest Slide · Where Funds Are Missing</span>
+    <h2>The ceiling is not ambition.<br />It's bandwidth.</h2>
+    <div class="gap-list" style="margin-top: 2rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <span class="gap-label">Without funding</span>
+        <span class="gap-label">With funding</span>
+      </div>
+      <ul class="gap-list" style="margin-top: 0;">
+        <li>
+          <div><span class="gap-now">Market Pulse relies on web scraping — fragile, slow, blocks on rate limits.</span></div>
+          <div><span class="gap-with">Real-time data pipelines via Serper, live job APIs, and structured market feeds. Pulse becomes a true weekly signal engine.</span></div>
+        </li>
+        <li>
+          <div><span class="gap-now">Domain coverage stuck at CS, AI/ML, cloud — design, commerce, medicine, law are architecturally ready but humanly unmanned.</span></div>
+          <div><span class="gap-with">3 new domain packs in 6 months. Delta goes from serving one field to serving every ambitious student regardless of stream.</span></div>
+        </li>
+        <li>
+          <div><span class="gap-now">Backend on Render free tier — cold starts, compute limits, no dedicated infra. Every heavy AI call competes with sleep cycles.</span></div>
+          <div><span class="gap-with">Dedicated infra. Sub-second response times. No cold starts. AI cycles that run in the background without the user waiting.</span></div>
+        </li>
+        <li>
+          <div><span class="gap-now">Zero paid distribution. Growth is organic, word-of-mouth, and limited to our personal networks.</span></div>
+          <div><span class="gap-with">First 5 college partnership deals. 10,000 students in 90 days. A repeatable B2B2C flywheel that compounds without CAC explosion.</span></div>
+        </li>
+        <li>
+          <div><span class="gap-now">11 builders stretched across 7 products. Focus is split. Delta gets part of the team, not the whole team.</span></div>
+          <div><span class="gap-with">Dedicated Delta core team. Lazycook runs parallel. Every other product is maintenance. One flagship gets full firepower.</span></div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 07 THE MARKET -->
+  <div class="slide">
+    <span class="slide-number">07 / 12</span>
+    <span class="label">Market Opportunity</span>
+    <h2>The sharpest wedge on the planet<br />is India's graduating class.</h2>
+    <div class="grid-3" style="margin-top: 2.5rem;">
+      <div class="stat">
+        <div class="number">40M+</div>
+        <div class="desc">Students in Indian higher education — the densest, most underserved career-intelligence market in the world.</div>
+      </div>
+      <div class="stat">
+        <div class="number">$300B+</div>
+        <div class="desc">Global career services, EdTech, and upskilling market. Every dollar currently spent on content, not intelligence.</div>
+      </div>
+      <div class="stat">
+        <div class="number">1B+</div>
+        <div class="desc">Students and early-career professionals globally navigating careers with zero personalized direction.</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 2.5rem;">
+      We're not competing for course-completion minutes. We're competing to become <strong style="color:#fff;">the OS every ambitious person opens every Monday morning.</strong> That is a different category with a different ceiling.
+    </p>
+  </div>
+
+  <!-- 08 BUSINESS MODEL -->
+  <div class="slide">
+    <span class="slide-number">08 / 12</span>
+    <span class="label">Business Model</span>
+    <h2>Freemium to subscription.<br />B2C to B2B2C. Then talent.</h2>
+    <div class="grid-2" style="margin-top: 2rem;">
+      <div>
+        <span class="label" style="margin-bottom: 1.25rem; display: block;">Delta — Primary Revenue</span>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div class="card">
+            <h3>Freemium → Pro</h3>
+            <p>Free intake and first roadmap to hook the user on day one. Full access — weekly AI plan, market pulse, Agent 2 chat, ATS resume engine — at ₹299–₹799/month. Retention is structural: users come back every week because the plan lives here.</p>
+          </div>
+          <div class="card">
+            <h3>B2B2C — Institutional</h3>
+            <p>Colleges, bootcamps, and universities license Delta for their student cohorts at per-seat pricing. They look modern. We get distribution, data, and a revenue line that doesn't depend on individual CAC.</p>
+          </div>
+          <div class="card">
+            <h3>Talent Marketplace (Phase 3)</h3>
+            <p>Delta knows who's genuinely job-ready — with completed proof, a built portfolio, and a resume that reflects reality. That is a hiring signal worth more than any job board. A second, larger company hiding inside the first.</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <span class="label" style="margin-bottom: 1.25rem; display: block;">Lazycook — Secondary Revenue</span>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          <div class="card">
+            <h3>Developer Tooling via PyPI</h3>
+            <p><code style="font-size: 12px; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px;">pip install lazycook</code> — distributed to developers already building automation pipelines. Pro tier and API access for teams.</p>
+          </div>
+          <div class="card">
+            <h3>Cross-sell Flywheel</h3>
+            <p>Lazycook's developer audience is the same technical audience that uses Delta. One studio, one infrastructure stack, compounding distribution with zero overlap cost.</p>
+          </div>
+          <div class="card" style="background: transparent; border: 1px solid rgba(255,255,255,0.06);">
+            <h3 style="color: rgba(255,255,255,0.5);">Every paying user makes the Vault deeper, the market model sharper, and the next user's experience better.</h3>
+            <p style="color: rgba(255,255,255,0.3); margin-top: 0.5rem;">Classic data-network-effect flywheel.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 09 WHY WE WIN -->
+  <div class="slide">
+    <span class="slide-number">09 / 12</span>
+    <span class="label">Competitive Advantage</span>
+    <h2>Nobody else closes<br />the triangle.</h2>
+    <p class="subtitle">Who you are + what the market wants today + what to do this week. That loop is the whole product. And it is our moat.</p>
+    <div class="grid-4" style="margin-top: 2.5rem;">
+      <div class="card" style="opacity: 0.45;">
+        <h3 style="font-size: 14px;">ChatGPT / Generic AI</h3>
+        <p>Smart but amnesiac. Forgets you the moment you close the tab. No market awareness. No plan. No proof.</p>
+      </div>
+      <div class="card" style="opacity: 0.45;">
+        <h3 style="font-size: 14px;">Coursera / Scaler</h3>
+        <p>Sells content and walks away. No memory. No weekly adjustment. No market pulse. No portfolio grading.</p>
+      </div>
+      <div class="card" style="opacity: 0.45;">
+        <h3 style="font-size: 14px;">LinkedIn / Job Boards</h3>
+        <p>Shows you jobs you're not ready for. No roadmap. No guidance. No proof-building. Just anxiety.</p>
+      </div>
+      <div class="card" style="border-color: rgba(255,255,255,0.35);">
+        <h3 style="font-size: 14px; color: #fff;">Delta</h3>
+        <p style="color: rgba(255,255,255,0.7);">Remembers you forever. Watches the market weekly. Builds proof, not just lessons. Adapts when you change. Honest about your real progress.</p>
+      </div>
+    </div>
+    <p style="margin-top: 2rem; font-size: 14px; color: rgba(255,255,255,0.35); max-width: 680px; line-height: 1.6;">
+      The Career Memory Vault is the structural moat — the longer a user stays, the harder it is to leave. Their entire journey, every task, every proof signal, every market shift they lived through lives inside Delta. That data does not exist anywhere else.
+    </p>
+  </div>
+
+  <!-- 10 IF WE GET THE FUNDS -->
+  <div class="slide">
+    <span class="slide-number">10 / 12</span>
+    <span class="label">Use of Capital</span>
+    <h2>What changes<br />with the funding.</h2>
+    <div class="fund-bar" style="margin-top: 2.5rem; max-width: 680px;">
+      <div class="fund-row">
+        <span class="fund-label">Data infrastructure & real-time pipelines</span>
+        <div class="bar-track"><div class="bar-fill" style="width: 35%;"></div></div>
+        <span class="pct">35%</span>
+      </div>
+      <div class="fund-row">
+        <span class="fund-label">College partnerships & distribution</span>
+        <div class="bar-track"><div class="bar-fill" style="width: 25%;"></div></div>
+        <span class="pct">25%</span>
+      </div>
+      <div class="fund-row">
+        <span class="fund-label">Domain pack expansion (3 new verticals)</span>
+        <div class="bar-track"><div class="bar-fill" style="width: 25%;"></div></div>
+        <span class="pct">25%</span>
+      </div>
+      <div class="fund-row">
+        <span class="fund-label">Team & operations</span>
+        <div class="bar-track"><div class="bar-fill" style="width: 15%;"></div></div>
+        <span class="pct">15%</span>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top: 2.5rem;">
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <p style="font-size: 13px; color: rgba(255,255,255,0.28); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.25rem;">90 days</p>
+        <p style="font-size: 14px; color: rgba(255,255,255,0.65); line-height: 1.6;">First 5 college partnerships signed. 10,000 students onboarded. Serper + live job API integrated. Market Pulse goes real-time.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <p style="font-size: 13px; color: rgba(255,255,255,0.28); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.25rem;">6 months</p>
+        <p style="font-size: 14px; color: rgba(255,255,255,0.65); line-height: 1.6;">3 new domain packs live (Design, Commerce, Medicine). Dedicated infra — no cold starts. Lazycook Pro tier launched. 50,000 total users.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 11 VISION -->
+  <div class="slide">
+    <span class="slide-number">11 / 12</span>
+    <span class="label">The Vision</span>
+    <h2>A career brain that follows you<br />for 40 years.</h2>
+    <div class="timeline">
+      <div class="tl-row">
+        <div class="tl-year">Year 1</div>
+        <div class="tl-content">
+          <h3>Own the wedge</h3>
+          <p>Default career OS for 100,000 Indian CS and engineering students. First B2B college contracts signed. Lazycook at 10,000 active developers.</p>
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-year">Year 2</div>
+        <div class="tl-content">
+          <h3>Generalize</h3>
+          <p>Domain packs for Design, Commerce, Medicine, Finance, and Law. Expand to Southeast Asia and the Middle East. 500,000 users. First institutional SaaS contracts.</p>
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-year">Year 3</div>
+        <div class="tl-content">
+          <h3>Become the signal</h3>
+          <p>Talent marketplace goes live — Delta knows who is genuinely job-ready with proof. Employers pay to access that signal. The second company inside the first unlocks.</p>
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-year">Year 5</div>
+        <div class="tl-content">
+          <h3>Career infrastructure</h3>
+          <p>10M+ users. The career memory layer that follows a person from their first year of college through every job change for the next four decades. One continuous brain. It is Delta.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12 CLOSING -->
+  <div class="slide" style="justify-content: center;">
+    <span class="slide-number">12 / 12</span>
+    <div style="max-width: 760px;">
+      <span class="label">The Ask</span>
+      <p class="quote">
+        Most people will spend the next decade guessing.<br />Delta's users will spend it knowing.
+      </p>
+      <div class="divider"></div>
+      <p class="subtitle">
+        We are raising to turn a working product into a category. We have the studio, the team, the shipping track record, and the system. We need the fuel to scale what already works.
+      </p>
+      <div style="margin-top: 3rem; display: flex; flex-direction: column; gap: 0.5rem;">
+        <p style="font-size: 13px; color: rgba(255,255,255,0.28); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">Alpha.Kore · Vadodara, India · 2025</p>
+        <p style="font-size: 13px; color: rgba(255,255,255,0.28);">alpha-kore.vercel.app · hitartht318@gmail.com</p>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

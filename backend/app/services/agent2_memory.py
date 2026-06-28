@@ -75,6 +75,12 @@ def sync_user_context(user_id: str, profile: dict | None, context: dict | None =
     context = context or {}
     memory = context.get("memory") or {}
     blob = _load_blob(user_id)
+    if not blob.get("profile_doc") and profile:
+        try:
+            from app.services.user_context_store import initialize_profile_doc
+            initialize_profile_doc(user_id, profile or {})
+        except Exception as _e:
+            logger.warning(f"profile_doc init failed (non-fatal): {_e}")
     blob["user_context"] = {
         "user_id": user_id,
         "source": "agent1_profile_and_career_context",

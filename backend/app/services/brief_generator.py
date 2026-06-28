@@ -1,12 +1,55 @@
 """Brief generator service — compiles role-specific 3-phase roadmaps dynamically."""
 import json
+import logging
 import uuid
 import re
 from app.services.ai_service import generate_response
 
+logger = logging.getLogger("delta.brief_generator")
 RESUME_MODEL = "gemini-2.5-flash"
 
-def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> dict:
+
+def _fetch_trend_intel(role: str) -> str:
+    """
+    Run 3 targeted Serper searches for the user's role and return a compact
+    text block ready for injection into the AI roadmap prompt.
+    Fails silently — if Serper is down or quota is exhausted, returns "".
+    """
+    try:
+        from app.services.web_search import get_web_search_service
+        svc = get_web_search_service()
+
+        def _search(q: str, n: int = 4) -> list[dict]:
+            try:
+                return svc.search(q, max_results=n) or []
+            except Exception as e:
+                logger.warning(f"[trend_intel] search failed for '{q}': {e}")
+                return []
+
+        skills_results = _search(f'"{role}" skills in demand trending 2025', 5)
+        courses_results = _search(f'best free courses "{role}" 2025 trending', 4)
+        tools_results = _search(f'"{role}" tools software frameworks trending 2025', 4)
+
+        def _fmt(results: list[dict], label: str) -> str:
+            lines = [
+                f"  - {r.get('title', '')} | {r.get('url', '')} — {r.get('snippet', '')[:120]}"
+                for r in results if r.get("title")
+            ]
+            return f"{label}:\n" + ("\n".join(lines) if lines else "  (no results)") if lines else ""
+
+        blocks = [
+            _fmt(skills_results, "Trending skills & hiring signals"),
+            _fmt(courses_results, "Trending courses & learning resources"),
+            _fmt(tools_results, "Trending tools & frameworks"),
+        ]
+        combined = "\n\n".join(b for b in blocks if b)
+        return combined
+    except Exception as e:
+        logger.warning(f"[trend_intel] fetch failed entirely: {e}")
+        return ""
+
+
+def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None, completed_task_titles: list = None, cycle_count: int = 0, horizon_months: int = 12) -> dict:
     """
     Generate highly personalized, role-specific Weekly Brief and Phase-Based Dynamic Roadmap.
     Calls OpenAI (gpt-4o-mini) to design a custom 3-phase chronological learning path 
@@ -16,6 +59,7 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
     agent2_memory = agent2_memory or {}
     onboarding_profile = onboarding_profile or {}
     recent_events = recent_events or []
+    completed_task_titles = completed_task_titles or []
 
     role = user.target_role or onboarding_profile.get("target_role") or (market_snapshot.target_role if market_snapshot else "AI Developer / Software Engineer")
     hours = user.hours_per_week or onboarding_profile.get("hours_per_week") or 15
@@ -69,6 +113,39 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
         for e in recent_events[:10]
     ) or "No recent activity logged."
 
+    # Difficulty level from cycle count (54 weeks/year, 3 levels)
+    if cycle_count <= 4:
+        difficulty_label = "beginner-foundation"
+        difficulty_note = "Week 1-4: absolute fundamentals only. Concepts over tools. Small wins."
+    elif cycle_count <= 12:
+        difficulty_label = "early-intermediate"
+        difficulty_note = f"Week {cycle_count}: build on foundation. Introduce one new tool or framework per week."
+    elif cycle_count <= 26:
+        difficulty_label = "intermediate"
+        difficulty_note = f"Week {cycle_count}: full project tasks, integration, debugging, deployment basics."
+    elif cycle_count <= 40:
+        difficulty_label = "advanced-intermediate"
+        difficulty_note = f"Week {cycle_count}: system-level thinking, performance, production patterns, portfolio-grade work."
+    else:
+        difficulty_label = "advanced"
+        difficulty_note = f"Week {cycle_count}: architecture decisions, contributions, leadership-level proofs, deep specialisation."
+
+    completed_block = ""
+    if completed_task_titles:
+        titles_list = "\n".join(f"  - {t}" for t in completed_task_titles[:40])
+        completed_block = f"""
+COMPLETED TASKS — NEVER ASSIGN THESE AGAIN (user has already done them):
+{titles_list}
+These are done. Do not repeat, rephrase, or reframe them as new tasks. Move forward.
+"""
+
+    # Live trend intel from Serper — what's actually trending RIGHT NOW for this role
+    trend_intel = _fetch_trend_intel(role)
+    trend_intel_section = f"""
+LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to make tasks unique and timely):
+{trend_intel if trend_intel else "  (web search unavailable — use market snapshot data below)"}
+""" if trend_intel else ""
+
     # Dense structural system prompt
     prompt = f"""
     You are delta's Senior Career OS Roadmap Compiler. Generate a highly personalized, production-grade 3-phase curriculum and weekly brief using ALL of the user's context below.
@@ -95,8 +172,18 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
     MARKET DEMAND PULSE:
     - Top Demanded Skills: {json.dumps(demanded)}
     - Emerging Tech Clusters: {market_snapshot.emerging_skills if market_snapshot else '[]'}
-
-    CURRICULUM INSTRUCTIONS:
+{trend_intel_section}
+    CURRENT WEEK NUMBER: {cycle_count + 1} (out of ~54 weeks/year)
+    DIFFICULTY LEVEL: {difficulty_label.upper()} — {difficulty_note}
+{completed_block}
+    CURRICULUM INSTRUCTIONS (read LIVE MARKET TREND INTELLIGENCE above before designing tasks):
+    CRITICAL ORDERING RULES:
+    1. NEVER assign a task that appears in the COMPLETED TASKS list above. Not in any form, not rephrased.
+    2. Pick difficulty one step above where the user currently is — not two steps, not the same level. Push gently.
+    3. At least 1 task per week must reference a currently trending tool, course, or skill from the live intel above.
+    4. Make tasks specific and timely — not generic. "Build a FastAPI endpoint with async SQLAlchemy and test it with pytest" is better than just "Learn FastAPI".
+    5. If a trending course was found, reference it by name and URL in the relevant node's resource_url.
+    6. Every task must be concrete enough that the student knows exactly what to do and what "done" looks like.
     1. Sequenced Curriculum: Design exactly 3 chronological phases that move this student from their current baseline to job-ready capability for the target role: "{role}".
        Treat resume/current skills as prior exposure. Do not assign beginner repeat tasks for skills they already listed.
        If a skill is already present but not mastered, convert it into a harder proof/project/debugging/deployment milestone.

@@ -601,6 +601,9 @@ _ACTION_TO_INTENT = {
     "easier": "normal",
     "add_course": "course",
     "constraint": "constraint",
+    "permanent_preference": "permanent_preference",
+    "next_week_request": "next_week_request",
+    "web_search": "web_search",
     "chat": "tutor_chat",
 }
 
@@ -633,22 +636,25 @@ Student message:
 
 Reply with ONLY a JSON object (no markdown), choosing exactly one action:
 {{
-  "action": "reduce_tasks | skip_task | next_week | restore | harder | easier | add_course | constraint | chat",
-  "count": <integer or null>,   // for reduce_tasks: how many tasks to KEEP. For a range like "2-3" use the higher number. null if unspecified.
-  "target": "<string or null>", // for skip_task: which task (its number or a keyword from its title). null if unclear.
+  "action": "reduce_tasks | skip_task | next_week | restore | harder | easier | add_course | constraint | permanent_preference | next_week_request | chat",
+  "count": <integer or null>,   // for reduce_tasks: how many tasks to KEEP. null if unspecified.
+  "target": "<string or null>", // for skip_task: which task. null if unclear.
   "reply": "<one short, warm sentence to the student, written in the SAME language they used, confirming what you will do>"
 }}
 
 Meaning of each action:
-- reduce_tasks: they feel it is too much and want fewer tasks this week.
-- skip_task: they want to drop/remove one specific task.
-- next_week: they want a brand-new next week of tasks.
-- restore: they want their previous/earlier tasks back, or to undo a change.
+- reduce_tasks: they feel overwhelmed and want fewer tasks this week.
+- skip_task: they want to drop one specific task from this week.
+- next_week: they are DONE and want to advance to a brand-new week RIGHT NOW. Only use when they explicitly say so (e.g. "I finished everything, give me next week", "advance", "I'm done").
+- restore: they want their previous tasks back or to undo a recent change.
 - harder: the work is too easy; they want tougher tasks.
 - easier: the work is too hard; they want simpler tasks.
 - add_course: they want a course assigned.
-- constraint: an exam, deadline, travel, illness, low energy, or busy period should reshape this week.
-- chat: anything else — a question, a request to explain, or normal conversation. When unsure, choose chat.
+- constraint: an exam, deadline, travel, illness, or busy period should reshape THIS week's tasks.
+- permanent_preference: the user is setting a firm, lasting rule about how ALL future weeks should be structured — things like "never give me more than 2 tasks", "stop giving me courses", "the pace is always too fast", "I don't want LeetCode ever", "always include a project". These rules must be remembered permanently.
+- next_week_request: the user is requesting something specific for NEXT week's plan without advancing now (e.g. "for next week give me API tasks", "can next week include a project?", "I want DSA next week"). Save it — don't advance yet.
+- web_search: the user explicitly wants current resources, course links, tutorials, documentation, or real-time info that would benefit from a live web search (e.g. "find me the best React course", "what are the best resources for FastAPI?", "search for system design resources").
+- chat: everything else — a question, an explanation request, general conversation. When unsure, always choose chat.
 
 Return only the JSON object."""
     try:
@@ -672,7 +678,7 @@ def _agent2_intent(text: str) -> str:
         "revert", "tasks you gave me before", "tasks you gave me",
     ]):
         return "restore"
-    if re.search(r"\b(next week|new week|generate next|give next|advance week)\b", lowered):
+    if re.search(r"\b(give me next week|generate next week|advance to next week|next week('s)? tasks|next week('s)? plan|new week now|start next week|move to next week)\b", lowered):
         return "next_week"
     if any(phrase in lowered for phrase in [
         "too many task", "too many", "these many task", "these many", "cant do these",
@@ -901,20 +907,38 @@ def chat_message(
     user_update = data.message.split("User update:", 1)[-1].strip() if "User update:" in data.message else data.message
     lowered_update = user_update.lower().strip(" .!?")
     current_actions = _current_actions_from_roadmap(roadmap)
-    # AI-first intent understanding: let the model interpret the message (any language /
-    # phrasing) into a structured decision, then deterministic code executes it. Keyword
-    # matching is only a fallback if the model is unavailable or unsure.
     intent_obj = _classify_intent_llm(user_update, current_actions) if is_weekly_agent else {}
     if intent_obj:
         intent = _ACTION_TO_INTENT.get(intent_obj.get("action"), "tutor_chat")
     else:
-        intent = _agent2_intent(user_update) if is_weekly_agent else "chat"
+        intent = "tutor_chat" if is_weekly_agent else "chat"
     llm_reply = intent_obj.get("reply") if intent_obj else None
     llm_count = intent_obj.get("count") if intent_obj else None
     llm_target = intent_obj.get("target") if intent_obj else None
     date_info = _parse_date_reference(user_update)
     date_context = _date_context_text(date_info)
-    profile_file = load_profile(data.user_id)
+    profile_file = load_profile(data.user_id) or {}
+    _hours_per_week = int(profile_file.get("hours_per_week") or 10)
+    _raw_months = profile_file.get("planning_horizon_months") or None
+    _raw_years = profile_file.get("planning_horizon_years") or None
+    if _raw_months:
+        _horizon_months = int(_raw_months)
+        _horizon_years = _horizon_months / 12
+    elif _raw_years:
+        _horizon_years = float(_raw_years)
+        _horizon_months = int(_horizon_years * 12)
+    else:
+        _horizon_months = 12
+        _horizon_years = 1.0
+    if _horizon_months >= 18:
+        _pace_label = "relaxed"
+        _task_cap = 2
+    elif _horizon_months >= 6:
+        _pace_label = "moderate"
+        _task_cap = 3
+    else:
+        _pace_label = "intensive"
+        _task_cap = 4
     # Intent over keywords: only treat a mentioned event as schedule-blocking when the AI
     # judged the user actually wants the week reshaped (constraint). A casual mention like
     # "a function at home this month" while asking to reduce tasks is context, NOT a command
@@ -946,6 +970,9 @@ def chat_message(
     profile_context = profile_as_context_string(data.user_id)
     persistent_context = memory_context_text(data.user_id)
     context_json = json.dumps(career_context, default=str)[:8000]
+    from app.services.user_context_store import read_current_week_context, read_profile_doc
+    user_instructions_ctx = read_current_week_context(data.user_id) if is_weekly_agent else ""
+    user_profile_doc = read_profile_doc(data.user_id) if is_weekly_agent else ""
 
     try:
         from app.services.ai_service import generate_response
@@ -973,6 +1000,43 @@ def chat_message(
                     response=response_text, context=user_context,
                     updated_actions=(previous if (roadmap and previous) else None),
                 )
+
+            if intent == "permanent_preference":
+                from app.services.user_context_store import append_permanent_instruction
+                append_permanent_instruction(data.user_id, user_update)
+                response_text = llm_reply or "Got it — I've saved that as a permanent preference. It will apply to every week going forward."
+                append_chat_turn(data.user_id, user_update, response_text, intent)
+                return ChatResponse(response=response_text, context=user_context)
+
+            if intent == "next_week_request":
+                from app.services.user_context_store import append_next_week_request
+                # Try to extract weeks count from message ("for 3 weeks", "next 2 weeks", "for the next 4 weeks", etc.)
+                import re as _re
+                _weeks_match = _re.search(r"(?:for\s+(?:the\s+)?next\s+|for\s+)(\d+)\s+weeks?", user_update, _re.IGNORECASE)
+                _weeks_count = int(_weeks_match.group(1)) if _weeks_match else 1
+                _weeks_count = max(1, min(12, _weeks_count))
+                append_next_week_request(data.user_id, user_update, weeks=_weeks_count)
+                _weeks_note = f" (active for {_weeks_count} week{'s' if _weeks_count > 1 else ''})" if _weeks_count > 1 else ""
+                response_text = llm_reply or f"Noted! I've saved that for your next weekly plan{_weeks_note}. When you're ready to advance, it will be factored in."
+                append_chat_turn(data.user_id, user_update, response_text, intent)
+                return ChatResponse(response=response_text, context=user_context)
+
+            if intent == "web_search":
+                try:
+                    from app.services.web_search import get_web_search_service
+                    svc = get_web_search_service()
+                    results = svc.search(user_update, max_results=5)
+                    search_context = "\n".join(
+                        f"- {r.get('title', '')}: {r.get('url', '')} — {r.get('snippet', '')}"
+                        for r in (results or [])[:5]
+                    )
+                except Exception as _se:
+                    logger.warning(f"Web search failed for web_search intent: {_se}")
+                    search_context = ""
+                # Fall through to tutor_chat LLM with search results injected
+                intent = "tutor_chat"
+                if search_context:
+                    user_update = f"{user_update}\n\n[Live web search results for your query:]\n{search_context}"
 
             if intent == "next_week":
                 try:
@@ -1148,19 +1212,76 @@ def chat_message(
                     updated_actions=updated_actions, week_phase="Pace-adjusted week",
                 )
 
-            role_prompt = f"""You are Agent 2 inside delta Career OS: the weekly roadmap strategist for any student domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
-Current date/time context: {date_context}
-Default behavior: chat like a normal human tutor. Answer the user's actual query using the student profile, persistent memory files, and this week's tasks. Be clear, direct, and useful.
-Do not change the weekly tasks during ordinary conversation. Explain, teach, clarify, estimate effort, suggest deliverables, and help the user express completed work professionally.
-Change the weekly tasks only when the user clearly asks for a change, skip, replacement, easier/harder work, a course, an exam/deadline pause, or the next week's tasks.
-When the user gives a date, day, duration, or relative time, reason from the current date/time context and persistent upcoming-events file. If a blocked event spans multiple weeks, keep normal delta tasks paused/reduced throughout that span.
-If the user has an exam period, the weekly task should focus on exam study until the event period is over.
-Never assign a long pre-made roadmap. Give one practical adjustment for this week and ask at most one follow-up question.
-The student profile/resume is the source of truth. If the profile says they already know a skill, do not assign beginner learning for it; assign a domain-appropriate harder proof, evaluation, portfolio piece, case study, design review, simulation, benchmark, red-team, audit, or extension task.
-Course rule: never assign more than one active course. If a course is already active, tell the user to complete or skip it first. Every course must include source and URL.
-Carryover rule: unfinished tasks stay assigned across weeks. Skipped tasks may be removed from blocking.
+            # Check if the user is CS / software-engineering oriented
+            _pf = profile_file or {}
+            _role_lower = (str(user.target_role or "") + " " + str(_pf.get("major", "") or "")).lower()
+            _cs_keywords = {"software", "developer", "engineer", "cs", "computer science", "cse",
+                            "data scientist", "machine learning", "ml", "ai", "backend", "frontend",
+                            "fullstack", "sde", "swe", "programmer", "data engineer"}
+            is_cs_user = any(kw in _role_lower for kw in _cs_keywords)
 
-CRITICAL: Only if the user explicitly requests a task change, output the updated list of tasks at the very end of your response inside a JSON block wrapped in triple backticks, like this:
+            # Build LeetCode context block — only for CS users whose current tasks include problems
+            leetcode_block = ""
+            if is_cs_user:
+                for _action in current_actions:
+                    _problems = _action.get("problems") or []
+                    if _problems:
+                        _lines = "\n".join(
+                            f"  - #{p['id']} {p['title']} [{p['difficulty']}] → {p['url']}"
+                            for p in _problems
+                        )
+                        leetcode_block = (
+                            f"\nThis week's LeetCode problems (NeetCode 150 — {_action.get('title', 'LeetCode')}):\n"
+                            f"{_lines}\n"
+                            "When the user asks about any of these problems or how to approach LeetCode this week, "
+                            "refer to the specific problems above by name, explain the pattern, hint the approach, "
+                            "and link the exact problem URL. Do not invent other problems."
+                        )
+                        break
+
+            leetcode_rule = (
+                leetcode_block if leetcode_block
+                else "\nDo NOT mention LeetCode, DSA practice, or coding interview problems. "
+                     "This student is not pursuing CS/engineering."
+                if not is_cs_user else ""
+            )
+
+            role_prompt = f"""You are Agent 2 inside delta Career OS — a personal weekly coach for students in any domain: CS, commerce, design, law, healthcare, arts, engineering, and more.
+Today: {date_context}
+
+━━ STUDENT PACE PROFILE (read this first, every time) ━━
+Planning horizon: {_horizon_months} months ({_horizon_years:.1f} years)
+Pace mode: {_pace_label.upper()}
+Weekly hours available: {_hours_per_week}h TOTAL — this is shared across ALL tasks combined, not per task.
+Max tasks this week: {_task_cap} (unless the student explicitly asks for more)
+
+Pacing rules (HARD RULES — override any other instinct):
+- {_pace_label.upper()} pace means: {"Do NOT pile on tasks. Keep it light and sustainable. 1–2 tasks maximum. If the student has 2+ years ahead, there is plenty of time — don't rush them. Only increase intensity if they explicitly ask." if _pace_label == "relaxed" else "Moderate load. 2–3 tasks. Match the weekly hours. Don't overload." if _pace_label == "moderate" else "Focused sprint. Up to 4 tasks. Use the full weekly hours. Student is in a time-pressured mode."}
+- Estimated effort of ALL tasks combined must not exceed {_hours_per_week}h per week.
+- If the user has NOT asked to go faster, default to the lighter end of the pace range.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PERMANENT INSTRUCTIONS (from user, apply every week — check the USER INSTRUCTIONS DOCUMENT):
+These override everything except safety. Read them before answering.
+
+━━ HOW TO RESPOND ━━
+Chit-chat / casual messages (hi, thanks, how are you, etc.): reply naturally like a human tutor. Do NOT output JSON for these.
+Questions about tasks: explain clearly, give steps, links, time estimates. No JSON unless a task needs updating.
+Task changes requested: see pushback rules below before complying.
+Live web results in the message ([Live web search results]): use those URLs in your answer.
+
+━━ PUSHBACK RULES (critical — do not skip) ━━
+You are not a yes-machine. You are a coach who cares about the student's actual outcome.
+If the student asks to remove, skip, or avoid a task that is genuinely important for their goal:
+  1. Push back directly and honestly. Tell them exactly why this task matters for their career.
+  2. Be frank — not rude, but don't sugarcoat it. Say things like "I can remove it, but I want to be honest with you — this task is foundational for X, and skipping it will slow you down."
+  3. If they insist a second time, respect their choice and comply. But make the case first, every time.
+  4. If the task is genuinely replaceable or they have a valid reason (exam, burnout, better alternative), agree and adjust.
+The goal: the student should feel you have their back, not just their approval.
+
+━━ TASK MANAGEMENT ━━
+Update tasks when you judge it would genuinely help — not just when explicitly asked.
+When updating tasks, output ONLY at the very end of your response:
 ```json
 {{
   "updated_actions": [
@@ -1169,17 +1290,17 @@ CRITICAL: Only if the user explicitly requests a task change, output the updated
       "type": "course|project|practice",
       "title": "Short title",
       "skill": "Skill name",
-      "description": "Task description...",
-      "source": "Course/project source if any",
-      "url": "https://..."
+      "description": "What to actually do this week (concrete, not vague)",
+      "source": "Resource name if any",
+      "url": "https://real-url.com"
     }}
   ]
 }}
 ```
-Current tasks in the user's plan:
-{json.dumps(current_actions, indent=2)}
-
-Keep the conversation friendly, comforting, and supportively warm. Ask at most one follow-up question. Do not output JSON for normal tutor answers."""
+Rules: max one active course at a time · every course needs a real URL · if student already knows a skill, skip beginner content and assign a proof/project instead · unfinished tasks carry over · skipped tasks are removed.
+{leetcode_rule}
+Current tasks:
+{json.dumps(current_actions, indent=2)}"""
         else:
             role_prompt = """You are delta, the central AI assistant inside a personalized Career OS.
 Use the user's Career Memory, Roadmap State, Market Pulse, Journey Log, Proof Projects, and Portfolio Assessment.
@@ -1187,28 +1308,28 @@ Be honest, specific, and action-oriented. If the user is drifting, say it clearl
 
         prompt = f"""{role_prompt}
 
-The user is:
+━━ STUDENT ━━
 {user_context}
 Skills: {skills_context}
-Profile / resume context:
+
+━━ FULL PROFILE ━━
 {profile_context}
 
-Date/time context:
-{date_context}
+━━ USER INSTRUCTIONS DOCUMENT ━━
+{user_instructions_ctx if user_instructions_ctx else "(no instructions yet)"}
 
-Persistent Agent 2 files:
+━━ PROFILE HISTORY (skills + completed tasks) ━━
+{user_profile_doc if user_profile_doc else "(not yet built)"}
+
+━━ CONVERSATION MEMORY ━━
 {persistent_context}
 
-Career OS Context JSON:
-{context_json}
-
-User message: {data.message}
-
-Respond with a practical next step, mention relevant roadmap/project/market context when useful, and ask at most one follow-up question."""
+━━ USER MESSAGE ━━
+{user_update}"""
         response = generate_response(
             prompt,
             temperature=0.5 if is_weekly_agent else 0.7,
-            max_tokens=1200 if is_weekly_agent and intent == "tutor_chat" else 10000,
+            max_tokens=10000,
         )
         cleaned_response = response.strip()
         updated_actions = None
@@ -1269,6 +1390,9 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
         )
         append_progress_event(data.user_id, serialize_journey_event(event))
         append_chat_turn(data.user_id, user_update, cleaned_response, intent)
+        if is_weekly_agent and intent == "tutor_chat" and len(cleaned_response) > 80:
+            from app.services.user_context_store import append_qa
+            append_qa(data.user_id, user_update, cleaned_response)
         return ChatResponse(response=cleaned_response, context=user_context, updated_actions=returned_actions)
     except Exception as exc:
         logger.error("chat endpoint failed for %s: %s", data.user_id, exc, exc_info=True)

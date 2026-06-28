@@ -67,7 +67,7 @@ export const briefsAPI = {
 
 // ── Chat API ──
 export const chatAPI = {
-  send: (data) => api.post('/chat/message', data).then(r => r.data),
+  send: (data) => api.post('/chat/message', data, { timeout: 180000 }).then(r => r.data),
   getHistory: (userId) => api.get(`/chat/history/${userId}`).then(r => r.data),
   startOnboarding: (data) => api.post('/chat/onboarding/start', data).then(r => r.data),
   finalizeOnboarding: (data) => api.post('/chat/onboarding/finalize', data).then(r => r.data),
@@ -183,6 +183,10 @@ export const careerOSAPI = {
   runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`, {}, { timeout: 300000 }).then(r => r.data),
   consolidateMemory: (userId) => api.post(`/career-os/user/${userId}/consolidate-memory`).then(r => r.data),
   logJourneyEvent: (userId, data) => api.post(`/career-os/user/${userId}/journey`, data).then(r => r.data),
+  getTaskDetail: (userId, data) => api.post(`/career-os/user/${userId}/task-detail`, data, { timeout: 60000 }).then(r => r.data),
+  getContextDocs: (userId) => api.get(`/career-os/user/${userId}/context-docs`).then(r => r.data),
+  updateContextDocs: (userId, data) => api.put(`/career-os/user/${userId}/context-docs`, data).then(r => r.data),
+  updateWeeklyTasks: (userId, tasks) => api.put(`/career-os/user/${userId}/weekly-tasks`, { tasks }).then(r => r.data),
 };
 
 // ── Ingestion API ──
