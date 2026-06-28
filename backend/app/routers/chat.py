@@ -1009,8 +1009,14 @@ def chat_message(
 
             if intent == "next_week_request":
                 from app.services.user_context_store import append_next_week_request
-                append_next_week_request(data.user_id, user_update)
-                response_text = llm_reply or "Noted! I've saved that for your next weekly plan. When you're ready to advance, it will be factored in."
+                # Try to extract weeks count from message ("for 3 weeks", "next 2 weeks", "for the next 4 weeks", etc.)
+                import re as _re
+                _weeks_match = _re.search(r"(?:for\s+(?:the\s+)?next\s+|for\s+)(\d+)\s+weeks?", user_update, _re.IGNORECASE)
+                _weeks_count = int(_weeks_match.group(1)) if _weeks_match else 1
+                _weeks_count = max(1, min(12, _weeks_count))
+                append_next_week_request(data.user_id, user_update, weeks=_weeks_count)
+                _weeks_note = f" (active for {_weeks_count} week{'s' if _weeks_count > 1 else ''})" if _weeks_count > 1 else ""
+                response_text = llm_reply or f"Noted! I've saved that for your next weekly plan{_weeks_note}. When you're ready to advance, it will be factored in."
                 append_chat_turn(data.user_id, user_update, response_text, intent)
                 return ChatResponse(response=response_text, context=user_context)
 

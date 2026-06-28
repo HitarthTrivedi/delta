@@ -200,9 +200,14 @@ def run_memory_consolidation(user_id: str, db: Session = Depends(get_db), _: str
 
 # ── Context Docs (permanent rules + next-week requests) ───────────────────────
 
+class TimedRequest(BaseModel):
+    text: str
+    weeks_remaining: int = 1
+
+
 class ContextDocsUpdate(BaseModel):
     permanent: list[str] = Field(default_factory=list)
-    next_week: list[str] = Field(default_factory=list)
+    next_week: list[TimedRequest] = Field(default_factory=list)
 
 
 @router.get("/user/{user_id}/context-docs")
@@ -211,7 +216,7 @@ def get_context_docs(user_id: str, _: str = Depends(require_owner)):
         from app.services.user_context_store import get_permanent_instructions, get_next_week_requests
         return {
             "permanent": get_permanent_instructions(user_id),
-            "next_week": get_next_week_requests(user_id),
+            "next_week": get_next_week_requests(user_id),  # [{text, weeks_remaining}]
         }
     except Exception as exc:
         _log.error("get_context_docs failed for %s: %s", user_id, exc, exc_info=True)
@@ -223,7 +228,7 @@ def update_context_docs(user_id: str, payload: ContextDocsUpdate, _: str = Depen
     try:
         from app.services.user_context_store import set_permanent_instructions, set_next_week_requests
         set_permanent_instructions(user_id, [s.strip() for s in payload.permanent if s.strip()])
-        set_next_week_requests(user_id, [s.strip() for s in payload.next_week if s.strip()])
+        set_next_week_requests(user_id, [r.dict() for r in payload.next_week if r.text.strip()])
         return {"status": "saved"}
     except Exception as exc:
         _log.error("update_context_docs failed for %s: %s", user_id, exc, exc_info=True)

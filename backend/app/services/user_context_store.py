@@ -126,9 +126,9 @@ def get_permanent_instructions(user_id: str) -> list[str]:
     return _extract_bullets(doc, "# PERMANENT INSTRUCTIONS", ["# PRESENT WEEK REQUESTS", WEEK_END_SEP])
 
 
-def get_next_week_requests(user_id: str) -> list[str]:
-    doc = _get_instructions(user_id)
-    return _extract_bullets(doc, "# NEXT WEEK REQUESTS", ["# GENERAL Q&A", WEEK_END_SEP])
+def get_next_week_requests(user_id: str) -> list[dict]:
+    """Return timed next-week requests as [{text, weeks_remaining}] from the JSON blob."""
+    return _load_blob(user_id).get("timed_requests") or []
 
 
 def _replace_bullets(doc: str, section_marker: str, next_marker: str, items: list[str]) -> str:
@@ -154,10 +154,22 @@ def set_permanent_instructions(user_id: str, items: list[str]) -> None:
     _set_instructions(user_id, doc)
 
 
-def set_next_week_requests(user_id: str, items: list[str]) -> None:
-    doc = _get_instructions(user_id)
-    doc = _replace_bullets(doc, "# NEXT WEEK REQUESTS", "# GENERAL Q&A", items)
-    _set_instructions(user_id, doc)
+def set_next_week_requests(user_id: str, items: list[dict]) -> None:
+    """Save timed next-week requests [{text, weeks_remaining}] to JSON blob + sync to text doc."""
+    blob = _load_blob(user_id)
+    blob["timed_requests"] = [{"text": i.get("text", ""), "weeks_remaining": int(i.get("weeks_remaining", i.get("weeks", 1)))} for i in items if i.get("text", "").strip()]
+    _sync_timed_requests_to_doc(blob)
+    _save_blob(user_id, blob)
+
+
+def _sync_timed_requests_to_doc(blob: dict) -> None:
+    """Write timed_requests back into the instructions_doc text so Agent 2 can read them."""
+    doc = blob.get("instructions_doc") or _BLANK_INSTRUCTIONS
+    items = blob.get("timed_requests") or []
+    # _replace_bullets adds "- " prefix, so pass bare text with the [Xw] tag
+    text_items = [f"[{r['weeks_remaining']}w] {r['text']}" for r in items]
+    doc = _replace_bullets(doc, "# NEXT WEEK REQUESTS", "# GENERAL Q&A", text_items)
+    blob["instructions_doc"] = doc
 
 
 # ── Write helpers — instructions_doc ─────────────────────────────────────────
@@ -177,11 +189,13 @@ def append_permanent_instruction(user_id: str, text: str) -> None:
     _set_instructions(user_id, doc)
 
 
-def append_next_week_request(user_id: str, text: str) -> None:
-    doc = _get_instructions(user_id)
-    entry = f"- {text}"
-    doc = _insert_before_marker(doc, "# GENERAL Q&A", entry)
-    _set_instructions(user_id, doc)
+def append_next_week_request(user_id: str, text: str, weeks: int = 1) -> None:
+    blob = _load_blob(user_id)
+    items = blob.get("timed_requests") or []
+    items.append({"text": text.strip(), "weeks_remaining": max(1, int(weeks))})
+    blob["timed_requests"] = items
+    _sync_timed_requests_to_doc(blob)
+    _save_blob(user_id, blob)
 
 
 def append_present_session(user_id: str, text: str) -> None:
@@ -207,39 +221,44 @@ def append_qa(user_id: str, question: str, answer: str) -> None:
 def promote_next_week_requests(user_id: str) -> None:
     """
     Called at the START of a new weekly cycle.
-    Moves NEXT WEEK REQUESTS into PRESENT WEEK REQUESTS, then clears them.
+    Decrements weeks_remaining on timed requests, promotes active ones, expires finished ones.
     """
-    doc = _get_instructions(user_id)
-    next_marker = "# NEXT WEEK REQUESTS"
-    qa_marker = "# GENERAL Q&A"
-    present_marker = "# PRESENT WEEK REQUESTS"
-
-    if next_marker not in doc or qa_marker not in doc:
-        return
-
-    next_start = doc.index(next_marker) + len(next_marker)
-    next_end = doc.index(qa_marker)
-    next_raw = doc[next_start:next_end].strip()
-
-    # Pull out only bullet lines
-    items = [ln for ln in next_raw.splitlines() if ln.strip().startswith("-")]
+    blob = _load_blob(user_id)
+    items = blob.get("timed_requests") or []
     if not items:
         return
 
-    present_start = doc.index(present_marker) + len(present_marker)
-    present_end = doc.index(next_marker)
-    present_raw = doc[present_start:present_end].strip()
+    active, to_promote = [], []
+    for item in items:
+        remaining = int(item.get("weeks_remaining", 1)) - 1
+        if remaining > 0:
+            active.append({"text": item["text"], "weeks_remaining": remaining})
+            to_promote.append(item["text"])
+        else:
+            to_promote.append(item["text"])  # last active week — include once then expire
 
-    # Rebuild: keep permanent + existing present items + promoted items
-    new_doc = (
-        doc[:present_start].rstrip() + "\n"
-        + (present_raw + "\n" if present_raw else "")
-        + "\n".join(items) + "\n\n"
-        + next_marker + "\n"
-        + "(Things the user wants included in the next weekly plan.)\n\n"
-        + doc[next_end:]
-    )
-    _set_instructions(user_id, new_doc)
+    blob["timed_requests"] = active
+    _sync_timed_requests_to_doc(blob)
+
+    # Also promote text into PRESENT WEEK REQUESTS
+    if to_promote:
+        doc = blob.get("instructions_doc") or _BLANK_INSTRUCTIONS
+        present_marker = "# PRESENT WEEK REQUESTS"
+        next_marker = "# NEXT WEEK REQUESTS"
+        if present_marker in doc and next_marker in doc:
+            present_start = doc.index(present_marker) + len(present_marker)
+            present_end = doc.index(next_marker)
+            present_raw = doc[present_start:present_end].strip()
+            new_items = "\n".join(f"- {t}" for t in to_promote)
+            doc = (
+                doc[:present_start].rstrip() + "\n"
+                + (present_raw + "\n" if present_raw else "")
+                + new_items + "\n\n"
+                + doc[present_end:]
+            )
+            blob["instructions_doc"] = doc
+
+    _save_blob(user_id, blob)
 
 
 def end_week(user_id: str, week_label: str) -> None:

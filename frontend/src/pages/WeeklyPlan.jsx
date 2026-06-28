@@ -53,6 +53,7 @@ export default function WeeklyPlan() {
   const [docsLoading, setDocsLoading] = useState(false);
   const [newPermanent, setNewPermanent] = useState('');
   const [newNextWeek, setNewNextWeek] = useState('');
+  const [newNextWeekWeeks, setNewNextWeekWeeks] = useState(1);
 
   // Task editing
   const [editingTasks, setEditingTasks] = useState(false);
@@ -267,7 +268,9 @@ export default function WeeklyPlan() {
     const text = newNextWeek.trim();
     if (!text) return;
     setNewNextWeek('');
-    await saveContextDocs({ next_week: [...contextDocs.next_week, text] });
+    const weeks = Math.max(1, Math.min(12, Number(newNextWeekWeeks) || 1));
+    setNewNextWeekWeeks(1);
+    await saveContextDocs({ next_week: [...contextDocs.next_week, { text, weeks_remaining: weeks }] });
   };
 
   const removeNextWeek = async (i) => {
@@ -661,14 +664,21 @@ export default function WeeklyPlan() {
                 <p style={{ margin: '0 0 10px', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No requests yet. Add one below or tell Agent 2.</p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                {contextDocs.next_week.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '7px 10px' }}>
-                    <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.4 }}>{item}</span>
-                    <button onClick={() => removeNextWeek(i)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
+                {contextDocs.next_week.map((item, i) => {
+                  const text = typeof item === 'string' ? item : item.text;
+                  const weeksLeft = typeof item === 'object' ? item.weeks_remaining : 1;
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '7px 10px' }}>
+                      <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.4 }}>{text}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: weeksLeft <= 1 ? 'rgba(251,191,36,0.18)' : 'rgba(255,255,255,0.08)', color: weeksLeft <= 1 ? '#fbbf24' : 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
+                        {weeksLeft}w
+                      </span>
+                      <button onClick={() => removeNextWeek(i)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <input
@@ -678,6 +688,18 @@ export default function WeeklyPlan() {
                   placeholder="e.g. Include a REST API project"
                   style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '7px 10px', color: '#fff', fontSize: 12, outline: 'none' }}
                 />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={newNextWeekWeeks}
+                    onChange={e => setNewNextWeekWeeks(e.target.value)}
+                    title="Number of weeks to keep this instruction active"
+                    style={{ width: 44, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '7px 6px', color: '#fff', fontSize: 12, outline: 'none', textAlign: 'center' }}
+                  />
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>wk</span>
+                </div>
                 <button onClick={addNextWeek} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, padding: '7px 10px', color: '#fff', cursor: 'pointer' }}>
                   <Plus size={14} />
                 </button>

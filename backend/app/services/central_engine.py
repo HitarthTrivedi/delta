@@ -1594,11 +1594,42 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             return roadmap
     skills = _sync_profile_skills_to_db(db, user)
 
+    # Gather all completed task titles to pass to the brief generator (no repeats)
+    all_completed_events = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user.id,
+        JourneyEvent.event_type == "weekly_task_completed",
+    ).all()
+    completed_task_titles = list({
+        (_event_json(ev, "evidence", {}).get("title") or "")
+        for ev in all_completed_events
+        if _event_json(ev, "evidence", {}).get("title")
+    })
+
+    # Determine cycle-based break week cadence (54 weeks/year assumed)
+    horizon_months = _planning_horizon_months(profile)
+    if horizon_months >= 24:
+        break_interval = 8   # 2+ years: break every 8 weeks
+    elif horizon_months >= 12:
+        break_interval = 6   # 1-2 years: break every 6 weeks
+    else:
+        break_interval = 0   # < 1 year: no auto-break (they're in a sprint)
+
+    should_cycle_break = (
+        regenerate
+        and not blocking_events
+        and break_interval > 0
+        and cycle_count > 0
+        and cycle_count % break_interval == 0
+    )
+
     roadmap_payload = generate_weekly_brief(
         user, skills, market,
         agent2_memory=agent2_memory or {},
         onboarding_profile=onboarding_profile or {},
         recent_events=recent_events or [],
+        completed_task_titles=completed_task_titles,
+        cycle_count=cycle_count,
+        horizon_months=horizon_months,
     )
 
     phases = roadmap_payload.get("phases", [])
@@ -1630,7 +1661,26 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             weekly_focus["phase_name"] = "Profile-based proof sprint"
             weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
             weekly_focus["selection_reason"] = "Matched against resume/project evidence and current skill depth."
-    if regenerate and not blocking_events and _should_assign_break_week(db, user, profile, roadmap):
+    if should_cycle_break:
+        # Check we haven't had a break too recently (< 14 days)
+        dest_so_far = _as_json(roadmap.destination if roadmap else "{}", {})
+        last_break = dest_so_far.get("last_break_week_at")
+        _too_recent = False
+        if last_break:
+            try:
+                _too_recent = (datetime.datetime.utcnow() - datetime.datetime.fromisoformat(last_break)).days < 14
+            except Exception:
+                pass
+        if not _too_recent:
+            weekly_focus["phase_name"] = "Break week"
+            weekly_focus["is_break_week"] = True
+            weekly_focus["primary_actions"] = _break_week_actions(
+                profile, user,
+                f"Scheduled recovery week — you've completed {cycle_count} weeks. Rest, reflect, and prepare."
+            )
+            weekly_focus["selection_reason"] = f"Cycle-based break week (every {break_interval} weeks for your {horizon_months}-month plan)."
+            destination["last_break_week_at"] = datetime.datetime.utcnow().isoformat()
+    elif regenerate and not blocking_events and _should_assign_break_week(db, user, profile, roadmap):
         weekly_focus["phase_name"] = "Break week"
         weekly_focus["is_break_week"] = True
         weekly_focus["primary_actions"] = _break_week_actions(
@@ -1639,7 +1689,6 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             "You have already completed or skipped enough tasks this month."
         )
         weekly_focus["selection_reason"] = "Monthly pacing guard assigned recovery instead of extra work."
-        # Record when this break was given so we don't re-trigger another one for ~3 weeks.
         destination["last_break_week_at"] = datetime.datetime.utcnow().isoformat()
     if blocking_events:
         weekly_focus["phase_name"] = "Event-focused week"
