@@ -600,6 +600,8 @@ _ACTION_TO_INTENT = {
     "easier": "normal",
     "add_course": "course",
     "constraint": "constraint",
+    "permanent_preference": "permanent_preference",
+    "next_week_request": "next_week_request",
     "chat": "tutor_chat",
 }
 
@@ -632,22 +634,24 @@ Student message:
 
 Reply with ONLY a JSON object (no markdown), choosing exactly one action:
 {{
-  "action": "reduce_tasks | skip_task | next_week | restore | harder | easier | add_course | constraint | chat",
-  "count": <integer or null>,   // for reduce_tasks: how many tasks to KEEP. For a range like "2-3" use the higher number. null if unspecified.
-  "target": "<string or null>", // for skip_task: which task (its number or a keyword from its title). null if unclear.
+  "action": "reduce_tasks | skip_task | next_week | restore | harder | easier | add_course | constraint | permanent_preference | next_week_request | chat",
+  "count": <integer or null>,   // for reduce_tasks: how many tasks to KEEP. null if unspecified.
+  "target": "<string or null>", // for skip_task: which task. null if unclear.
   "reply": "<one short, warm sentence to the student, written in the SAME language they used, confirming what you will do>"
 }}
 
 Meaning of each action:
-- reduce_tasks: they feel it is too much and want fewer tasks this week.
-- skip_task: they want to drop/remove one specific task.
-- next_week: they are DONE with this week and want to advance to a brand-new week RIGHT NOW. Only use this when they explicitly say they finished or want to move on immediately (e.g. "give me next week", "I'm done, advance", "move to next week now").
-- restore: they want their previous/earlier tasks back, or to undo a change.
+- reduce_tasks: they feel overwhelmed and want fewer tasks this week.
+- skip_task: they want to drop one specific task from this week.
+- next_week: they are DONE and want to advance to a brand-new week RIGHT NOW. Only use when they explicitly say so (e.g. "I finished everything, give me next week", "advance", "I'm done").
+- restore: they want their previous tasks back or to undo a recent change.
 - harder: the work is too easy; they want tougher tasks.
 - easier: the work is too hard; they want simpler tasks.
 - add_course: they want a course assigned.
-- constraint: an exam, deadline, travel, illness, low energy, or busy period should reshape this week.
-- chat: anything else — a question, a suggestion for what to include NEXT week, a request to explain something, or normal conversation. IMPORTANT: if the student says "for next week include X" or "can next week have Y" or "I want X next week" — that is a PREFERENCE NOTE, not an advance command. Treat it as chat, acknowledge their request, and tell them it will be considered when they advance. When unsure, always choose chat.
+- constraint: an exam, deadline, travel, illness, or busy period should reshape THIS week's tasks.
+- permanent_preference: the user is setting a firm, lasting rule about how ALL future weeks should be structured — things like "never give me more than 2 tasks", "stop giving me courses", "the pace is always too fast", "I don't want LeetCode ever", "always include a project". These rules must be remembered permanently.
+- next_week_request: the user is requesting something specific for NEXT week's plan without advancing now (e.g. "for next week give me API tasks", "can next week include a project?", "I want DSA next week"). Save it — don't advance yet.
+- chat: everything else — a question, an explanation request, general conversation. When unsure, always choose chat.
 
 Return only the JSON object."""
     try:
@@ -942,6 +946,9 @@ def chat_message(
     profile_context = profile_as_context_string(data.user_id)
     persistent_context = memory_context_text(data.user_id)
     context_json = json.dumps(career_context, default=str)[:8000]
+    from app.services.user_context_store import read_current_week_context, read_profile_doc
+    user_instructions_ctx = read_current_week_context(data.user_id) if is_weekly_agent else ""
+    user_profile_doc = read_profile_doc(data.user_id) if is_weekly_agent else ""
 
     try:
         from app.services.ai_service import generate_response
@@ -969,6 +976,20 @@ def chat_message(
                     response=response_text, context=user_context,
                     updated_actions=(previous if (roadmap and previous) else None),
                 )
+
+            if intent == "permanent_preference":
+                from app.services.user_context_store import append_permanent_instruction
+                append_permanent_instruction(data.user_id, user_update)
+                response_text = llm_reply or "Got it — I've saved that as a permanent preference. It will apply to every week going forward."
+                append_chat_turn(data.user_id, user_update, response_text, intent)
+                return ChatResponse(response=response_text, context=user_context)
+
+            if intent == "next_week_request":
+                from app.services.user_context_store import append_next_week_request
+                append_next_week_request(data.user_id, user_update)
+                response_text = llm_reply or "Noted! I've saved that for your next weekly plan. When you're ready to advance, it will be factored in."
+                append_chat_turn(data.user_id, user_update, response_text, intent)
+                return ChatResponse(response=response_text, context=user_context)
 
             if intent == "next_week":
                 try:
@@ -1226,7 +1247,13 @@ Profile / resume context:
 Date/time context:
 {date_context}
 
-Persistent Agent 2 files:
+--- USER PROFILE DOCUMENT (identity + skills + completed history) ---
+{user_profile_doc if user_profile_doc else "(not yet built — user may not have completed onboarding)"}
+
+--- USER INSTRUCTIONS DOCUMENT (current week only — permanent rules + this week's context + Q&A) ---
+{user_instructions_ctx if user_instructions_ctx else "(no instructions logged yet)"}
+
+Persistent Agent 2 memory:
 {persistent_context}
 
 Career OS Context JSON:
@@ -1299,6 +1326,9 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
         )
         append_progress_event(data.user_id, serialize_journey_event(event))
         append_chat_turn(data.user_id, user_update, cleaned_response, intent)
+        if is_weekly_agent and intent == "tutor_chat" and len(cleaned_response) > 80:
+            from app.services.user_context_store import append_qa
+            append_qa(data.user_id, user_update, cleaned_response)
         return ChatResponse(response=cleaned_response, context=user_context, updated_actions=returned_actions)
     except Exception as exc:
         logger.error("chat endpoint failed for %s: %s", data.user_id, exc, exc_info=True)

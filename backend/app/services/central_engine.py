@@ -1184,6 +1184,22 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         for e in recent_events
     ]
 
+    # Archive the closing week and promote next-week requests before generating new tasks
+    try:
+        from app.services.user_context_store import (
+            end_week, promote_next_week_requests, update_profile_with_completed_tasks
+        )
+        week_label = f"Week {week_number}" if 'week_number' in dir() else "Previous Week"
+        completed_tasks_for_profile = [
+            a for a in current_actions
+            if _normalize(a.get("id") or a.get("title")) in accepted_ids
+        ]
+        update_profile_with_completed_tasks(user_id, completed_tasks_for_profile, week_label)
+        promote_next_week_requests(user_id)
+        end_week(user_id, week_label)
+    except Exception as _ctx_err:
+        logger.warning(f"[ctx_store] week transition failed (non-fatal): {_ctx_err}")
+
     roadmap = get_or_create_roadmap_state(
         db, user, market, regenerate=True,
         agent2_memory=agent2_memory,

@@ -1,0 +1,306 @@
+"""
+User context documents for Agent 2. Two documents per user, stored as strings
+inside the agent2_memory_data JSON blob (no extra DB columns needed).
+
+DOCUMENT 1 — instructions_doc
+  Sections (in order, top to bottom):
+    PERMANENT INSTRUCTIONS  — firm rules that never auto-clear (carry every week)
+    PRESENT WEEK REQUESTS   — adjustments/context for the current week only
+    NEXT WEEK REQUESTS      — what the user wants included in next week's plan
+    GENERAL Q&A             — course questions + answers logged this week
+
+  After each week closes, an ===WEEK_END=== separator is inserted.
+  Agent 2 reads only up to the FIRST occurrence of this marker — so old weeks
+  are invisible to it without manual deletion.
+
+DOCUMENT 2 — profile_doc
+  Static identity info from intake + cumulative skills/projects/courses
+  appended after each week closes.
+"""
+
+from __future__ import annotations
+
+import datetime
+import logging
+import re
+
+logger = logging.getLogger("delta.user_context_store")
+
+WEEK_END_SEP = "===WEEK_END==="
+
+_BLANK_INSTRUCTIONS = """\
+# PERMANENT INSTRUCTIONS
+(Firm rules that apply every week. Never change unless the user explicitly says so.)
+
+
+# PRESENT WEEK REQUESTS
+(Tasks, context, or adjustments for the current week only.)
+
+
+# NEXT WEEK REQUESTS
+(Things the user wants included in the next weekly plan.)
+
+
+# GENERAL Q&A
+(Course questions and agent answers logged this week.)
+
+"""
+
+
+# ── Blob helpers (reuse existing agent2_memory_data column) ──────────────────
+
+def _load_blob(user_id: str) -> dict:
+    import json
+    from app.database import SessionLocal
+    from app.models.user import User
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.agent2_memory_data:
+            return {}
+        return json.loads(user.agent2_memory_data)
+    except Exception as e:
+        logger.error(f"[ctx_store] load error {user_id}: {e}")
+        return {}
+    finally:
+        db.close()
+
+
+def _save_blob(user_id: str, blob: dict) -> None:
+    import json
+    from app.database import SessionLocal
+    from app.models.user import User
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.agent2_memory_data = json.dumps(blob, ensure_ascii=False, default=str)
+            db.commit()
+    except Exception as e:
+        logger.error(f"[ctx_store] save error {user_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+def _get_instructions(user_id: str) -> str:
+    return _load_blob(user_id).get("instructions_doc") or _BLANK_INSTRUCTIONS
+
+
+def _set_instructions(user_id: str, doc: str) -> None:
+    blob = _load_blob(user_id)
+    blob["instructions_doc"] = doc
+    _save_blob(user_id, blob)
+
+
+# ── Read helpers ──────────────────────────────────────────────────────────────
+
+def read_current_week_context(user_id: str) -> str:
+    """Return only content above the first WEEK_END_SEP — the current week."""
+    doc = _get_instructions(user_id)
+    if WEEK_END_SEP in doc:
+        return doc.split(WEEK_END_SEP)[0].strip()
+    return doc.strip()
+
+
+def read_profile_doc(user_id: str) -> str:
+    return _load_blob(user_id).get("profile_doc") or ""
+
+
+# ── Write helpers — instructions_doc ─────────────────────────────────────────
+
+def _insert_before_marker(doc: str, before_marker: str, entry: str) -> str:
+    """Insert `entry` on a new line just before `before_marker` in `doc`."""
+    if before_marker in doc:
+        idx = doc.index(before_marker)
+        return doc[:idx].rstrip() + "\n" + entry + "\n\n" + doc[idx:]
+    return doc.rstrip() + "\n" + entry + "\n"
+
+
+def append_permanent_instruction(user_id: str, text: str) -> None:
+    doc = _get_instructions(user_id)
+    entry = f"- {text}"
+    doc = _insert_before_marker(doc, "# PRESENT WEEK REQUESTS", entry)
+    _set_instructions(user_id, doc)
+
+
+def append_next_week_request(user_id: str, text: str) -> None:
+    doc = _get_instructions(user_id)
+    entry = f"- {text}"
+    doc = _insert_before_marker(doc, "# GENERAL Q&A", entry)
+    _set_instructions(user_id, doc)
+
+
+def append_present_session(user_id: str, text: str) -> None:
+    doc = _get_instructions(user_id)
+    entry = f"- {text}"
+    doc = _insert_before_marker(doc, "# NEXT WEEK REQUESTS", entry)
+    _set_instructions(user_id, doc)
+
+
+def append_qa(user_id: str, question: str, answer: str) -> None:
+    doc = _get_instructions(user_id)
+    entry = f"\nQ: {question[:300]}\nA: {answer[:800]}"
+    sep_pos = doc.find(WEEK_END_SEP)
+    if sep_pos != -1:
+        doc = doc[:sep_pos].rstrip() + entry + "\n\n" + doc[sep_pos:]
+    else:
+        doc = doc.rstrip() + entry + "\n"
+    _set_instructions(user_id, doc)
+
+
+# ── Week transition ───────────────────────────────────────────────────────────
+
+def promote_next_week_requests(user_id: str) -> None:
+    """
+    Called at the START of a new weekly cycle.
+    Moves NEXT WEEK REQUESTS into PRESENT WEEK REQUESTS, then clears them.
+    """
+    doc = _get_instructions(user_id)
+    next_marker = "# NEXT WEEK REQUESTS"
+    qa_marker = "# GENERAL Q&A"
+    present_marker = "# PRESENT WEEK REQUESTS"
+
+    if next_marker not in doc or qa_marker not in doc:
+        return
+
+    next_start = doc.index(next_marker) + len(next_marker)
+    next_end = doc.index(qa_marker)
+    next_raw = doc[next_start:next_end].strip()
+
+    # Pull out only bullet lines
+    items = [ln for ln in next_raw.splitlines() if ln.strip().startswith("-")]
+    if not items:
+        return
+
+    present_start = doc.index(present_marker) + len(present_marker)
+    present_end = doc.index(next_marker)
+    present_raw = doc[present_start:present_end].strip()
+
+    # Rebuild: keep permanent + existing present items + promoted items
+    new_doc = (
+        doc[:present_start].rstrip() + "\n"
+        + (present_raw + "\n" if present_raw else "")
+        + "\n".join(items) + "\n\n"
+        + next_marker + "\n"
+        + "(Things the user wants included in the next weekly plan.)\n\n"
+        + doc[next_end:]
+    )
+    _set_instructions(user_id, new_doc)
+
+
+def end_week(user_id: str, week_label: str) -> None:
+    """
+    Called at the START of a new weekly cycle (after promoting next-week requests).
+    Archives current-week sections below WEEK_END_SEP, resets them for the new week.
+    PERMANENT INSTRUCTIONS are preserved at the top.
+    """
+    doc = _get_instructions(user_id)
+    perm_marker = "# PERMANENT INSTRUCTIONS"
+    present_marker = "# PRESENT WEEK REQUESTS"
+
+    if perm_marker in doc and present_marker in doc:
+        perm_end = doc.index(present_marker)
+        permanent_block = doc[:perm_end]
+        archived = doc[perm_end:].strip()
+    else:
+        permanent_block = ""
+        archived = doc.strip()
+
+    new_doc = (
+        permanent_block.rstrip() + "\n\n"
+        "# PRESENT WEEK REQUESTS\n"
+        "(Tasks, context, or adjustments for the current week only.)\n\n\n"
+        "# NEXT WEEK REQUESTS\n"
+        "(Things the user wants included in the next weekly plan.)\n\n\n"
+        "# GENERAL Q&A\n"
+        "(Course questions and agent answers logged this week.)\n\n"
+        f"{WEEK_END_SEP}\n"
+        f"# {week_label} — ARCHIVED\n"
+        f"{archived}\n"
+    )
+    _set_instructions(user_id, new_doc)
+
+
+# ── Profile document ──────────────────────────────────────────────────────────
+
+def initialize_profile_doc(user_id: str, profile: dict, user_obj=None) -> None:
+    """Build or rebuild the profile doc from Agent 1 intake data."""
+    name = (getattr(user_obj, "name", None) or profile.get("name") or "User")
+    role = (getattr(user_obj, "target_role", None) or profile.get("target_role") or profile.get("domain") or "")
+    major = profile.get("major") or ""
+    university = profile.get("university") or profile.get("college") or ""
+    study_year = profile.get("study_year") or profile.get("year_of_study") or ""
+    hours = profile.get("hours_per_week") or profile.get("weekly_hours") or ""
+    horizon = profile.get("planning_horizon") or ""
+    skill_level = profile.get("skill_level") or ""
+
+    skills_raw = profile.get("skills") or {}
+    if isinstance(skills_raw, dict):
+        skill_lines = "\n".join(f"- {k}: {v}/10 (self-assessed)" for k, v in skills_raw.items())
+    elif isinstance(skills_raw, list):
+        skill_lines = "\n".join(f"- {s}" for s in skills_raw)
+    else:
+        skill_lines = "- Not specified"
+
+    doc = f"""# USER PROFILE — {name}
+Last updated: Intake
+
+## Identity
+- Name: {name}
+- Target Role: {role}
+- Major: {major}
+- University / College: {university}
+- Study Year: {study_year}
+- Hours/Week Available: {hours}
+- Planning Horizon: {horizon}
+- Self-assessed Skill Level: {skill_level}
+
+## Current Skills (from intake)
+{skill_lines}
+
+## Completed Journey
+(Completed tasks and proofs are added here as each week closes.)
+
+## Projects Built
+(Project tasks are logged here after completion.)
+
+## Courses / Resources Used
+(Course tasks are logged here after completion.)
+"""
+    blob = _load_blob(user_id)
+    blob["profile_doc"] = doc
+    _save_blob(user_id, blob)
+
+
+def update_profile_with_completed_tasks(user_id: str, completed_tasks: list[dict], week_label: str) -> None:
+    """Append completed tasks from a closed week into the profile doc sections."""
+    blob = _load_blob(user_id)
+    doc = blob.get("profile_doc") or ""
+    if not doc:
+        return
+
+    journey_entries, project_entries, course_entries = [], [], []
+    for task in completed_tasks:
+        title = task.get("title") or task.get("skill") or ""
+        ttype = (task.get("type") or "").lower()
+        if "course" in ttype or "resource" in ttype:
+            course_entries.append(f"- [{week_label}] {title}")
+        elif "project" in ttype or "proof" in title.lower():
+            project_entries.append(f"- [{week_label}] {title}")
+        else:
+            journey_entries.append(f"- [{week_label}] {title}")
+
+    def _insert_after(doc: str, marker: str, entries: list[str]) -> str:
+        if marker in doc and entries:
+            idx = doc.index(marker) + len(marker)
+            doc = doc[:idx] + "\n" + "\n".join(entries) + doc[idx:]
+        return doc
+
+    doc = _insert_after(doc, "## Completed Journey", journey_entries)
+    doc = _insert_after(doc, "## Projects Built", project_entries)
+    doc = _insert_after(doc, "## Courses / Resources Used", course_entries)
+    doc = re.sub(r"Last updated: .*", f"Last updated: {week_label}", doc, count=1)
+
+    blob["profile_doc"] = doc
+    _save_blob(user_id, blob)
