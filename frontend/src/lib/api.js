@@ -67,7 +67,7 @@ export const briefsAPI = {
 
 // ── Chat API ──
 export const chatAPI = {
-  send: (data) => api.post('/chat/message', data).then(r => r.data),
+  send: (data) => api.post('/chat/message', data, { timeout: 180000 }).then(r => r.data),
   getHistory: (userId) => api.get(`/chat/history/${userId}`).then(r => r.data),
   startOnboarding: (data) => api.post('/chat/onboarding/start', data).then(r => r.data),
   finalizeOnboarding: (data) => api.post('/chat/onboarding/finalize', data).then(r => r.data),
