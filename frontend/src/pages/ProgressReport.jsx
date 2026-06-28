@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, BookOpen, Check, Circle, Loader2, RefreshCw, RotateCcw, Signal, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
-import { careerOSAPI } from '../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { getTaskProgress } from '../lib/taskProgress';
 import { useAuthStore } from '../store/authStore';
+import { fetchCareerContext } from '../hooks/useCareerOS';
 
 const panel = {
   background: '#050505',
@@ -125,20 +126,21 @@ function TaskRow({ task, tone = 'left' }) {
 
 export default function ProgressReport() {
   const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadContext = useCallback(async () => {
     setLoading(true);
     try {
-      setContext(await careerOSAPI.getContext(userId));
+      setContext(await fetchCareerContext(queryClient, userId));
     } catch (err) {
       console.error(err);
       toast.error('Could not load your progress.');
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, queryClient]);
 
   useEffect(() => {
     loadContext();

@@ -4,9 +4,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { careerOSAPI, chatAPI } from '../lib/api';
 import { getTaskProgress } from '../lib/taskProgress';
 import { useAuthStore } from '../store/authStore';
+import { seedCareerContext } from '../hooks/useCareerOS';
 
 const panelStyle = {
   background: '#050505',
@@ -29,6 +31,7 @@ const SUGGESTIONS = [
 
 export default function WeeklyPlan() {
   const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
   const location = useLocation();
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +53,7 @@ export default function WeeklyPlan() {
     try {
       const data = await careerOSAPI.getContext(userId);
       setContext(data);
+      seedCareerContext(queryClient, userId, data);
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
@@ -60,7 +64,7 @@ export default function WeeklyPlan() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, queryClient]);
 
   // Load chat history for current week
   useEffect(() => {
@@ -106,6 +110,7 @@ export default function WeeklyPlan() {
     try {
       const data = await careerOSAPI.getContext(userId);
       setContext(data);
+      seedCareerContext(queryClient, userId, data);
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
@@ -161,6 +166,7 @@ export default function WeeklyPlan() {
       clearInterval(stepInterval);
       setAdvanceStep(ADVANCE_STEPS.length - 1);
       setContext(data);
+      seedCareerContext(queryClient, userId, data);
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);

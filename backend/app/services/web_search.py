@@ -309,9 +309,9 @@ class WebSearchService:
 
     def _search_serper(self, query: str, max_results: int) -> list[SearchResult]:
         """Execute a Google search via Serper and normalise organic results."""
-        import requests
+        from app.services.http_client import get_session
 
-        response = requests.post(
+        response = get_session().post(
             "https://google.serper.dev/search",
             headers={
                 "X-API-KEY": self._serper_api_key or "",

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import datetime
 import json
@@ -1274,6 +1275,104 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
         error_msg = "Sorry, something went wrong on my end. Please try again in a moment."
         append_chat_turn(data.user_id, user_update, error_msg, intent)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/stream")
+@limiter.limit("20/minute")
+def chat_stream(
+    request: Request,
+    data: ChatRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
+    """Server-Sent-Events variant of the general assistant chat.
+
+    Streams the LLM reply token-by-token so the UI doesn't block on the full
+    3-10s generation. Only the general (non weekly-agent) path is streamed; the
+    action-capable Agent 2 path emits `event: fallback` so the client uses the
+    unchanged /message endpoint. /message itself is not modified.
+    """
+    verify_resource_owner(data.user_id, x_user_id=x_user_id, authorization=authorization)
+
+    # The weekly-agent path mutates the plan and parses action JSON — keep it on
+    # the structured /message endpoint.
+    if "Agent 2 weekly plan discussion" in data.message:
+        def _fallback():
+            yield "event: fallback\ndata: {}\n\n"
+        return StreamingResponse(_fallback(), media_type="text/event-stream")
+
+    user = db.query(User).filter(User.id == data.user_id).first()
+    skills = db.query(SkillNode).filter(SkillNode.user_id == data.user_id).all()
+    user_context = f"User: {user.name if user else 'Unknown'}, Target: {user.target_role if user else 'N/A'}"
+
+    try:
+        career_context = compile_career_context(db, data.user_id)
+    except Exception:
+        career_context = {}
+
+    skills_context = ", ".join([f"{s.name} ({s.proficiency}/10)" for s in skills]) if skills else "No skills yet"
+    profile_context = profile_as_context_string(data.user_id)
+    persistent_context = memory_context_text(data.user_id)
+    date_context = _date_context_text(_parse_date_reference(data.message))
+    context_json = json.dumps(career_context, default=str)[:8000]
+
+    # Same persona/prompt as the non-weekly branch of /message.
+    role_prompt = """You are delta, the central AI assistant inside a personalized Career OS.
+Use the user's Career Memory, Roadmap State, Market Pulse, Journey Log, Proof Projects, and Portfolio Assessment.
+Be honest, specific, and action-oriented. If the user is drifting, say it clearly but supportively."""
+    prompt = f"""{role_prompt}
+
+The user is:
+{user_context}
+Skills: {skills_context}
+Profile / resume context:
+{profile_context}
+
+Date/time context:
+{date_context}
+
+Persistent Agent 2 files:
+{persistent_context}
+
+Career OS Context JSON:
+{context_json}
+
+User message: {data.message}
+
+Respond with a practical next step, mention relevant roadmap/project/market context when useful, and ask at most one follow-up question."""
+
+    def _event_stream():
+        from app.services.ai_service import generate_response_stream
+        chunks: list[str] = []
+        try:
+            for piece in generate_response_stream(prompt, temperature=0.7, max_tokens=10000):
+                if piece:
+                    chunks.append(piece)
+                    yield f"data: {json.dumps({'delta': piece})}\n\n"
+        except Exception as exc:
+            logger.error("chat stream generation failed for %s: %s", data.user_id, exc)
+
+        full = "".join(chunks).strip() or "Sorry, something went wrong on my end. Please try again in a moment."
+
+        # Persist the turn identically to the /message non-weekly path.
+        try:
+            event = log_journey_event(
+                db=db,
+                user_id=data.user_id,
+                event_type="assistant_guidance",
+                summary=f"delta answered career question: {data.message[:120]}",
+                evidence={"message": data.message, "response_text": full},
+                impact={"context_used": bool(career_context)},
+            )
+            append_progress_event(data.user_id, serialize_journey_event(event))
+            append_chat_turn(data.user_id, data.message, full, "chat")
+        except Exception as exc:
+            logger.error("chat stream persist failed for %s: %s", data.user_id, exc)
+
+        yield f"event: done\ndata: {json.dumps({'response': full, 'context': user_context})}\n\n"
+
+    return StreamingResponse(_event_stream(), media_type="text/event-stream")
 
 
 @router.get("/history/{user_id}")

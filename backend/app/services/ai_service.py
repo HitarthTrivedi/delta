@@ -116,6 +116,68 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
     return _mock_structured_response(prompt)
 
 
+def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None):
+    """Stream a Gemini response as text chunks (generator).
+
+    Mirrors generate_response's key rotation. If streaming yields nothing or
+    fails before any output, falls back to a single non-streaming reply so the
+    caller always gets an answer. Never raises — the chat must not break.
+    """
+    _build_clients()
+    if not model:
+        try:
+            from app.config import settings
+            model = settings.GEMINI_MODEL or "gemma-4-31b-it"
+        except Exception:
+            model = "gemma-4-31b-it"
+
+    logger.info(f"[LLM stream] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
+
+    if not _clients:
+        yield _mock_structured_response(prompt)
+        return
+
+    last_error = None
+    for _ in range(len(_clients)):
+        client = _next_client()
+        if client is None:
+            break
+        got = False
+        try:
+            stream = client.models.generate_content_stream(
+                model=model,
+                contents=prompt,
+                config={"temperature": temperature, "max_output_tokens": max_tokens},
+            )
+            for chunk in stream:
+                text = getattr(chunk, "text", None)
+                if text:
+                    got = True
+                    yield text
+            if got:
+                return
+            # produced no text — try the next key
+        except Exception as e:
+            last_error = e
+            if got:
+                # already streamed partial content; stop rather than duplicate
+                logger.error(f"[LLM stream] error after partial output: {e}")
+                return
+            err_str = str(e).lower()
+            if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or "rate" in err_str:
+                logger.warning(f"[LLM stream] quota hit, rotating key: {type(e).__name__}")
+                continue
+            logger.error(f"[LLM stream] non-quota error: {e}")
+            break
+
+    # Nothing streamed — fall back to a single non-streaming reply.
+    logger.warning(f"[LLM stream] falling back to non-streaming reply. last_error={last_error}")
+    try:
+        yield generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=model)
+    except Exception:
+        yield _mock_structured_response(prompt)
+
+
 def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None) -> dict | list:
     """
     Generate a JSON response. Strips markdown fences and parses automatically.

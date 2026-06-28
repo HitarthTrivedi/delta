@@ -85,6 +85,25 @@ def startup():
             conn.commit()
     except Exception as e:
         print(f"[WARN] composite index creation skipped: {e}")
+
+    # Warm the embedding model + cache connection in the background so the first
+    # real request doesn't pay the ~2s model load / Redis probe. Non-blocking;
+    # failures are harmless (model falls back to MOCK, cache fails open).
+    def _warm():
+        try:
+            from app.services.memory_graph import _get_embedding_model
+            _get_embedding_model()
+        except Exception as e:
+            print(f"[WARN] embedding model warmup skipped: {e}")
+        try:
+            from app.services.cache import _get_redis
+            _get_redis()
+        except Exception as e:
+            print(f"[WARN] cache warmup skipped: {e}")
+
+    import threading
+    threading.Thread(target=_warm, name="delta-warmup", daemon=True).start()
+
     print("[OK] delta 2.0 API started - tables synced")
 
 

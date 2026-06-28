@@ -71,6 +71,76 @@ export const chatAPI = {
   getHistory: (userId) => api.get(`/chat/history/${userId}`).then(r => r.data),
   startOnboarding: (data) => api.post('/chat/onboarding/start', data).then(r => r.data),
   finalizeOnboarding: (data) => api.post('/chat/onboarding/finalize', data).then(r => r.data),
+
+  // SSE streaming for the general assistant chat. Calls onToken(text) as the
+  // reply streams, onDone(payload) at the end, onError(err) on hard failure.
+  // The action-capable Agent 2 path emits a `fallback` event, which this helper
+  // transparently routes to the structured /chat/message endpoint.
+  streamMessage: async ({ user_id, message }, { onToken, onDone, onError } = {}) => {
+    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+    const userId = useAuthStore.getState().userId;
+    const token = useAuthStore.getState().token;
+    const headers = { 'Content-Type': 'application/json' };
+    if (userId) headers['X-User-Id'] = userId;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    let resp;
+    try {
+      resp = await fetch(`${baseURL}/chat/stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ user_id, message }),
+      });
+    } catch (err) {
+      return onError && onError(err);
+    }
+    if (!resp.ok || !resp.body) {
+      return onError && onError(new Error(`stream HTTP ${resp.status}`));
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let doneData = null;
+    let fellBack = false;
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let sep;
+        while ((sep = buffer.indexOf('\n\n')) !== -1) {
+          const block = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          let evt = 'message';
+          let dataStr = '';
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event:')) evt = line.slice(6).trim();
+            else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
+          }
+          if (!dataStr) continue;
+          let payload;
+          try { payload = JSON.parse(dataStr); } catch { continue; }
+          if (evt === 'fallback') fellBack = true;
+          else if (evt === 'done') doneData = payload;
+          else if (payload.delta && onToken) onToken(payload.delta);
+        }
+      }
+    } catch (err) {
+      return onError && onError(err);
+    }
+
+    if (fellBack) {
+      try {
+        const res = await api.post('/chat/message', { user_id, message }).then(r => r.data);
+        return onDone && onDone(res);
+      } catch (err) {
+        return onError && onError(err);
+      }
+    }
+    return onDone && onDone(doneData || {});
+  },
 };
 
 // ── Resume API ──

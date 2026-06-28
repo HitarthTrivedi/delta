@@ -20,8 +20,10 @@ import {
 import { toast } from 'sonner';
 
 import GlassPanel from '../components/ui/GlassPanel';
+import { useQueryClient } from '@tanstack/react-query';
 import { usersAPI, briefsAPI, calendarAPI, dossierAPI, careerOSAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import { fetchCareerContext, seedCareerContext } from '../hooks/useCareerOS';
 import ResumeSection from './ResumeSection';
 
 const views = [
@@ -116,6 +118,7 @@ function Row({ children, className = '' }) {
 
 export default function Dashboard() {
   const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
   const [stats, setStats] = useState(null);
   const [brief, setBrief] = useState(null);
   const [events, setEvents] = useState([]);
@@ -158,7 +161,7 @@ export default function Dashboard() {
         calendarAPI.getEvents(userId).catch(() => []),
         calendarAPI.getSources().catch(() => []),
         dossierAPI.getWeekly(userId).catch(() => emptyDossier),
-        careerOSAPI.getContext(userId),
+        fetchCareerContext(queryClient, userId),
         careerOSAPI.getSystemStatus().catch(() => null),
       ]);
 
@@ -173,7 +176,7 @@ export default function Dashboard() {
       console.error(err);
       toast.error('Dashboard sync failed.');
     }
-  }, [fetchBrief, userId]);
+  }, [fetchBrief, userId, queryClient]);
 
   useEffect(() => {
     loadData();
@@ -187,8 +190,11 @@ export default function Dashboard() {
       careerOSAPI.getContext(userId).catch(() => null),
     ]);
     if (statsRes) setStats(statsRes);
-    if (contextRes) setCareerContext(contextRes);
-  }, [userId]);
+    if (contextRes) {
+      setCareerContext(contextRes);
+      seedCareerContext(queryClient, userId, contextRes);
+    }
+  }, [userId, queryClient]);
 
   const playBeep = useCallback((freq = 800, type = 'sine', duration = 0.08) => {
     try {
@@ -214,6 +220,7 @@ export default function Dashboard() {
     try {
       const refreshedContext = await careerOSAPI.getContext(userId);
       setCareerContext(refreshedContext);
+      seedCareerContext(queryClient, userId, refreshedContext);
       await loadData();
       toast.success('Career OS refreshed.');
     } catch (err) {
@@ -230,6 +237,7 @@ export default function Dashboard() {
     try {
       const context = await careerOSAPI.consolidateMemory(userId);
       setCareerContext(context);
+      seedCareerContext(queryClient, userId, context);
       await loadData();
       const report = context.memory_consolidation || {};
       toast.success(`Memory consolidated. ${report.merged_nodes || 0} duplicates merged.`);

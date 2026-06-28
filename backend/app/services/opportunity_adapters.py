@@ -6,6 +6,7 @@ import time
 from html import unescape
 
 from app.services.domain_packs import infer_domain_pack
+from app.services.http_client import get_session
 
 ALLOW_MOCKS = os.getenv("DELTA_ALLOW_MOCKS", "").lower() in {"1", "true", "yes", "on"}
 
@@ -66,9 +67,7 @@ class LeetCodeAdapter(OpportunityAdapter):
 
     def _fetch_live_contests(self, days_ahead):
         try:
-            import requests
-
-            response = requests.post(
+            response = get_session().post(
                 "https://leetcode.com/graphql",
                 json={
                     "query": """
@@ -132,9 +131,7 @@ class CodeforcesAdapter(OpportunityAdapter):
 
     def _fetch_live_contests(self, days_ahead):
         try:
-            import requests
-
-            response = requests.get(
+            response = get_session().get(
                 "https://codeforces.com/api/contest.list",
                 params={"gym": "false"},
                 timeout=8,
@@ -244,10 +241,8 @@ class JobPostSignalAdapter(OpportunityAdapter):
 
     def fetch(self, user_skills, target_role, days_ahead):
         try:
-            import requests
-
             role = target_role or "software engineer"
-            response = requests.get(
+            response = get_session().get(
                 "https://www.arbeitnow.com/api/job-board-api",
                 params={"search": role},
                 headers={"User-Agent": "DeltaCareerOS/1.0"},
@@ -422,9 +417,7 @@ def _scrape_listing_events(
     days_ahead: int,
 ) -> list[dict]:
     try:
-        import requests
-
-        response = requests.get(
+        response = get_session().get(
             listing_url,
             headers={"User-Agent": "DeltaCareerOS/1.0"},
             timeout=10,

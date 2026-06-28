@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Send, Zap, Cpu, Sparkles, BookOpen, User } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import GlassPanel from '../components/ui/GlassPanel';
-import { chatAPI, briefsAPI, careerOSAPI } from '../lib/api';
+import { chatAPI, briefsAPI } from '../lib/api';
+import { fetchCareerContext } from '../hooks/useCareerOS';
 import { toast } from 'sonner';
 
 // Markdown component styled for dark chat bubbles
@@ -48,6 +50,7 @@ function ChatMarkdown({ content }) {
 
 export default function CareerChat() {
   const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -60,7 +63,7 @@ export default function CareerChat() {
       const [history, briefRes, contextRes] = await Promise.all([
         chatAPI.getHistory(userId),
         briefsAPI.getLatest(userId).catch(() => null),
-        careerOSAPI.getContext(userId).catch(() => null),
+        fetchCareerContext(queryClient, userId).catch(() => null),
       ]);
       setMessages(history.messages || []);
       setActiveBrief(briefRes);
@@ -68,7 +71,7 @@ export default function CareerChat() {
     } catch (err) {
       console.error(err);
     }
-  }, [userId]);
+  }, [userId, queryClient]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -84,12 +87,32 @@ export default function CareerChat() {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setSending(true);
 
+    let acc = '';
+    // Append the assistant bubble on the first token, then keep updating it.
+    const renderAssistant = (content) => setMessages(prev => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (last && last.role === 'assistant') copy[copy.length - 1] = { ...last, content };
+      else copy.push({ role: 'assistant', content });
+      return copy;
+    });
+
     try {
-      const response = await chatAPI.send({ user_id: userId, message: text });
-      setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to get a response. Please try again.');
+      await chatAPI.streamMessage({ user_id: userId, message: text }, {
+        onToken: (t) => { acc += t; renderAssistant(acc); },
+        onDone: (payload) => { renderAssistant((payload && payload.response) || acc || ''); },
+        onError: async (err) => {
+          console.error(err);
+          // Hard stream failure — fall back to the non-streaming endpoint.
+          try {
+            const res = await chatAPI.send({ user_id: userId, message: text });
+            renderAssistant(res.response);
+          } catch (e2) {
+            console.error(e2);
+            toast.error('Failed to get a response. Please try again.');
+          }
+        },
+      });
     } finally {
       setSending(false);
     }
@@ -240,7 +263,7 @@ export default function CareerChat() {
                 })
               )}
 
-              {sending && (
+              {sending && (messages.length === 0 || messages[messages.length - 1].role !== 'assistant') && (
                 <div className="flex gap-3 justify-start">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-primary-500/15 border border-primary-500/30 text-primary-400">
                     <Cpu size={13} className="animate-spin" />

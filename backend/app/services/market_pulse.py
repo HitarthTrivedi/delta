@@ -4,9 +4,8 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-import requests
-
 from app.services.cache import cached
+from app.services.http_client import get_session
 from app.services.domain_packs import infer_domain_pack
 from app.services.opportunity_adapters import collect_opportunities, summarize_opportunity_signals
 from app.services.parallel import run_parallel
@@ -130,7 +129,7 @@ def _fetch_github_signals(target_role: str, taxonomy: list[str]) -> list[dict]:
     query_terms = [target_role, *taxonomy[:4]]
     query = " ".join(term for term in query_terms if term)
     try:
-        response = requests.get(
+        response = get_session().get(
             "https://api.github.com/search/repositories",
             params={
                 "q": f"{query} pushed:>2025-01-01",
@@ -164,7 +163,7 @@ def _fetch_github_signals(target_role: str, taxonomy: list[str]) -> list[dict]:
 def _fetch_stackexchange_signals(taxonomy: list[str]) -> list[dict]:
     tags = [skill.lower().replace(" ", "-").replace("++", "pp") for skill in taxonomy[:6]]
     try:
-        response = requests.get(
+        response = get_session().get(
             "https://api.stackexchange.com/2.3/tags",
             params={
                 "order": "desc",
@@ -193,7 +192,7 @@ def _fetch_stackexchange_signals(taxonomy: list[str]) -> list[dict]:
 
 def _fetch_job_signals(target_role: str) -> list[dict]:
     try:
-        response = requests.get(
+        response = get_session().get(
             "https://www.arbeitnow.com/api/job-board-api",
             params={"search": target_role},
             headers={"User-Agent": "DeltaCareerOS/1.0"},
