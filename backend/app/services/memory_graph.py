@@ -25,21 +25,11 @@ import networkx as nx
 import numpy as np
 from sqlalchemy.orm import Session
 
-# Lazy-load sentence-transformers to avoid slow import on startup
-_embedding_model = None
-_EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 output dimension
+_embedding_model = "MOCK"  # sentence-transformers removed — too heavy for 512MB Render free tier
+_EMBEDDING_DIM = 384
 
 
 def _get_embedding_model():
-    """Lazy-load the sentence-transformers model (first call takes ~2s)."""
-    global _embedding_model
-    if _embedding_model is None:
-        try:
-            from sentence_transformers import SentenceTransformer
-            _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-        except (ImportError, Exception) as e:
-            print(f"[WARN] sentence-transformers failed to load ({e}). Embeddings will be mock-simulated.")
-            _embedding_model = "MOCK"
     return _embedding_model
 
 
