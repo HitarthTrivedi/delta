@@ -39,10 +39,9 @@ def _build_clients():
             return
         for key in keys:
             try:
-                # timeout is in SECONDS for the google-genai SDK (passed to httpx).
-                # 120s gives the model enough time for long responses without letting
-                # Google's internal deadline fire first (which causes 504 errors).
-                _clients.append(genai.Client(api_key=key, http_options={"timeout": 120}))
+                # timeout is in MILLISECONDS. 120000ms = 120s gives the model
+                # enough time for long responses and avoids Google's internal deadline.
+                _clients.append(genai.Client(api_key=key, http_options={"timeout": 120000}))
             except Exception as e:
                 logger.warning(f"Failed to init genai client for a key: {e}")
         if _clients:
