@@ -1147,6 +1147,39 @@ def chat_message(
                     updated_actions=updated_actions, week_phase="Pace-adjusted week",
                 )
 
+            # Check if the user is CS / software-engineering oriented
+            _role_lower = (str(user.target_role or "") + " " + str(profile_file.get("major", "") or "")).lower()
+            _cs_keywords = {"software", "developer", "engineer", "cs", "computer science", "cse",
+                            "data scientist", "machine learning", "ml", "ai", "backend", "frontend",
+                            "fullstack", "sde", "swe", "programmer", "data engineer"}
+            is_cs_user = any(kw in _role_lower for kw in _cs_keywords)
+
+            # Build LeetCode context block — only for CS users whose current tasks include problems
+            leetcode_block = ""
+            if is_cs_user:
+                for _action in current_actions:
+                    _problems = _action.get("problems") or []
+                    if _problems:
+                        _lines = "\n".join(
+                            f"  - #{p['id']} {p['title']} [{p['difficulty']}] → {p['url']}"
+                            for p in _problems
+                        )
+                        leetcode_block = (
+                            f"\nThis week's LeetCode problems (NeetCode 150 — {_action.get('title', 'LeetCode')}):\n"
+                            f"{_lines}\n"
+                            "When the user asks about any of these problems or how to approach LeetCode this week, "
+                            "refer to the specific problems above by name, explain the pattern, hint the approach, "
+                            "and link the exact problem URL. Do not invent other problems."
+                        )
+                        break
+
+            leetcode_rule = (
+                leetcode_block if leetcode_block
+                else "\nDo NOT mention LeetCode, DSA practice, or coding interview problems. "
+                     "This student is not pursuing CS/engineering."
+                if not is_cs_user else ""
+            )
+
             role_prompt = f"""You are Agent 2 inside delta Career OS: the weekly roadmap strategist for any student domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
 Current date/time context: {date_context}
 Default behavior: chat like a normal human tutor. Answer the user's actual query using the student profile, persistent memory files, and this week's tasks. Be clear, direct, and useful.
@@ -1158,7 +1191,7 @@ Never assign a long pre-made roadmap. Give one practical adjustment for this wee
 The student profile/resume is the source of truth. If the profile says they already know a skill, do not assign beginner learning for it; assign a domain-appropriate harder proof, evaluation, portfolio piece, case study, design review, simulation, benchmark, red-team, audit, or extension task.
 Course rule: never assign more than one active course. If a course is already active, tell the user to complete or skip it first. Every course must include source and URL.
 Carryover rule: unfinished tasks stay assigned across weeks. Skipped tasks may be removed from blocking.
-
+{leetcode_rule}
 CRITICAL: Only if the user explicitly requests a task change, output the updated list of tasks at the very end of your response inside a JSON block wrapped in triple backticks, like this:
 ```json
 {{
