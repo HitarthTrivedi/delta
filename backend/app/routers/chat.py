@@ -916,7 +916,28 @@ def chat_message(
     llm_target = intent_obj.get("target") if intent_obj else None
     date_info = _parse_date_reference(user_update)
     date_context = _date_context_text(date_info)
-    profile_file = load_profile(data.user_id)
+    profile_file = load_profile(data.user_id) or {}
+    _hours_per_week = int(profile_file.get("hours_per_week") or 10)
+    _raw_months = profile_file.get("planning_horizon_months") or None
+    _raw_years = profile_file.get("planning_horizon_years") or None
+    if _raw_months:
+        _horizon_months = int(_raw_months)
+        _horizon_years = _horizon_months / 12
+    elif _raw_years:
+        _horizon_years = float(_raw_years)
+        _horizon_months = int(_horizon_years * 12)
+    else:
+        _horizon_months = 12
+        _horizon_years = 1.0
+    if _horizon_months >= 18:
+        _pace_label = "relaxed"
+        _task_cap = 2
+    elif _horizon_months >= 6:
+        _pace_label = "moderate"
+        _task_cap = 3
+    else:
+        _pace_label = "intensive"
+        _task_cap = 4
     # Intent over keywords: only treat a mentioned event as schedule-blocking when the AI
     # judged the user actually wants the week reshaped (constraint). A casual mention like
     # "a function at home this month" while asking to reduce tasks is context, NOT a command
@@ -1218,19 +1239,33 @@ def chat_message(
                 if not is_cs_user else ""
             )
 
-            role_prompt = f"""You are Agent 2 inside delta Career OS — the weekly roadmap strategist and tutor for students in any domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
-Current date/time context: {date_context}
+            role_prompt = f"""You are Agent 2 inside delta Career OS — a personal weekly coach for students in any domain: CS, commerce, design, law, healthcare, arts, engineering, and more.
+Today: {date_context}
 
-## How you respond
-- Chat like a focused human tutor. Answer the user's actual question clearly and directly.
-- Use the student profile, persistent memory files, USER PROFILE DOCUMENT, and USER INSTRUCTIONS DOCUMENT to give personalised, context-aware answers.
-- If the user gives a date, day, or relative time ("next week", "in 3 days"), reason from the current date context.
-- Always read the PERMANENT INSTRUCTIONS section in the USER INSTRUCTIONS DOCUMENT — these are firm, standing rules that override defaults. Follow them every response.
-- Read the PRESENT WEEK REQUESTS section to understand what was already asked/customised for this week.
+━━ STUDENT PACE PROFILE (read this first, every time) ━━
+Planning horizon: {_horizon_months} months ({_horizon_years:.1f} years)
+Pace mode: {_pace_label.upper()}
+Weekly hours available: {_hours_per_week}h TOTAL — this is shared across ALL tasks combined, not per task.
+Max tasks this week: {_task_cap} (unless the student explicitly asks for more)
 
-## Task management
-- You CAN and SHOULD update tasks whenever you judge it would genuinely help the student (not just when explicitly asked). If you see a better task based on what the student said, update it.
-- When updating tasks, output the full updated list at the end of your response inside a JSON block:
+Pacing rules (HARD RULES — override any other instinct):
+- {_pace_label.upper()} pace means: {"Do NOT pile on tasks. Keep it light and sustainable. 1–2 tasks maximum. If the student has 2+ years ahead, there is plenty of time — don't rush them. Only increase intensity if they explicitly ask." if _pace_label == "relaxed" else "Moderate load. 2–3 tasks. Match the weekly hours. Don't overload." if _pace_label == "moderate" else "Focused sprint. Up to 4 tasks. Use the full weekly hours. Student is in a time-pressured mode."}
+- Estimated effort of ALL tasks combined must not exceed {_hours_per_week}h per week.
+- If the user has NOT asked to go faster, default to the lighter end of the pace range.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PERMANENT INSTRUCTIONS (from user, apply every week — check the USER INSTRUCTIONS DOCUMENT):
+These override everything except safety. Read them before answering.
+
+━━ HOW TO RESPOND ━━
+Chit-chat / casual messages (hi, thanks, how are you, etc.): reply naturally like a human tutor. Do NOT output JSON for these.
+Questions about tasks: explain clearly, give steps, links, time estimates. No JSON unless a task needs updating.
+Task changes requested: update the task list and output the JSON block below.
+Live web results in the message ([Live web search results]): use those URLs in your answer.
+
+━━ TASK MANAGEMENT ━━
+Update tasks when you judge it would genuinely help — not just when explicitly asked.
+When updating tasks, output ONLY at the very end of your response:
 ```json
 {{
   "updated_actions": [
@@ -1239,22 +1274,17 @@ Current date/time context: {date_context}
       "type": "course|project|practice",
       "title": "Short title",
       "skill": "Skill name",
-      "description": "Task description...",
-      "source": "Course/project source if any",
-      "url": "https://..."
+      "description": "What to actually do this week (concrete, not vague)",
+      "source": "Resource name if any",
+      "url": "https://real-url.com"
     }}
   ]
 }}
 ```
-- Never assign more than one active course. Every course must include a real URL.
-- The student profile is the source of truth — if they already know a skill, skip beginner content and assign a proof/portfolio/project task instead.
-- Unfinished tasks carry over; skipped tasks are removed from blocking.
-- If a live search result was included in the user's message (marked [Live web search results]), use those URLs and titles in your response.
+Rules: max one active course at a time · every course needs a real URL · if student already knows a skill, skip beginner content and assign a proof/project instead · unfinished tasks carry over · skipped tasks are removed.
 {leetcode_rule}
-Current tasks in the user's plan:
-{json.dumps(current_actions, indent=2)}
-
-Keep responses warm, focused, and useful. Ask at most one follow-up question. Skip the JSON block if no task update is needed."""
+Current tasks:
+{json.dumps(current_actions, indent=2)}"""
         else:
             role_prompt = """You are delta, the central AI assistant inside a personalized Career OS.
 Use the user's Career Memory, Roadmap State, Market Pulse, Journey Log, Proof Projects, and Portfolio Assessment.
@@ -1262,30 +1292,24 @@ Be honest, specific, and action-oriented. If the user is drifting, say it clearl
 
         prompt = f"""{role_prompt}
 
-The user is:
+━━ STUDENT ━━
 {user_context}
 Skills: {skills_context}
-Profile / resume context:
+
+━━ FULL PROFILE ━━
 {profile_context}
 
-Date/time context:
-{date_context}
+━━ USER INSTRUCTIONS DOCUMENT ━━
+{user_instructions_ctx if user_instructions_ctx else "(no instructions yet)"}
 
---- USER PROFILE DOCUMENT (identity + skills + completed history) ---
-{user_profile_doc if user_profile_doc else "(not yet built — user may not have completed onboarding)"}
+━━ PROFILE HISTORY (skills + completed tasks) ━━
+{user_profile_doc if user_profile_doc else "(not yet built)"}
 
---- USER INSTRUCTIONS DOCUMENT (current week only — permanent rules + this week's context + Q&A) ---
-{user_instructions_ctx if user_instructions_ctx else "(no instructions logged yet)"}
-
-Persistent Agent 2 memory:
+━━ CONVERSATION MEMORY ━━
 {persistent_context}
 
-Career OS Context JSON:
-{context_json}
-
-User message: {data.message}
-
-Respond with a practical next step, mention relevant roadmap/project/market context when useful, and ask at most one follow-up question."""
+━━ USER MESSAGE ━━
+{user_update}"""
         response = generate_response(
             prompt,
             temperature=0.5 if is_weekly_agent else 0.7,
