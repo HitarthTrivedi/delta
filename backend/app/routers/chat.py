@@ -898,12 +898,15 @@ def chat_message(
     user_context = f"User: {user.name if user else 'Unknown'}, Target: {user.target_role if user else 'N/A'}"
     is_weekly_agent = "Agent 2 weekly plan discussion" in data.message
     user_update = data.message.split("User update:", 1)[-1].strip() if "User update:" in data.message else data.message
+    # "How to do this" messages always want a tutor explanation — skip the extra LLM
+    # intent-classification call so we save 10–20 seconds on every task-detail query.
+    is_how_to_query = "how do i complete this task" in user_update.lower() or "how to do this" in user_update.lower()
     lowered_update = user_update.lower().strip(" .!?")
     current_actions = _current_actions_from_roadmap(roadmap)
     # AI-first intent understanding: let the model interpret the message (any language /
     # phrasing) into a structured decision, then deterministic code executes it. Keyword
     # matching is only a fallback if the model is unavailable or unsure.
-    intent_obj = _classify_intent_llm(user_update, current_actions) if is_weekly_agent else {}
+    intent_obj = _classify_intent_llm(user_update, current_actions) if (is_weekly_agent and not is_how_to_query) else {}
     if intent_obj:
         intent = _ACTION_TO_INTENT.get(intent_obj.get("action"), "tutor_chat")
     else:
