@@ -1145,7 +1145,8 @@ def chat_message(
                 )
 
             # Check if the user is CS / software-engineering oriented
-            _role_lower = (str(user.target_role or "") + " " + str(profile_file.get("major", "") or "")).lower()
+            _pf = profile_file or {}
+            _role_lower = (str(user.target_role or "") + " " + str(_pf.get("major", "") or "")).lower()
             _cs_keywords = {"software", "developer", "engineer", "cs", "computer science", "cse",
                             "data scientist", "machine learning", "ml", "ai", "backend", "frontend",
                             "fullstack", "sde", "swe", "programmer", "data engineer"}
