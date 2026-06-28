@@ -1,10 +1,53 @@
 """Brief generator service — compiles role-specific 3-phase roadmaps dynamically."""
 import json
+import logging
 import uuid
 import re
 from app.services.ai_service import generate_response
 
+logger = logging.getLogger("delta.brief_generator")
 RESUME_MODEL = "gemini-2.5-flash"
+
+
+def _fetch_trend_intel(role: str) -> str:
+    """
+    Run 3 targeted Serper searches for the user's role and return a compact
+    text block ready for injection into the AI roadmap prompt.
+    Fails silently — if Serper is down or quota is exhausted, returns "".
+    """
+    try:
+        from app.services.web_search import get_web_search_service
+        svc = get_web_search_service()
+
+        def _search(q: str, n: int = 4) -> list[dict]:
+            try:
+                return svc.search(q, max_results=n) or []
+            except Exception as e:
+                logger.warning(f"[trend_intel] search failed for '{q}': {e}")
+                return []
+
+        skills_results = _search(f'"{role}" skills in demand trending 2025', 5)
+        courses_results = _search(f'best free courses "{role}" 2025 trending', 4)
+        tools_results = _search(f'"{role}" tools software frameworks trending 2025', 4)
+
+        def _fmt(results: list[dict], label: str) -> str:
+            lines = [
+                f"  - {r.get('title', '')} | {r.get('url', '')} — {r.get('snippet', '')[:120]}"
+                for r in results if r.get("title")
+            ]
+            return f"{label}:\n" + ("\n".join(lines) if lines else "  (no results)") if lines else ""
+
+        blocks = [
+            _fmt(skills_results, "Trending skills & hiring signals"),
+            _fmt(courses_results, "Trending courses & learning resources"),
+            _fmt(tools_results, "Trending tools & frameworks"),
+        ]
+        combined = "\n\n".join(b for b in blocks if b)
+        return combined
+    except Exception as e:
+        logger.warning(f"[trend_intel] fetch failed entirely: {e}")
+        return ""
+
 
 def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> dict:
     """
@@ -69,6 +112,13 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
         for e in recent_events[:10]
     ) or "No recent activity logged."
 
+    # Live trend intel from Serper — what's actually trending RIGHT NOW for this role
+    trend_intel = _fetch_trend_intel(role)
+    trend_intel_section = f"""
+LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to make tasks unique and timely):
+{trend_intel if trend_intel else "  (web search unavailable — use market snapshot data below)"}
+""" if trend_intel else ""
+
     # Dense structural system prompt
     prompt = f"""
     You are delta's Senior Career OS Roadmap Compiler. Generate a highly personalized, production-grade 3-phase curriculum and weekly brief using ALL of the user's context below.
@@ -95,8 +145,11 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
     MARKET DEMAND PULSE:
     - Top Demanded Skills: {json.dumps(demanded)}
     - Emerging Tech Clusters: {market_snapshot.emerging_skills if market_snapshot else '[]'}
-
-    CURRICULUM INSTRUCTIONS:
+{trend_intel_section}
+    CURRICULUM INSTRUCTIONS (read LIVE MARKET TREND INTELLIGENCE above before designing tasks):
+    IMPORTANT: At least 1 task per week must reference a currently trending tool, course, or skill from the live intel above.
+    Make tasks specific and timely — not generic. A task like "Learn FastAPI using the trending Pydantic v2 migration pattern" is better than just "Learn FastAPI".
+    If a trending course was found, reference it by name and URL in the relevant node's resource_url.
     1. Sequenced Curriculum: Design exactly 3 chronological phases that move this student from their current baseline to job-ready capability for the target role: "{role}".
        Treat resume/current skills as prior exposure. Do not assign beginner repeat tasks for skills they already listed.
        If a skill is already present but not mastered, convert it into a harder proof/project/debugging/deployment milestone.
