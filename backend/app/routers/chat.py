@@ -602,6 +602,7 @@ _ACTION_TO_INTENT = {
     "constraint": "constraint",
     "permanent_preference": "permanent_preference",
     "next_week_request": "next_week_request",
+    "web_search": "web_search",
     "chat": "tutor_chat",
 }
 
@@ -651,6 +652,7 @@ Meaning of each action:
 - constraint: an exam, deadline, travel, illness, or busy period should reshape THIS week's tasks.
 - permanent_preference: the user is setting a firm, lasting rule about how ALL future weeks should be structured — things like "never give me more than 2 tasks", "stop giving me courses", "the pace is always too fast", "I don't want LeetCode ever", "always include a project". These rules must be remembered permanently.
 - next_week_request: the user is requesting something specific for NEXT week's plan without advancing now (e.g. "for next week give me API tasks", "can next week include a project?", "I want DSA next week"). Save it — don't advance yet.
+- web_search: the user explicitly wants current resources, course links, tutorials, documentation, or real-time info that would benefit from a live web search (e.g. "find me the best React course", "what are the best resources for FastAPI?", "search for system design resources").
 - chat: everything else — a question, an explanation request, general conversation. When unsure, always choose chat.
 
 Return only the JSON object."""
@@ -991,6 +993,23 @@ def chat_message(
                 append_chat_turn(data.user_id, user_update, response_text, intent)
                 return ChatResponse(response=response_text, context=user_context)
 
+            if intent == "web_search":
+                try:
+                    from app.services.web_search import get_web_search_service
+                    svc = get_web_search_service()
+                    results = svc.search(user_update, max_results=5)
+                    search_context = "\n".join(
+                        f"- {r.get('title', '')}: {r.get('url', '')} — {r.get('snippet', '')}"
+                        for r in (results or [])[:5]
+                    )
+                except Exception as _se:
+                    logger.warning(f"Web search failed for web_search intent: {_se}")
+                    search_context = ""
+                # Fall through to tutor_chat LLM with search results injected
+                intent = "tutor_chat"
+                if search_context:
+                    user_update = f"{user_update}\n\n[Live web search results for your query:]\n{search_context}"
+
             if intent == "next_week":
                 try:
                     next_context = run_weekly_career_cycle(db, data.user_id)
@@ -1199,19 +1218,19 @@ def chat_message(
                 if not is_cs_user else ""
             )
 
-            role_prompt = f"""You are Agent 2 inside delta Career OS: the weekly roadmap strategist for any student domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
+            role_prompt = f"""You are Agent 2 inside delta Career OS — the weekly roadmap strategist and tutor for students in any domain: commerce, arts, mechanical, electrical, computer science, AI, healthcare, law, design, and more.
 Current date/time context: {date_context}
-Default behavior: chat like a normal human tutor. Answer the user's actual query using the student profile, persistent memory files, and this week's tasks. Be clear, direct, and useful.
-Do not change the weekly tasks during ordinary conversation. Explain, teach, clarify, estimate effort, suggest deliverables, and help the user express completed work professionally.
-Change the weekly tasks only when the user clearly asks for a change, skip, replacement, easier/harder work, a course, an exam/deadline pause, or the next week's tasks.
-When the user gives a date, day, duration, or relative time, reason from the current date/time context and persistent upcoming-events file. If a blocked event spans multiple weeks, keep normal delta tasks paused/reduced throughout that span.
-If the user has an exam period, the weekly task should focus on exam study until the event period is over.
-Never assign a long pre-made roadmap. Give one practical adjustment for this week and ask at most one follow-up question.
-The student profile/resume is the source of truth. If the profile says they already know a skill, do not assign beginner learning for it; assign a domain-appropriate harder proof, evaluation, portfolio piece, case study, design review, simulation, benchmark, red-team, audit, or extension task.
-Course rule: never assign more than one active course. If a course is already active, tell the user to complete or skip it first. Every course must include source and URL.
-Carryover rule: unfinished tasks stay assigned across weeks. Skipped tasks may be removed from blocking.
-{leetcode_rule}
-CRITICAL: Only if the user explicitly requests a task change, output the updated list of tasks at the very end of your response inside a JSON block wrapped in triple backticks, like this:
+
+## How you respond
+- Chat like a focused human tutor. Answer the user's actual question clearly and directly.
+- Use the student profile, persistent memory files, USER PROFILE DOCUMENT, and USER INSTRUCTIONS DOCUMENT to give personalised, context-aware answers.
+- If the user gives a date, day, or relative time ("next week", "in 3 days"), reason from the current date context.
+- Always read the PERMANENT INSTRUCTIONS section in the USER INSTRUCTIONS DOCUMENT — these are firm, standing rules that override defaults. Follow them every response.
+- Read the PRESENT WEEK REQUESTS section to understand what was already asked/customised for this week.
+
+## Task management
+- You CAN and SHOULD update tasks whenever you judge it would genuinely help the student (not just when explicitly asked). If you see a better task based on what the student said, update it.
+- When updating tasks, output the full updated list at the end of your response inside a JSON block:
 ```json
 {{
   "updated_actions": [
@@ -1227,10 +1246,15 @@ CRITICAL: Only if the user explicitly requests a task change, output the updated
   ]
 }}
 ```
+- Never assign more than one active course. Every course must include a real URL.
+- The student profile is the source of truth — if they already know a skill, skip beginner content and assign a proof/portfolio/project task instead.
+- Unfinished tasks carry over; skipped tasks are removed from blocking.
+- If a live search result was included in the user's message (marked [Live web search results]), use those URLs and titles in your response.
+{leetcode_rule}
 Current tasks in the user's plan:
 {json.dumps(current_actions, indent=2)}
 
-Keep the conversation friendly, comforting, and supportively warm. Ask at most one follow-up question. Do not output JSON for normal tutor answers."""
+Keep responses warm, focused, and useful. Ask at most one follow-up question. Skip the JSON block if no task update is needed."""
         else:
             role_prompt = """You are delta, the central AI assistant inside a personalized Career OS.
 Use the user's Career Memory, Roadmap State, Market Pulse, Journey Log, Proof Projects, and Portfolio Assessment.

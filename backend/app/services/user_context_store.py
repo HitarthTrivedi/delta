@@ -107,6 +107,59 @@ def read_profile_doc(user_id: str) -> str:
     return _load_blob(user_id).get("profile_doc") or ""
 
 
+def _extract_bullets(doc: str, from_marker: str, to_markers: list[str]) -> list[str]:
+    """Return bullet items between from_marker and the first matching to_marker."""
+    if from_marker not in doc:
+        return []
+    start = doc.index(from_marker) + len(from_marker)
+    end = len(doc)
+    for m in to_markers:
+        pos = doc.find(m, start)
+        if pos != -1:
+            end = min(end, pos)
+    text = doc[start:end]
+    return [ln.lstrip("- ").strip() for ln in text.splitlines() if ln.strip().startswith("-")]
+
+
+def get_permanent_instructions(user_id: str) -> list[str]:
+    doc = _get_instructions(user_id)
+    return _extract_bullets(doc, "# PERMANENT INSTRUCTIONS", ["# PRESENT WEEK REQUESTS", WEEK_END_SEP])
+
+
+def get_next_week_requests(user_id: str) -> list[str]:
+    doc = _get_instructions(user_id)
+    return _extract_bullets(doc, "# NEXT WEEK REQUESTS", ["# GENERAL Q&A", WEEK_END_SEP])
+
+
+def _replace_bullets(doc: str, section_marker: str, next_marker: str, items: list[str]) -> str:
+    """Replace bullet items in a section without touching comments or other sections."""
+    if section_marker not in doc:
+        return doc
+    sec_start = doc.index(section_marker) + len(section_marker)
+    if next_marker and next_marker in doc:
+        sec_end = doc.index(next_marker, sec_start)
+    else:
+        sec_end = len(doc)
+    # Preserve any parenthetical comment line at the top of the section
+    raw = doc[sec_start:sec_end]
+    comment = next((ln for ln in raw.splitlines() if ln.strip().startswith("(")), "")
+    bullets = "\n".join(f"- {item}" for item in items)
+    new_block = f"\n{comment}\n\n{bullets}\n\n" if comment else f"\n{bullets}\n\n"
+    return doc[:sec_start] + new_block + doc[sec_end:]
+
+
+def set_permanent_instructions(user_id: str, items: list[str]) -> None:
+    doc = _get_instructions(user_id)
+    doc = _replace_bullets(doc, "# PERMANENT INSTRUCTIONS", "# PRESENT WEEK REQUESTS", items)
+    _set_instructions(user_id, doc)
+
+
+def set_next_week_requests(user_id: str, items: list[str]) -> None:
+    doc = _get_instructions(user_id)
+    doc = _replace_bullets(doc, "# NEXT WEEK REQUESTS", "# GENERAL Q&A", items)
+    _set_instructions(user_id, doc)
+
+
 # ── Write helpers — instructions_doc ─────────────────────────────────────────
 
 def _insert_before_marker(doc: str, before_marker: str, entry: str) -> str:

@@ -196,3 +196,63 @@ def run_memory_consolidation(user_id: str, db: Session = Depends(get_db), _: str
     except Exception as exc:
         _log.error("consolidate-memory failed for %s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Memory consolidation failed: {exc}") from exc
+
+
+# ── Context Docs (permanent rules + next-week requests) ───────────────────────
+
+class ContextDocsUpdate(BaseModel):
+    permanent: list[str] = Field(default_factory=list)
+    next_week: list[str] = Field(default_factory=list)
+
+
+@router.get("/user/{user_id}/context-docs")
+def get_context_docs(user_id: str, _: str = Depends(require_owner)):
+    try:
+        from app.services.user_context_store import get_permanent_instructions, get_next_week_requests
+        return {
+            "permanent": get_permanent_instructions(user_id),
+            "next_week": get_next_week_requests(user_id),
+        }
+    except Exception as exc:
+        _log.error("get_context_docs failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.put("/user/{user_id}/context-docs")
+def update_context_docs(user_id: str, payload: ContextDocsUpdate, _: str = Depends(require_owner)):
+    try:
+        from app.services.user_context_store import set_permanent_instructions, set_next_week_requests
+        set_permanent_instructions(user_id, [s.strip() for s in payload.permanent if s.strip()])
+        set_next_week_requests(user_id, [s.strip() for s in payload.next_week if s.strip()])
+        return {"status": "saved"}
+    except Exception as exc:
+        _log.error("update_context_docs failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── Manual weekly-task override ────────────────────────────────────────────────
+
+class WeeklyTasksUpdate(BaseModel):
+    tasks: list[dict]
+
+
+@router.put("/user/{user_id}/weekly-tasks")
+def update_weekly_tasks(user_id: str, payload: WeeklyTasksUpdate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    try:
+        roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+        if not roadmap:
+            raise HTTPException(status_code=404, detail="No roadmap found for user.")
+        import json as _json
+        weekly_focus = json.loads(roadmap.weekly_focus) if roadmap.weekly_focus else {}
+        weekly_focus["primary_actions"] = payload.tasks
+        roadmap.weekly_focus = _json.dumps(weekly_focus)
+        db.commit()
+        from app.services.agent2_memory import sync_current_week
+        sync_current_week(user_id, {"roadmap": {"weekly_focus": weekly_focus}}, payload.tasks, reason="Manual task edit by user.")
+        return {"status": "saved", "tasks": payload.tasks}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        _log.error("update_weekly_tasks failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

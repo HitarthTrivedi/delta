@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, Bell, X } from 'lucide-react';
+import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, Bell, X, Pencil, Plus, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { careerOSAPI, chatAPI } from '../lib/api';
 import { getTaskProgress } from '../lib/taskProgress';
@@ -48,6 +48,21 @@ export default function WeeklyPlan() {
     'Notification' in window ? Notification.permission : 'unsupported'
   );
 
+  // Context docs (permanent rules + next-week requests)
+  const [contextDocs, setContextDocs] = useState({ permanent: [], next_week: [] });
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [newPermanent, setNewPermanent] = useState('');
+  const [newNextWeek, setNewNextWeek] = useState('');
+
+  // Task editing
+  const [editingTasks, setEditingTasks] = useState(false);
+  const [editableTasks, setEditableTasks] = useState([]);
+  const [savingTasks, setSavingTasks] = useState(false);
+
+  // Task feedback
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+
   const bottomRef = useRef(null);
 
   const loadContext = useCallback(async (regenerate = false) => {
@@ -77,6 +92,14 @@ export default function WeeklyPlan() {
     const params = new URLSearchParams(location.search);
     loadContext(params.get('from') === 'intake');
   }, [loadContext, location.search]);
+
+  useEffect(() => {
+    setDocsLoading(true);
+    careerOSAPI.getContextDocs(userId)
+      .then(data => setContextDocs(data || { permanent: [], next_week: [] }))
+      .catch(() => {})
+      .finally(() => setDocsLoading(false));
+  }, [userId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -219,6 +242,70 @@ export default function WeeklyPlan() {
   const openChatWithSuggestion = (text) => {
     setInput(text);
     setChatOpen(true);
+  };
+
+  const saveContextDocs = async (updated) => {
+    const next = { ...contextDocs, ...updated };
+    setContextDocs(next);
+    try {
+      await careerOSAPI.updateContextDocs(userId, next);
+    } catch { toast.error('Could not save preference.'); }
+  };
+
+  const addPermanent = async () => {
+    const text = newPermanent.trim();
+    if (!text) return;
+    setNewPermanent('');
+    await saveContextDocs({ permanent: [...contextDocs.permanent, text] });
+  };
+
+  const removePermanent = async (i) => {
+    await saveContextDocs({ permanent: contextDocs.permanent.filter((_, idx) => idx !== i) });
+  };
+
+  const addNextWeek = async () => {
+    const text = newNextWeek.trim();
+    if (!text) return;
+    setNewNextWeek('');
+    await saveContextDocs({ next_week: [...contextDocs.next_week, text] });
+  };
+
+  const removeNextWeek = async (i) => {
+    await saveContextDocs({ next_week: contextDocs.next_week.filter((_, idx) => idx !== i) });
+  };
+
+  const startEditTasks = () => {
+    setEditableTasks(actions.map(a => ({ ...a })));
+    setEditingTasks(true);
+  };
+
+  const saveEditedTasks = async () => {
+    setSavingTasks(true);
+    try {
+      await careerOSAPI.updateWeeklyTasks(userId, editableTasks);
+      setContext(prev => ({
+        ...(prev || {}),
+        roadmap: {
+          ...((prev || {}).roadmap || {}),
+          weekly_focus: {
+            ...(((prev || {}).roadmap || {}).weekly_focus || {}),
+            primary_actions: editableTasks,
+          },
+        },
+      }));
+      setEditingTasks(false);
+      toast.success('Tasks updated.');
+    } catch { toast.error('Could not save tasks.'); }
+    finally { setSavingTasks(false); }
+  };
+
+  const submitFeedback = async () => {
+    const text = feedbackText.trim();
+    if (!text) return;
+    setFeedbackText('');
+    setFeedbackOpen(false);
+    setChatOpen(true);
+    setTimeout(() => sendMessageText(`Feedback on this week's tasks: ${text}`), 150);
   };
 
   const handleEnableReminders = async (e) => {
@@ -522,6 +609,170 @@ export default function WeeklyPlan() {
               >
                 <Check size={18} /> Request Next Week's Activities
               </button>
+            </div>
+          )}
+        </section>
+
+        {/* Plan Preferences — permanent rules + next-week requests */}
+        <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Plan Preferences</h2>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: 13 }}>
+                Permanent rules apply every week · Next week requests carry forward once
+              </p>
+            </div>
+            {docsLoading && <Loader2 size={15} style={{ animation: 'spin 1s linear infinite', color: 'rgba(255,255,255,0.4)' }} />}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* Permanent */}
+            <div style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 14 }}>
+              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>Permanent Rules</p>
+              {contextDocs.permanent.length === 0 && (
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No permanent rules yet. Add one below.</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                {contextDocs.permanent.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '7px 10px' }}>
+                    <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.4 }}>{item}</span>
+                    <button onClick={() => removePermanent(i)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={newPermanent}
+                  onChange={e => setNewPermanent(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addPermanent()}
+                  placeholder="e.g. Never more than 2 tasks"
+                  style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '7px 10px', color: '#fff', fontSize: 12, outline: 'none' }}
+                />
+                <button onClick={addPermanent} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, padding: '7px 10px', color: '#fff', cursor: 'pointer' }}>
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+            {/* Next week requests */}
+            <div style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 14 }}>
+              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>Next Week Requests</p>
+              {contextDocs.next_week.length === 0 && (
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No requests yet. Add one below or tell Agent 2.</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                {contextDocs.next_week.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '7px 10px' }}>
+                    <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.4 }}>{item}</span>
+                    <button onClick={() => removeNextWeek(i)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={newNextWeek}
+                  onChange={e => setNewNextWeek(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addNextWeek()}
+                  placeholder="e.g. Include a REST API project"
+                  style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '7px 10px', color: '#fff', fontSize: 12, outline: 'none' }}
+                />
+                <button onClick={addNextWeek} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, padding: '7px 10px', color: '#fff', cursor: 'pointer' }}>
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Task feedback + manual edit */}
+        <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: editingTasks ? 16 : 0 }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Task Controls</h2>
+              <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: 13 }}>
+                Edit tasks manually or give Agent 2 feedback on this week's selection
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => { setFeedbackOpen(o => !o); setEditingTasks(false); }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+              >
+                <ThumbsUp size={13} /> Feedback
+              </button>
+              <button
+                onClick={() => { startEditTasks(); setFeedbackOpen(false); }}
+                disabled={editingTasks}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: editingTasks ? 'rgba(255,255,255,0.12)' : '#fff', color: editingTasks ? 'rgba(255,255,255,0.6)' : '#000', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: editingTasks ? 'not-allowed' : 'pointer', fontWeight: 700 }}
+              >
+                <Pencil size={13} /> Edit Tasks
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback form */}
+          {feedbackOpen && (
+            <div style={{ marginTop: 14 }}>
+              <p style={{ margin: '0 0 8px', fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
+                What's wrong with this week's tasks? Agent 2 will adjust based on your feedback.
+              </p>
+              <textarea
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                placeholder="e.g. The LeetCode task is too hard, I'd prefer easier problems. The FastAPI task has no clear goal."
+                rows={3}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '10px 12px', color: '#fff', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => setFeedbackOpen(false)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px 14px', color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={submitFeedback} style={{ background: '#fff', color: '#000', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Send to Agent 2</button>
+              </div>
+            </div>
+          )}
+
+          {/* Inline task editor */}
+          {editingTasks && (
+            <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {editableTasks.map((task, i) => (
+                  <div key={i} style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                      <input
+                        value={task.title || ''}
+                        onChange={e => setEditableTasks(prev => prev.map((t, idx) => idx === i ? { ...t, title: e.target.value } : t))}
+                        placeholder="Task title"
+                        style={{ flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '7px 10px', color: '#fff', fontSize: 14, fontWeight: 700, outline: 'none' }}
+                      />
+                      <button onClick={() => setEditableTasks(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: 4 }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <textarea
+                      value={task.detail || task.description || ''}
+                      onChange={e => setEditableTasks(prev => prev.map((t, idx) => idx === i ? { ...t, detail: e.target.value, description: e.target.value } : t))}
+                      placeholder="Task description"
+                      rows={2}
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '7px 10px', color: 'rgba(255,255,255,0.7)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+                <button
+                  onClick={() => setEditableTasks(prev => [...prev, { id: `manual-${Date.now()}`, title: '', detail: '', type: 'project' }])}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px 12px', color: 'rgba(255,255,255,0.7)', fontSize: 13, cursor: 'pointer' }}
+                >
+                  <Plus size={13} /> Add task
+                </button>
+                <div style={{ flex: 1 }} />
+                <button onClick={() => setEditingTasks(false)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '8px 14px', color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={saveEditedTasks} disabled={savingTasks} style={{ background: '#fff', color: '#000', border: 'none', borderRadius: 6, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: savingTasks ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {savingTasks ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
+                  Save
+                </button>
+              </div>
             </div>
           )}
         </section>
