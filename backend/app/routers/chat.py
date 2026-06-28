@@ -641,13 +641,13 @@ Reply with ONLY a JSON object (no markdown), choosing exactly one action:
 Meaning of each action:
 - reduce_tasks: they feel it is too much and want fewer tasks this week.
 - skip_task: they want to drop/remove one specific task.
-- next_week: they want a brand-new next week of tasks.
+- next_week: they are DONE with this week and want to advance to a brand-new week RIGHT NOW. Only use this when they explicitly say they finished or want to move on immediately (e.g. "give me next week", "I'm done, advance", "move to next week now").
 - restore: they want their previous/earlier tasks back, or to undo a change.
 - harder: the work is too easy; they want tougher tasks.
 - easier: the work is too hard; they want simpler tasks.
 - add_course: they want a course assigned.
 - constraint: an exam, deadline, travel, illness, low energy, or busy period should reshape this week.
-- chat: anything else — a question, a request to explain, or normal conversation. When unsure, choose chat.
+- chat: anything else — a question, a suggestion for what to include NEXT week, a request to explain something, or normal conversation. IMPORTANT: if the student says "for next week include X" or "can next week have Y" or "I want X next week" — that is a PREFERENCE NOTE, not an advance command. Treat it as chat, acknowledge their request, and tell them it will be considered when they advance. When unsure, always choose chat.
 
 Return only the JSON object."""
     try:
