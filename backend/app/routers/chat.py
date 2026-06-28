@@ -1240,7 +1240,7 @@ Respond with a practical next step, mention relevant roadmap/project/market cont
         response = generate_response(
             prompt,
             temperature=0.5 if is_weekly_agent else 0.7,
-            max_tokens=4000 if is_weekly_agent and intent == "tutor_chat" else 10000,
+            max_tokens=10000,
         )
         cleaned_response = response.strip()
         updated_actions = None
