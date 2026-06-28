@@ -910,7 +910,9 @@ def chat_message(
     if intent_obj:
         intent = _ACTION_TO_INTENT.get(intent_obj.get("action"), "tutor_chat")
     else:
-        intent = _agent2_intent(user_update) if is_weekly_agent else "chat"
+        # AI classification failed or was skipped — default to tutor_chat (safe).
+        # Never keyword-match: the AI understands nuance that keywords cannot.
+        intent = "tutor_chat" if is_weekly_agent else "chat"
     llm_reply = intent_obj.get("reply") if intent_obj else None
     llm_count = intent_obj.get("count") if intent_obj else None
     llm_target = intent_obj.get("target") if intent_obj else None

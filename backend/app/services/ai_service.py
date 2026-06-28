@@ -39,9 +39,10 @@ def _build_clients():
             return
         for key in keys:
             try:
-                # http_options.timeout (ms) bounds a hung call so it fails fast
-                # instead of riding the SDK default and stalling the request.
-                _clients.append(genai.Client(api_key=key, http_options={"timeout": 60000}))
+                # timeout is in SECONDS for the google-genai SDK (passed to httpx).
+                # 120s gives the model enough time for long responses without letting
+                # Google's internal deadline fire first (which causes 504 errors).
+                _clients.append(genai.Client(api_key=key, http_options={"timeout": 120}))
             except Exception as e:
                 logger.warning(f"Failed to init genai client for a key: {e}")
         if _clients:
@@ -102,8 +103,8 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
         except Exception as e:
             err_str = str(e).lower()
             last_error = e
-            if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or "rate" in err_str:
-                logger.warning(f"[LLM] quota hit on key, rotating to next key: {type(e).__name__}")
+            if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str or "rate" in err_str or "504" in err_str or "deadline" in err_str or "unavailable" in err_str:
+                logger.warning(f"[LLM] retryable error on key, rotating: {type(e).__name__}: {str(e)[:120]}")
                 continue  # try next key
             # Non-quota error — raise immediately
             logger.error(f"[LLM] non-quota error: {e}")
