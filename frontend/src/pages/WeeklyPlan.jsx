@@ -67,6 +67,9 @@ export default function WeeklyPlan() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
 
+  // Skip dialog
+  const [skipDialog, setSkipDialog] = useState(null); // {action, index}
+
   const bottomRef = useRef(null);
 
   const loadContext = useCallback(async (regenerate = false) => {
@@ -102,7 +105,7 @@ export default function WeeklyPlan() {
     setDocsLoading(true);
     careerOSAPI.getContextDocs(userId)
       .then(data => setContextDocs(data || { permanent: [], next_week: [] }))
-      .catch(() => {})
+      .catch(() => toast.error('Could not load your saved preferences.'))
       .finally(() => setDocsLoading(false));
   }, [userId]);
 
@@ -169,23 +172,48 @@ export default function WeeklyPlan() {
     }
   };
 
-  const skipTask = async (e, action, index) => {
+  const skipTask = (e, action, index) => {
     e.stopPropagation();
     if (advancing) return;
+    setSkipDialog({ action, index });
+  };
+
+  const confirmSkip = async (choice) => {
+    if (!skipDialog) return;
+    const { action, index } = skipDialog;
+    setSkipDialog(null);
     setChecked(prev => ({ ...prev, [index]: false }));
     setSkipped(prev => ({ ...prev, [index]: true }));
     try {
       await careerOSAPI.logJourneyEvent(userId, {
         event_type: 'weekly_task_skipped',
         summary: `Skipped Agent 2 task: ${action.title}`,
-        evidence: action,
-        impact: { user_chose_to_skip: true },
+        evidence: { ...action, skip_choice: choice },
+        impact: { user_chose_to_skip: true, disposition: choice },
       });
-      toast.success('Task skipped.');
+      if (choice === 'next_week') {
+        await appendNextWeekRequestFromSkip(action.title);
+        toast.success('Task moved to next week.');
+      } else if (choice === 'remove') {
+        toast.success('Task permanently removed from your plan.');
+      } else {
+        toast.success('Task skipped for this week.');
+      }
     } catch (err) {
       console.error(err);
       toast.error('Could not save skip.');
     }
+  };
+
+  const appendNextWeekRequestFromSkip = async (title) => {
+    const updated = {
+      ...contextDocs,
+      next_week: [...contextDocs.next_week, { text: `Include task: ${title}`, weeks_remaining: 1 }],
+    };
+    setContextDocs(updated);
+    try {
+      await careerOSAPI.updateContextDocs(userId, updated);
+    } catch { /* non-fatal */ }
   };
 
   // Core send — accepts text directly so it can be called programmatically
@@ -863,6 +891,32 @@ export default function WeeklyPlan() {
           </section>
         )}
       </div>
+
+      {/* Skip task dialog */}
+      {skipDialog && (
+        <>
+          <div onClick={() => setSkipDialog(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 80 }} />
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 81, background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: 28, width: 'min(90vw, 420px)' }}>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px' }}>Skipping task</p>
+            <p style={{ color: '#fff', fontSize: 15, fontWeight: 600, margin: '0 0 20px', lineHeight: 1.4 }}>{skipDialog.action.title}</p>
+            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, margin: '0 0 18px' }}>What do you want to do with this task?</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button onClick={() => confirmSkip('next_week')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '12px 16px', color: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>Move to next week</span>
+                <span style={{ color: 'rgba(255,255,255,0.4)', display: 'block', fontSize: 12, marginTop: 2 }}>Agent 2 will include it in your next weekly plan</span>
+              </button>
+              <button onClick={() => confirmSkip('remove')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '12px 16px', color: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
+                <span style={{ fontWeight: 600 }}>Permanently remove</span>
+                <span style={{ color: 'rgba(255,255,255,0.4)', display: 'block', fontSize: 12, marginTop: 2 }}>Remove from your plan entirely — won't come back</span>
+              </button>
+              <button onClick={() => confirmSkip('skip_once')} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 16px', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
+                Just skip this week — no action
+              </button>
+            </div>
+            <button onClick={() => setSkipDialog(null)} style={{ marginTop: 14, background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 12, padding: 0 }}>Cancel</button>
+          </div>
+        </>
+      )}
 
       {/* Half-screen chat drawer */}
       {chatOpen && (

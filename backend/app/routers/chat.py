@@ -918,7 +918,7 @@ def chat_message(
     date_info = _parse_date_reference(user_update)
     date_context = _date_context_text(date_info)
     profile_file = load_profile(data.user_id) or {}
-    _hours_per_week = int(profile_file.get("hours_per_week") or 10)
+    _hours_per_week = int(profile_file.get("hours_per_week") or (user.hours_per_week if user else None) or 10)
     _raw_months = profile_file.get("planning_horizon_months") or None
     _raw_years = profile_file.get("planning_horizon_years") or None
     if _raw_months:
