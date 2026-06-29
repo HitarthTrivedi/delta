@@ -59,7 +59,11 @@ class Settings(BaseSettings):
 
     @property
     def CORS_ORIGINS(self) -> list[str]:
-        return parse_csv_env("CORS_ORIGINS", ["http://localhost:3000", "http://127.0.0.1:3000"])
+        return parse_csv_env("CORS_ORIGINS", [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "https://delta-kappa-pink.vercel.app",
+        ])
     OPPORTUNITY_SOURCE_MODE: str = os.getenv("OPPORTUNITY_SOURCE_MODE", "mock")
     LEETCODE_SOURCE_MODE: str = os.getenv("LEETCODE_SOURCE_MODE", "")
     CODEFORCES_SOURCE_MODE: str = os.getenv("CODEFORCES_SOURCE_MODE", "")
