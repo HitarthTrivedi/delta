@@ -45,10 +45,10 @@ week's plan + a brief.
 | **Backend** | Python 3.11, FastAPI 0.110, Uvicorn 0.25, SQLAlchemy 2.x (**sync**), Pydantic 2 / pydantic-settings, slowapi (rate limiting) |
 | **Database** | SQLite by default (sync driver); PostgreSQL in production (`psycopg2-binary`) |
 | **Auth** | Supabase (email/password + Google OAuth) via `@supabase/supabase-js`; backend verifies Supabase JWTs (PyJWT + cryptography) |
-| **AI / search** | Google Gemini via `google-genai`; `sentence-transformers` (all-MiniLM-L6-v2) for embeddings; Tavily / Serper for web search |
+| **AI / search** | Google Gemini via `google-genai`; embeddings via a local deterministic **hash-based mock** (`sentence-transformers` was removed to fit the 512 MB Render tier); Tavily / Serper for web search |
 | **Cache** | Redis (`redis`) with in-process TTL fallback (`cachetools`) |
 | **Email** | Resend (currently stubbed) |
-| **Container / deploy** | Docker (backend `Dockerfile`), `docker-compose.yml`; frontend on Vercel, backend on a container host (Render) |
+| **Container / deploy** | Docker (backend `Dockerfile`), `docker-compose.yml`; frontend on Vercel, backend on a container host (Railway; dynamic `$PORT`; previously Render) |
 
 > **Important:** the backend uses **synchronous** SQLAlchemy (`create_engine`,
 > not the async engine) and synchronous route handlers. See
@@ -66,7 +66,7 @@ flowchart LR
       Z["Zustand auth store"]
     end
 
-    subgraph API["FastAPI backend (Render)"]
+    subgraph API["FastAPI backend (Railway)"]
       R["Routers /api/*"]
       CE["Central AI Engine"]
       SVC["Services<br/>(market, brief, resume, memory…)"]
@@ -203,6 +203,8 @@ Sync SQLAlchemy ORM; tables auto-created on startup via
 | `weekly_briefs` | `weekly_brief.py` | Generated weekly briefs | `user_id` (idx), `created_at` |
 | `skill_nodes` | `skill_node.py` | User's skills | `user_id` (idx) |
 | `personalization_profiles` | `personalization.py` | Personalization settings | `user_id` **unique** |
+| `opportunity_boards` | `opportunity_board.py` | AI-matched jobs/internships board | `user_id` **unique**, `preferences`/`opportunities` (JSON), `profile_signature` |
+| `achievements` | `achievement.py` | Trophy-cabinet entries (certs/projects/awards) | `user_id` (idx), `type`, `title`, `organization`, `url` |
 | `feedbacks` | `feedback.py` | User feedback submissions | `created_at` |
 | `semantic_nodes` / `semantic_edges` / `tension_nodes` | `semantic_memory.py` | Embedding-backed memory graph + detected tensions | `user_id` (idx) |
 | `ingestion_sessions` | `semantic_memory.py` | Onboarding/ingestion session state | `user_id` (idx) |
@@ -234,6 +236,7 @@ All routes are under `/api`. Ownership is enforced via the `X-User-Id` header +
 | | GET | `/briefs/scores/{user_id}/history` | Score history |
 | | POST | `/briefs/recommendations/{rec_id}/complete` | Mark recommendation done |
 | **chat** | POST | `/chat/message` | Agent 2 chat / weekly actions *(LLM; 20/min)* |
+| | POST | `/chat/stream` | SSE token streaming (general assistant) |
 | | GET | `/chat/history/{user_id}` | Chat history |
 | | POST | `/chat/onboarding/start` | Start onboarding chat |
 | | POST | `/chat/onboarding/finalize` | Finalize onboarding |
@@ -251,6 +254,11 @@ All routes are under `/api`. Ownership is enforced via the `X-User-Id` header +
 | | GET | `/resume/{user_id}/suggestions` · `/download` | Suggestions / export |
 | **calendar** | GET | `/calendar/events` · `/sources` | Calendar events + source statuses |
 | **dossier** | GET | `/dossier/weekly/{user_id}` | Weekly dossier |
+| **opportunities** | GET | `/opportunities/{user_id}` | Stored prefs + last AI board (no LLM) |
+| | PUT | `/opportunities/{user_id}/preferences` | Save opportunity preferences |
+| | POST | `/opportunities/{user_id}/generate` | Regenerate AI-matched board *(LLM)* |
+| **achievements** | GET/POST/DELETE | `/achievements/{user_id}` · `/{achievement_id}` | Trophy-cabinet CRUD |
+| **reminders** | POST | `/reminders/daily` | Send daily task-reminder emails *(secret-protected cron)* |
 | **feedback** | GET/POST | `/feedback` | Feedback |
 
 Interactive docs: `http://localhost:8000/docs` (Swagger), `/health`, `/`.
@@ -304,8 +312,9 @@ auth gating, and route-level code-splitting.
   `/early-access`, `/privacy`, `/terms`, `/login`.
 - **Auth only (no onboarding required):** `/onboarding`, `/intake`.
 - **Auth + onboarding complete:** `/dashboard`, `/weekly-plan`, `/roadmap`,
-  `/progress-report`, `/resume`, `/ledger`, `/briefs`, `/pulse`, `/calendar`,
-  `/portfolio`, `/profile`.
+  `/progress-report`, `/resume`, `/achievements` (Trophy Cabinet),
+  `/opportunities`, `/ledger`, `/briefs`, `/pulse`, `/calendar`, `/portfolio`,
+  `/profile`.
 - Gating is done by `<RequireAuth>` (checks Zustand `userId`/`loading`) and
   `<ProtectedRoute>` (checks `onboarding_complete`).
 
@@ -387,12 +396,12 @@ A shared cache with a **fail-open** design:
 | Service | Used for | Module | Notes |
 |---------|----------|--------|-------|
 | **Google Gemini** | All LLM generation | `ai_service.py` | Up to 5 API keys in round-robin; rotates on 429/quota; 60s timeout. Default model `gemma-4-31b-it`; `gemini-2.5-flash` **only** for resume analysis (see §15) |
-| **sentence-transformers** | Embeddings (memory graph) | `memory_graph.py` | `all-MiniLM-L6-v2`, 384-dim; lazy-loaded; cached |
+| **Local embeddings** | Embeddings (memory graph) | `memory_graph.py` | Deterministic hash-based mock, 384-dim, in-process (no data leaves). `sentence-transformers` removed for the 512 MB tier; real-model path (with 30d cache) still present |
 | **Tavily / Serper** | Web search | `web_search.py` | Provider waterfall → mock fallback |
 | **GitHub / StackExchange / Arbeitnow** | Market signals | `market_pulse.py` | Public APIs, each timeout-bounded |
 | **LeetCode / Codeforces / Kaggle / Unstop / Devpost** | Opportunities | `opportunity_adapters.py` | Public APIs / scrapers |
 | **Supabase** | Auth (email/password, Google OAuth) | FE `store/authStore.js`, BE `dependencies/auth.py` | JWT verified server-side |
-| **Resend** | Email | `email_service.py` | Currently stubbed |
+| **Gmail SMTP** | Daily reminder emails | `email_service.py` | Sends via `smtp.gmail.com`; triggered by the `/reminders/daily` cron |
 | **Redis** | Shared cache | `cache.py` | Optional; fail-open fallback |
 
 ---
@@ -409,10 +418,10 @@ A shared cache with a **fail-open** design:
 | `CACHE_ENABLED` | `true` | Master switch for caching |
 | `TAVILY_API_KEY` / `SERPER_API_KEY` | — | Web search providers |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_JWT_SECRET` | — | Auth / JWT verification |
-| `RESEND_API_KEY` / `EMAIL_FROM` | — | Email (stubbed) |
-| `DEV_MODE` | `true` | Relaxes weekly time gates for testing |
+| `REMINDER_FROM_EMAIL` / `REMINDER_FROM_PASSWORD` / `REMINDER_SECRET` | — | Gmail SMTP creds + cron-protection secret for `/reminders/daily` |
+| `FRONTEND_URL` | `https://delta-ai.vercel.app` | Link target in reminder emails |
 | `SQL_ECHO` | `false` | Log all SQL |
-| `OPPORTUNITY_SOURCE_MODE` | `mock` | Live vs mock opportunity adapters |
+| `OPPORTUNITY_SOURCE_MODE` (+ `LEETCODE_`, `CODEFORCES_`, `KAGGLE_`, `UNSTOP_`, `HACKATHON_`, `JOBPOSTS_`) | `mock` | Live vs mock adapters |
 
 ### Frontend (`frontend/.env`)
 | Var | Purpose |
@@ -432,10 +441,11 @@ A shared cache with a **fail-open** design:
   routes to `index.html` (SPA). Build: `npm run build` (`craco build`). Vercel
   builds with `CI=true`, so **lint warnings fail the build** — keep the tree
   warning-clean. Pushes to `main` auto-deploy.
-- **Backend → container host (Render).** Built from `backend/Dockerfile`
-  (`python:3.11-slim`, installs `requirements.txt`, runs Uvicorn). Production DB
-  is Postgres (so the SQLite-only WAL path is skipped; pooling + index creation
-  apply instead). **The backend must be redeployed separately** to pick up
+- **Backend → container host (Railway; previously Render).** Built from
+  `backend/Dockerfile` (`python:3.11-slim`, installs `requirements.txt`, runs
+  Uvicorn on dynamic `$PORT`). Production DB is Postgres (so the SQLite-only WAL
+  path is skipped; pooling + index creation apply instead). **The backend must
+  be redeployed separately** to pick up
   backend changes / new dependencies.
 - **Redis (optional).** Provision a managed Redis and set `REDIS_URL` for a
   shared cache across instances/restarts; otherwise each instance uses its own

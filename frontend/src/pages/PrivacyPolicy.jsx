@@ -4,8 +4,11 @@ import { ArrowLeft } from 'lucide-react';
 
 const section = { marginBottom: 36 };
 const h2 = { color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 10, marginTop: 0 };
+const h3 = { color: 'rgba(255,255,255,0.9)', fontSize: 15, fontWeight: 600, marginBottom: 6, marginTop: 18 };
 const p = { color: 'rgba(255,255,255,0.6)', fontSize: 15, lineHeight: 1.8, margin: '0 0 12px' };
 const ul = { color: 'rgba(255,255,255,0.6)', fontSize: 15, lineHeight: 1.8, paddingLeft: 22, margin: '0 0 12px' };
+const strong = { color: 'rgba(255,255,255,0.85)' };
+const link = { color: '#fff' };
 
 export default function PrivacyPolicy() {
   const navigate = useNavigate();
@@ -26,65 +29,276 @@ export default function PrivacyPolicy() {
         </button>
 
         <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, marginBottom: 8 }}>Privacy Policy</h1>
-        <p style={{ ...p, marginBottom: 40 }}>Last updated: June 26, 2026</p>
+        <p style={{ ...p, marginBottom: 8 }}>Last updated: July 2, 2026</p>
+        <p style={{ ...p, marginBottom: 40 }}>
+          This Privacy Policy is drafted to comply with India&apos;s Digital Personal Data Protection Act, 2023
+          (the &ldquo;DPDP Act&rdquo;) and, to the extent applicable, the Information Technology Act, 2000 and the
+          SPDI Rules, 2011.
+        </p>
 
         <div style={section}>
-          <h2 style={h2}>What we collect</h2>
-          <p style={p}>When you use Delta, we collect the following information:</p>
+          <h2 style={h2}>1. Who we are (the Data Fiduciary)</h2>
+          <p style={p}>
+            Delta (branded &ldquo;Delta by Alpha.Kore&rdquo;, &ldquo;Delta&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) is an AI-powered
+            career-planning web application, currently operated as an early-stage, non-commercial project by an
+            individual, Mr. Hitarth Trivedi (&ldquo;the Operator&rdquo;), who is the Data Fiduciary responsible for your
+            personal data under the DPDP Act.
+          </p>
           <ul style={ul}>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Account information</strong> — your name, email address, and authentication credentials managed by Supabase.</li>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Career profile</strong> — your background, skills, goals, constraints, and preferences that you share during onboarding and throughout your use of the app.</li>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Resume content</strong> — text extracted from resumes you upload. We do not store the original file after processing.</li>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Conversation history</strong> — messages exchanged with Agent 1 (onboarding) and Agent 2 (weekly planning), stored to provide continuity across sessions.</li>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Usage data</strong> — task completions, weekly progress, and interaction patterns used to improve your roadmap.</li>
+            <li><strong style={strong}>Data Fiduciary / Operator</strong> — Hitarth Trivedi</li>
+            <li><strong style={strong}>Contact &amp; Grievance Officer</strong> — <a href="mailto:hitartht318@gmail.com" style={link}>hitartht318@gmail.com</a></li>
+            <li><strong style={strong}>Country of operation</strong> — India</li>
+          </ul>
+          <p style={p}>
+            A &ldquo;Data Principal&rdquo; is you — the individual whose personal data we process. A &ldquo;Data Processor&rdquo;
+            is a third party that processes personal data on our behalf (listed in Section 6).
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>2. Scope</h2>
+          <p style={p}>
+            This Policy applies when you create an account, complete onboarding, chat with our AI agents (Agent 1 —
+            onboarding, and Agent 2 — weekly planning), upload a résumé, add achievements, set opportunity
+            preferences, use the roadmap, weekly plan, résumé, opportunities, calendar and other features, or visit
+            our website. It does not apply to third-party sites we link to (for example, LinkedIn job pages you open
+            from the Opportunities board), which have their own policies.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>3. What personal data we collect</h2>
+          <p style={p}>We collect only the data needed to provide and personalise the service:</p>
+
+          <h3 style={h3}>Account &amp; identity</h3>
+          <p style={p}>
+            Name, email address, and a unique user ID. Authentication is handled by Supabase; we do not store your raw
+            password. If you sign in with Google, we receive basic profile information (name, email).
+          </p>
+
+          <h3 style={h3}>Contact &amp; profile links</h3>
+          <p style={p}>Phone number, and LinkedIn / GitHub / portfolio URLs, where you provide them.</p>
+
+          <h3 style={h3}>Education &amp; academic</h3>
+          <p style={p}>
+            Institution/university, major, year of study, GPA, education or life stage, and any target exams and exam
+            dates you share.
+          </p>
+
+          <h3 style={h3}>Professional &amp; career</h3>
+          <p style={p}>
+            Current and target role(s), years of experience and experience level, past-experience descriptions, skills
+            and their depth, projects, certificates, achievements (your &ldquo;Trophy Cabinet&rdquo;), and target industries.
+          </p>
+
+          <h3 style={h3}>Résumé data</h3>
+          <p style={p}>
+            Text and structured details extracted from résumé files (PDF/DOCX) you upload. We do not retain the
+            original uploaded file after extraction — only the extracted text and structured data.
+          </p>
+
+          <h3 style={h3}>Preferences &amp; constraints</h3>
+          <p style={p}>
+            Hours available per week, learning style, preferred content types, location and relocation openness, and
+            opportunity preferences (location, role types, work mode, industries, notes).
+          </p>
+
+          <h3 style={h3}>Conversations</h3>
+          <p style={p}>
+            Messages you exchange with Agent 1 and Agent 2, your personal introduction/backstory and transition
+            reasons, and notes derived from those conversations, stored to give continuity and personalise your plan.
+          </p>
+
+          <h3 style={h3}>Activity &amp; derived data</h3>
+          <p style={p}>
+            Task completions, journey/progress events (which may include self-reported mood and AI planning
+            decisions), Delta Score history, weekly briefs, roadmaps, market snapshots, and internal memory records
+            derived from the above.
+          </p>
+
+          <h3 style={h3}>Technical &amp; usage data</h3>
+          <p style={p}>
+            A session token in your browser&apos;s local storage, functional cookies/local storage to keep you signed
+            in, and standard server/CDN logs (such as IP address and request metadata) via our hosting and database
+            providers.
+          </p>
+
+          <h3 style={h3}>Data we do not intentionally collect</h3>
+          <p style={p}>
+            We do not intentionally collect financial, health, biometric, or other specially sensitive data. Please do
+            not enter such information into free-text fields or chats; if you do, contact us to have it removed.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>4. Why we process your data &amp; legal basis</h2>
+          <p style={p}>
+            We process your personal data on the basis of your consent, which you give by accepting this Policy and by
+            voluntarily providing information as you use Delta. We use your data to:
+          </p>
+          <ul style={ul}>
+            <li>build and refine your personalised career roadmap and weekly plan;</li>
+            <li>power the AI agents that answer questions, adapt your plan, generate briefs, match opportunities, and analyse your résumé;</li>
+            <li>track your progress, journey history and Delta Score;</li>
+            <li>send daily task-reminder emails (if enabled) and important account notices;</li>
+            <li>authenticate you, prevent unauthorised access to other users&apos; data, and secure the service; and</li>
+            <li>improve Delta — in aggregated and de-identified form wherever feasible.</li>
+          </ul>
+          <p style={p}>
+            We follow purpose limitation and data minimisation. <strong style={strong}>We do not sell your personal
+            data, and we do not use it — or allow our AI provider to use it — to train third-party AI models.</strong>
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>5. How the AI processing works</h2>
+          <p style={p}>
+            Delta uses large language models (currently Google Gemini) to generate roadmaps, chat replies, résumé
+            analysis and opportunity suggestions. To do this, relevant parts of your profile, your chat messages, and
+            (for résumé features) your résumé text are sent to Google&apos;s Gemini API to generate a response.
+            AI-generated content can be inaccurate, outdated or incomplete — always verify important information such
+            as deadlines, eligibility and salary data from authoritative sources.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>6. Who we share data with (sub-processors)</h2>
+          <p style={p}>
+            We share personal data only with the service providers needed to run Delta. Each acts as our Data
+            Processor and may use the data only to provide their service to us:
+          </p>
+          <ul style={ul}>
+            <li><strong style={strong}>Supabase</strong> — authentication and database (PostgreSQL) hosting; stores your account and profile/app data.</li>
+            <li><strong style={strong}>Google (Gemini API)</strong> — AI generation; receives profile context, chat messages, résumé text and prompts.</li>
+            <li><strong style={strong}>Google (Gmail SMTP)</strong> — sends daily reminder emails; receives your email and pending-task titles.</li>
+            <li><strong style={strong}>Tavily / Serper</strong> — web search for market signals; receives search queries (which may be derived from your profile).</li>
+            <li><strong style={strong}>Vercel &amp; Render</strong> — frontend and backend hosting; standard request/CDN logs.</li>
+            <li><strong style={strong}>Redis provider</strong> (if configured) — caches market/search results; no personalised generative content.</li>
+          </ul>
+          <p style={p}>
+            Market/opportunity data sources (GitHub, StackExchange, job boards, coding/hackathon platforms) are queried
+            for public, role-level information and do not receive your personal data. Job-search deeplinks (e.g. to
+            LinkedIn) are URLs you click; we do not transmit your data to those sites. We may disclose data if required
+            by law or to protect the rights and safety of Delta and its users. We do not sell your personal data.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>7. International transfer</h2>
+          <p style={p}>
+            Some sub-processors (including Google, Supabase, Vercel and Render) store or process data on servers
+            outside India. By using Delta you acknowledge this transfer. Under Section 16 of the DPDP Act,
+            cross-border transfer is permitted except to countries restricted by the Central Government; we will not
+            transfer personal data to any such restricted country.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>8. Children&apos;s data</h2>
+          <p style={p}>
+            Under the DPDP Act, a &ldquo;child&rdquo; is anyone under 18 years of age.
+          </p>
+          <ul style={ul}>
+            <li>If you are under 18, you may use Delta only with the verifiable consent of your parent or legal guardian, who must provide and manage that consent.</li>
+            <li>We do not undertake tracking, behavioural monitoring, or targeted advertising directed at children, and will not knowingly process a child&apos;s data in a way likely to harm their well-being.</li>
+            <li>If we learn we collected a child&apos;s data without the required verifiable parental/guardian consent, we will delete it promptly.</li>
+            <li>A parent or guardian may contact us to review, correct, delete, or withdraw consent for their child&apos;s data.</li>
           </ul>
         </div>
 
         <div style={section}>
-          <h2 style={h2}>How we use your data</h2>
+          <h2 style={h2}>9. Data retention</h2>
+          <p style={p}>
+            We retain your personal data for as long as your account is active and as needed for the purposes above.
+            When you delete your account, withdraw consent, or the data is no longer necessary, we erase it — unless
+            retention is required to comply with a legal obligation or to defend legal claims. Backups and logs may
+            persist for a limited period and are overwritten on normal cycles. De-identified data may be retained for
+            analytics.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>10. How we protect your data</h2>
           <ul style={ul}>
-            <li>To generate and refine your personalised career roadmap.</li>
-            <li>To power the AI agents that answer your questions and adapt your weekly plan.</li>
-            <li>To track your progress and surface relevant opportunities over time.</li>
-            <li>To improve Delta's models and features (only in aggregate and anonymised form).</li>
+            <li>Authentication via Supabase-issued JWTs, verified server-side.</li>
+            <li>Ownership checks on every user-scoped request so one user cannot access another&apos;s data.</li>
+            <li>Encryption in transit (HTTPS/TLS) between your browser, our backend, and our providers.</li>
+            <li>Rate limiting on sensitive endpoints and input validation on writes.</li>
+            <li>Access to production data limited to the Operator.</li>
           </ul>
-          <p style={p}>We do not sell your personal data. We do not use your data to train third-party AI models.</p>
+          <p style={p}>
+            No method of transmission or storage is 100% secure, and we cannot guarantee absolute security. You are
+            responsible for keeping your login credentials confidential.
+          </p>
         </div>
 
         <div style={section}>
-          <h2 style={h2}>Third-party services</h2>
-          <p style={p}>Delta relies on the following third-party services to operate:</p>
+          <h2 style={h2}>11. Personal data breach</h2>
+          <p style={p}>
+            If a personal data breach occurs, we will take reasonable steps to contain and assess it and, in
+            accordance with the DPDP Act, notify the Data Protection Board of India and each affected Data Principal
+            within the timelines prescribed by law.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>12. Your rights as a Data Principal</h2>
           <ul style={ul}>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Supabase</strong> — authentication and database hosting. Your data is stored in Supabase's PostgreSQL infrastructure.</li>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Google Gemini</strong> — AI model provider. Conversation content is sent to Gemini to generate responses. Google's API data usage policy applies.</li>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Vercel</strong> — frontend hosting.</li>
-            <li><strong style={{ color: 'rgba(255,255,255,0.85)' }}>Render</strong> — backend API hosting.</li>
+            <li><strong style={strong}>Access</strong> — a summary of the data we hold about you and who it has been shared with.</li>
+            <li><strong style={strong}>Correction &amp; completion</strong> — correct, complete or update your data (much of it is editable via the Intake/Profile pages).</li>
+            <li><strong style={strong}>Erasure</strong> — request deletion of your data and account, subject to legal-retention exceptions.</li>
+            <li><strong style={strong}>Withdraw consent</strong> — at any time, as easily as you gave it (this may limit or end the service).</li>
+            <li><strong style={strong}>Grievance redressal</strong> — raise a grievance and receive a response.</li>
+            <li><strong style={strong}>Nominate</strong> — nominate someone to exercise your rights in the event of death or incapacity.</li>
+            <li><strong style={strong}>Export</strong> — request a copy of your profile data.</li>
           </ul>
+          <p style={p}>
+            To exercise any right, email <a href="mailto:hitartht318@gmail.com" style={link}>hitartht318@gmail.com</a> from
+            your registered email. We respond within the timelines required by law after verifying your identity.
+          </p>
         </div>
 
         <div style={section}>
-          <h2 style={h2}>Data retention</h2>
-          <p style={p}>Your profile and conversation data is retained for as long as your account is active. You can request deletion of your account and all associated data at any time by contacting us.</p>
+          <h2 style={h2}>13. Grievance redressal</h2>
+          <p style={p}>
+            For any concern about how we handle your personal data, contact our Grievance Officer, Mr. Hitarth Trivedi,
+            at <a href="mailto:hitartht318@gmail.com" style={link}>hitartht318@gmail.com</a>. If you are not satisfied
+            with our response, you have the right to lodge a complaint with the Data Protection Board of India.
+          </p>
         </div>
 
         <div style={section}>
-          <h2 style={h2}>Your rights</h2>
-          <ul style={ul}>
-            <li>Access the data we hold about you.</li>
-            <li>Correct inaccurate data in your profile at any time via the Intake page.</li>
-            <li>Delete your account and data by contacting us at the address below.</li>
-            <li>Export your profile data on request.</li>
-          </ul>
+          <h2 style={h2}>14. Your duties</h2>
+          <p style={p}>
+            Under Section 15 of the DPDP Act, you agree to provide authentic information, not impersonate another
+            person, not suppress material information where legally required, and not raise false or frivolous
+            grievances.
+          </p>
         </div>
 
         <div style={section}>
-          <h2 style={h2}>Cookies</h2>
-          <p style={p}>Delta uses only functional cookies and local storage to maintain your login session. We do not use advertising or tracking cookies.</p>
+          <h2 style={h2}>15. Cookies &amp; local storage</h2>
+          <p style={p}>
+            Delta uses only functional cookies/local storage needed to keep you signed in and remember your session and
+            in-app preferences. We do not use advertising or third-party tracking cookies.
+          </p>
         </div>
 
         <div style={section}>
-          <h2 style={h2}>Contact</h2>
-          <p style={p}>For any privacy-related questions or deletion requests, email us at <a href="mailto:hitartht318@gmail.com" style={{ color: '#fff' }}>hitartht318@gmail.com</a>.</p>
+          <h2 style={h2}>16. Changes to this Policy</h2>
+          <p style={p}>
+            We may update this Policy from time to time. If we make material changes, we will update the
+            &ldquo;Last updated&rdquo; date and, where appropriate, notify you by email or an in-app notice. Continued use
+            of Delta after changes take effect constitutes acceptance.
+          </p>
+        </div>
+
+        <div style={section}>
+          <h2 style={h2}>17. Contact</h2>
+          <p style={p}>
+            For any privacy question, rights request, or grievance, email us at{' '}
+            <a href="mailto:hitartht318@gmail.com" style={link}>hitartht318@gmail.com</a>.
+          </p>
         </div>
 
       </div>

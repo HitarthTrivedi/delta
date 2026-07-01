@@ -4,8 +4,10 @@ Delta 2.0 is a career intelligence web app with a FastAPI backend and a React fr
 
 ## Documentation
 
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system architecture: layers, data model, API reference, request lifecycle, frontend structure, and the performance/caching design. Start here to understand or track the codebase.
+- **[docs/SYSTEM_DOCUMENTATION.md](docs/SYSTEM_DOCUMENTATION.md)** — the complete end-to-end system reference: what Delta is, every feature (what it does + how), architecture, data model, API, security, deployment, and the personal-data map. Read this first for the full picture.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — condensed technical reference: layers, data model, API tables, request lifecycle, frontend structure, and the performance/caching design.
 - **[docs/DELTA_CAREER_OS_BLUEPRINT.md](docs/DELTA_CAREER_OS_BLUEPRINT.md)** — the product vision and the ten system pillars.
+- **[docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md)** / **[docs/TERMS_OF_SERVICE.md](docs/TERMS_OF_SERVICE.md)** — legal documents drafted for India's DPDP Act, 2023.
 
 ## Tech Stack
 
