@@ -8,11 +8,13 @@ from app.models.personalization import PersonalizationProfile
 from app.models.career_os import CareerMemoryProfile, JourneyEvent, RoadmapState, ResumeProfile
 from app.models.semantic_memory import SemanticNodeModel, SemanticEdgeModel, TensionNodeModel, IngestionSession
 from app.models.feedback import Feedback
+from app.models.achievement import Achievement
+from app.models.opportunity_board import OpportunityBoard
 
 __all__ = [
     "User", "SkillNode", "DeltaScore", "WeeklyBrief",
     "Recommendation", "MarketSnapshot", "PersonalizationProfile",
     "CareerMemoryProfile", "JourneyEvent", "RoadmapState", "ResumeProfile",
     "SemanticNodeModel", "SemanticEdgeModel", "TensionNodeModel", "IngestionSession",
-    "Feedback",
+    "Feedback", "Achievement", "OpportunityBoard",
 ]

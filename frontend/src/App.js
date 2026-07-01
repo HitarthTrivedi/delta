@@ -42,6 +42,8 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const WeeklyPlan = lazy(() => import("./pages/WeeklyPlan"));
 const ProgressReport = lazy(() => import("./pages/ProgressReport"));
 const ResumePage = lazy(() => import("./pages/ResumePage"));
+const TrophyCabinet = lazy(() => import("./pages/TrophyCabinet"));
+const Opportunities = lazy(() => import("./pages/Opportunities"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 
 // Core connection hooks
@@ -200,6 +202,8 @@ function AppContent() {
         <Route path="/roadmap" element={<RequireAuth><ProtectedRoute><WeeklyPlan /></ProtectedRoute></RequireAuth>} />
         <Route path="/progress-report" element={<RequireAuth><ProtectedRoute><ProgressReport /></ProtectedRoute></RequireAuth>} />
         <Route path="/resume" element={<RequireAuth><ProtectedRoute><ResumePage /></ProtectedRoute></RequireAuth>} />
+        <Route path="/achievements" element={<RequireAuth><ProtectedRoute><TrophyCabinet /></ProtectedRoute></RequireAuth>} />
+        <Route path="/opportunities" element={<RequireAuth><ProtectedRoute><Opportunities /></ProtectedRoute></RequireAuth>} />
         <Route path="/dashboard" element={<RequireAuth><ProtectedRoute><Dashboard /></ProtectedRoute></RequireAuth>} />
         <Route path="/chat" element={<Navigate to="/roadmap" replace />} />
         <Route path="/ledger" element={<RequireAuth><ProtectedRoute><Ledger /></ProtectedRoute></RequireAuth>} />

@@ -189,6 +189,21 @@ export const careerOSAPI = {
   updateWeeklyTasks: (userId, tasks) => api.put(`/career-os/user/${userId}/weekly-tasks`, { tasks }).then(r => r.data),
 };
 
+// ── Opportunities API (AI-matched jobs & internships) ──
+export const opportunitiesAPI = {
+  get: (userId) => api.get(`/opportunities/${userId}`).then(r => r.data),
+  updatePreferences: (userId, prefs) => api.put(`/opportunities/${userId}/preferences`, prefs).then(r => r.data),
+  // AI generation can take several seconds — allow a generous timeout.
+  generate: (userId) => api.post(`/opportunities/${userId}/generate`, {}, { timeout: 120000 }).then(r => r.data),
+};
+
+// ── Achievements API (trophy cabinet) ──
+export const achievementsAPI = {
+  list: (userId) => api.get(`/achievements/${userId}`).then(r => r.data),
+  create: (userId, data) => api.post(`/achievements/${userId}`, data).then(r => r.data),
+  remove: (userId, achievementId) => api.delete(`/achievements/${userId}/${achievementId}`).then(r => r.data),
+};
+
 // ── Ingestion API ──
 export const ingestionAPI = {
   start: (userId, journeyType) => api.post('/ingestion/start', { user_id: userId, journey_type: journeyType }).then(r => r.data),

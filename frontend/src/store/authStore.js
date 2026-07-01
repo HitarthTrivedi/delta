@@ -123,7 +123,8 @@ export const useAuthStore = create((set) => ({
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/intake',
+        // /roadmap gates on profile completion and falls back to onboarding.
+        redirectTo: window.location.origin + '/roadmap',
       }
     });
     if (error) throw error;

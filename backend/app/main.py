@@ -7,7 +7,7 @@ from app.limiter import limiter
 from app.config import settings
 from app.database import engine, Base
 from app.models import *  # noqa: F401,F403 — ensures all models register with Base
-from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders
+from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders, achievements, opportunities
 
 # Global rate limiter imported from app.limiter (avoids circular imports)
 
@@ -45,6 +45,8 @@ app.include_router(career_os.router)
 app.include_router(ingestion.router)
 app.include_router(feedback.router)
 app.include_router(reminders.router)
+app.include_router(achievements.router)
+app.include_router(opportunities.router)
 
 
 @app.on_event("startup")

@@ -5,10 +5,11 @@ import remarkGfm from 'remark-gfm';
 import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, Bell, X, Pencil, Plus, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { careerOSAPI, chatAPI } from '../lib/api';
+import { careerOSAPI } from '../lib/api';
 import { getTaskProgress } from '../lib/taskProgress';
 import { useReminder, requestNotificationPermission } from '../lib/useReminder';
 import { useAuthStore } from '../store/authStore';
+import { useAgent2Chat } from '../store/agent2ChatStore';
 import { seedCareerContext } from '../hooks/useCareerOS';
 
 const panelStyle = {
@@ -42,11 +43,17 @@ export default function WeeklyPlan() {
   const [checked, setChecked] = useState({});
   const [skipped, setSkipped] = useState({});
   const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Agent 2 is ready. Tell me if exams, deadlines, low energy, travel, or inactivity should change this week\'s plan.' },
-  ]);
+  // Agent 2 chat state lives in a shared store so the thread and any in-flight
+  // reply persist across navigating away from this page and back.
+  const messages = useAgent2Chat((s) => s.messages);
+  const sending = useAgent2Chat((s) => s.sending);
+  const historyLoaded = useAgent2Chat((s) => s.historyLoaded);
+  const loadingHistory = useAgent2Chat((s) => s.loadingHistory);
+  const ensureAgent2User = useAgent2Chat((s) => s.ensureUser);
+  const sendAgent2 = useAgent2Chat((s) => s.send);
+  const resetAgent2Chat = useAgent2Chat((s) => s.reset);
+  const loadAgent2History = useAgent2Chat((s) => s.loadHistory);
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'unsupported'
   );
@@ -90,11 +97,12 @@ export default function WeeklyPlan() {
     }
   }, [userId, queryClient]);
 
+  // Bind the shared Agent 2 thread to the current user (resets only when the
+  // user changes). Past conversation is loaded lazily via a button, not here —
+  // so the chat opens instantly instead of blocking on a history fetch.
   useEffect(() => {
-    chatAPI.getHistory(userId).then((res) => {
-      if (res?.messages?.length) setMessages(res.messages);
-    }).catch(() => {});
-  }, [userId]);
+    if (userId) ensureAgent2User(userId);
+  }, [userId, ensureAgent2User]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -216,43 +224,32 @@ export default function WeeklyPlan() {
     } catch { /* non-fatal */ }
   };
 
-  // Core send — accepts text directly so it can be called programmatically
+  // Core send — accepts text directly so it can be called programmatically.
+  // The store owns the message thread + sending flag (so they persist across
+  // navigation); here we just build the prompt and apply any task updates.
   const sendMessageText = async (text) => {
     if (!text || sending) return;
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
-    setSending(true);
-    try {
-      const response = await chatAPI.send({
-        user_id: userId,
-        message: `Agent 2 weekly plan discussion. Current weekly actions: ${actions.map(a => a.title).join('; ')}. User update: ${text}`,
-      });
-      setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
-      if (Array.isArray(response.updated_actions)) {
-        setContext(prev => ({
-          ...(prev || {}),
-          roadmap: {
-            ...((prev || {}).roadmap || {}),
-            weekly_focus: {
-              ...(((prev || {}).roadmap || {}).weekly_focus || {}),
-              primary_actions: response.updated_actions,
-              phase_name: response.week_phase || (((prev || {}).roadmap || {}).weekly_focus || {}).phase_name,
-            },
+    const prompt = `Agent 2 weekly plan discussion. Current weekly actions: ${actions.map(a => a.title).join('; ')}. User update: ${text}`;
+    const response = await sendAgent2(userId, text, prompt);
+    if (response && Array.isArray(response.updated_actions)) {
+      setContext(prev => ({
+        ...(prev || {}),
+        roadmap: {
+          ...((prev || {}).roadmap || {}),
+          weekly_focus: {
+            ...(((prev || {}).roadmap || {}).weekly_focus || {}),
+            primary_actions: response.updated_actions,
+            phase_name: response.week_phase || (((prev || {}).roadmap || {}).weekly_focus || {}).phase_name,
           },
-        }));
-        setChecked({});
-        setSkipped({});
-      } else {
-        await loadContext();
-      }
-    } catch (err) {
-      console.error(err);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Agent 2 could not reply right now. Try again in a few seconds.',
-      }]);
+        },
+      }));
+      setChecked({});
+      setSkipped({});
+    } else {
+      // No task change (or the reply failed) — pull fresh context so the page
+      // and the server stay in sync. On failure the store already showed an
+      // error line, and task changes are persisted server-side regardless.
       await loadContext();
-    } finally {
-      setSending(false);
     }
   };
 
@@ -380,7 +377,7 @@ export default function WeeklyPlan() {
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
-      setMessages([{ role: 'assistant', content: 'New week loaded. Tell me if anything has changed — exams, pace, priorities.' }]);
+      resetAgent2Chat('New week loaded. Tell me if anything has changed — exams, pace, priorities.');
       toast.success('Next week loaded — Agent 2 has updated your tasks.');
     } catch (err) {
       clearInterval(stepInterval);
@@ -952,6 +949,25 @@ export default function WeeklyPlan() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {!historyLoaded && (
+                <button
+                  onClick={async () => {
+                    const ok = await loadAgent2History(userId);
+                    if (!ok) toast.error('Could not load previous chat.');
+                  }}
+                  disabled={loadingHistory}
+                  style={{
+                    alignSelf: 'center', marginBottom: 4,
+                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 999, padding: '6px 14px', color: 'rgba(255,255,255,0.6)',
+                    fontSize: 12, cursor: loadingHistory ? 'default' : 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  {loadingHistory && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />}
+                  {loadingHistory ? 'Loading previous chat...' : 'Load previous chat'}
+                </button>
+              )}
               {messages.map((msg, i) => {
                 const isUser = msg.role === 'user';
                 return (

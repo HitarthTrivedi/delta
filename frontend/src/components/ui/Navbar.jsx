@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, FileText, Map, BarChart3, LogOut, Menu, X } from 'lucide-react';
+import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const navItems = [
   { label: 'Intake', path: '/intake', icon: ClipboardList },
   { label: 'Roadmap', path: '/roadmap', icon: Map },
   { label: 'Progress', path: '/progress-report', icon: BarChart3 },
+  { label: 'Opportunities', path: '/opportunities', icon: Briefcase },
+  { label: 'Trophies', path: '/achievements', icon: Trophy },
   { label: 'Resume', path: '/resume', icon: FileText },
 ];
 

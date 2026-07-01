@@ -36,7 +36,10 @@ export default function LoginPage() {
       } else {
         await login(email, password);
         toast.success('Welcome back!');
-        navigate('/intake');
+        // Send returning users to their roadmap. The /roadmap route's
+        // ProtectedRoute redirects to /onboarding automatically if the profile
+        // isn't complete, so incomplete users still land in intake.
+        navigate('/roadmap');
       }
     } catch (err) {
       toast.error(err.message || 'Authentication failed');
