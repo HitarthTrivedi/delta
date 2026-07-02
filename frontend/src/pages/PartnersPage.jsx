@@ -32,40 +32,31 @@ export default function PartnersPage() {
     setForm({ company: '', name: '', email: '', website: '', message: '' });
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 14px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 8,
-    color: '#fff',
-    fontSize: 14,
-    outline: 'none',
-    fontFamily: "'Inter', sans-serif",
-  };
+  const inputClass =
+    'w-full px-3.5 py-3 bg-paper border border-rule text-ink placeholder:text-ink-soft/70 text-sm outline-none focus:border-oxblood transition-colors';
 
   return (
-    <div style={{ background: '#000', minHeight: '100vh' }}>
+    <div className="bg-bone min-h-screen">
       <Header />
-      <main style={{ paddingTop: '5.5rem', paddingBottom: '3rem' }}>
-        <div style={{ maxWidth: 920, margin: '0 auto', padding: '0 1.5rem' }}>
+      <main className="pt-[5.5rem] pb-12">
+        <div className="max-w-[920px] mx-auto px-6">
 
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
-            style={{ marginBottom: 48 }}
+            className="mb-12"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <Handshake size={22} style={{ color: 'rgba(255,255,255,0.5)' }} />
-              <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 13, fontWeight: 600, margin: 0 }}>
+            <div className="flex items-center gap-2.5 mb-3.5">
+              <Handshake size={22} className="text-oxblood" />
+              <p className="kicker m-0">
                 Course Partners
               </p>
             </div>
-            <h1 style={{ color: '#fff', fontSize: 'clamp(2rem, 4vw, 3rem)', lineHeight: 1.12, fontWeight: 700, margin: '0 0 16px' }}>
+            <h1 className="font-display text-oxblood font-medium leading-[1.12] m-0 mb-4" style={{ fontSize: 'clamp(2rem, 4vw, 3rem)' }}>
               Get your courses in front of the right students
             </h1>
-            <p style={{ color: 'rgba(255,255,255,0.52)', fontSize: 16, lineHeight: 1.7, maxWidth: 640, margin: 0 }}>
+            <p className="text-ink-soft text-base leading-[1.7] max-w-[640px] m-0">
               Delta recommends courses, certifications, and learning resources to thousands of students as part of their personalized weekly roadmap. We partner with platforms like Coursera, Udemy, and independent creators who want their best content to reach students at the perfect moment in their learning journey.
             </p>
           </motion.div>
@@ -76,27 +67,22 @@ export default function PartnersPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45 }}
-            style={{ marginBottom: 48 }}
+            className="mb-12"
           >
-            <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 650, margin: '0 0 6px' }}>
+            <h2 className="font-display text-oxblood text-2xl font-semibold m-0 mb-1.5">
               How partnering works
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 1.7, margin: '0 0 24px' }}>
+            <p className="text-ink-soft text-sm leading-[1.7] m-0 mb-6">
               We review your courses, verify quality, and integrate them into Delta's recommendation engine.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
               {['Submit your course catalog', 'Delta reviews and curates', 'Students get matched automatically'].map((step, i) => (
-                <div key={i} style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 10,
-                  padding: '22px 20px',
-                }}>
-                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 10 }}>
+                <div key={i} className="bg-paper border border-rule px-5 py-[22px]">
+                  <span className="kicker block mb-2.5" style={{ color: 'var(--oxblood)' }}>
                     Step {i + 1}
                   </span>
-                  <p style={{ color: '#fff', fontSize: 15, fontWeight: 550, margin: 0 }}>{step}</p>
+                  <p className="font-display text-ink text-lg font-semibold m-0">{step}</p>
                 </div>
               ))}
             </div>
@@ -108,24 +94,19 @@ export default function PartnersPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45 }}
-            style={{ marginBottom: 48 }}
+            className="mb-12"
           >
-            <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 650, margin: '0 0 24px' }}>
+            <h2 className="font-display text-oxblood text-2xl font-semibold m-0 mb-6">
               Why partner with Delta
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
               {benefits.map((b, i) => {
                 const Icon = b.icon;
                 return (
-                  <div key={i} style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 10,
-                    padding: '24px 20px',
-                  }}>
-                    <Icon size={20} style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 14 }} />
-                    <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 600, margin: '0 0 8px' }}>{b.title}</h3>
-                    <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>{b.description}</p>
+                  <div key={i} className="bg-paper border border-rule px-5 py-6">
+                    <Icon size={20} className="text-oxblood mb-3.5" />
+                    <h3 className="font-display text-ink text-lg font-semibold m-0 mb-2">{b.title}</h3>
+                    <p className="text-ink-soft text-sm leading-[1.6] m-0">{b.description}</p>
                   </div>
                 );
               })}
@@ -139,45 +120,34 @@ export default function PartnersPage() {
             viewport={{ once: true }}
             transition={{ duration: 0.45 }}
           >
-            <div style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 12,
-              padding: '32px 28px',
-              maxWidth: 560,
-            }}>
-              <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 650, margin: '0 0 6px' }}>
+            <div className="bg-paper border border-rule px-7 py-8 max-w-[560px]">
+              <h2 className="font-display text-oxblood text-xl font-semibold m-0 mb-1.5">
                 Reach out to partner
               </h2>
-              <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, margin: '0 0 24px' }}>
+              <p className="text-ink-soft text-sm m-0 mb-6">
                 Tell us about your platform and courses. We will review and get back to you.
               </p>
 
               {submitted ? (
-                <p style={{ color: 'rgba(100,255,180,0.9)', fontSize: 15, fontWeight: 500 }}>
+                <p className="text-oxblood text-[15px] font-medium">
                   Thanks for reaching out. We will review your submission and get back to you soon.
                 </p>
               ) : (
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <input style={inputStyle} placeholder="Company / Platform name" required
+                <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+                  <input className={inputClass} placeholder="Company / Platform name" required
                     value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} />
-                  <input style={inputStyle} placeholder="Your name"
+                  <input className={inputClass} placeholder="Your name"
                     value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-                  <input style={inputStyle} placeholder="Email address" type="email" required
+                  <input className={inputClass} placeholder="Email address" type="email" required
                     value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-                  <input style={inputStyle} placeholder="Website URL"
+                  <input className={inputClass} placeholder="Website URL"
                     value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} />
-                  <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }}
+                  <textarea className={`${inputClass} min-h-[90px] resize-y`}
                     placeholder="Tell us about your courses and how you'd like to partner"
                     value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))} />
-                  <button type="submit" style={{
-                    background: '#fff', color: '#000', border: 'none', borderRadius: 999,
-                    padding: '11px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                    display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-                    transition: 'background 0.2s',
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#e5e5e5'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                  <button
+                    type="submit"
+                    className="bg-oxblood text-bone border border-oxblood font-mono text-xs uppercase tracking-[0.14em] px-6 py-3 cursor-pointer inline-flex items-center gap-1.5 self-start hover:bg-ink hover:border-ink transition-colors"
                   >
                     Submit inquiry <Send size={13} />
                   </button>

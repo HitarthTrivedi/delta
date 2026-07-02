@@ -24,52 +24,31 @@ const roles = [
 
 export default function CareersPage() {
   return (
-    <div style={{ background: '#000', minHeight: '100vh' }}>
+    <div className="bg-bone min-h-screen">
       <Header />
-      <main style={{ paddingTop: '5.5rem', paddingBottom: '3rem' }}>
-        <div style={{ maxWidth: 920, margin: '0 auto', padding: '0 1.5rem' }}>
+      <main className="pt-[5.5rem] pb-12">
+        <div className="max-w-[920px] mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
-            style={{ marginBottom: 14 }}
+            className="mb-3.5"
           >
-            <p style={{
-              color: 'rgba(255,255,255,0.48)',
-              fontSize: 13,
-              fontWeight: 600,
-              margin: '0 0 12px',
-            }}>
+            <p className="kicker mb-3">
               Careers
             </p>
-            <h1 style={{
-              color: '#fff',
-              fontSize: 'clamp(2rem, 4.5vw, 3.2rem)',
-              lineHeight: 1.12,
-              fontWeight: 700,
-              margin: '0 0 14px',
-            }}>
+            <h1 className="font-display text-oxblood font-medium leading-[1.12] m-0 mb-3.5" style={{ fontSize: 'clamp(2rem, 4.5vw, 3.2rem)' }}>
               Join the mission.
             </h1>
-            <p style={{
-              color: 'rgba(255,255,255,0.52)',
-              fontSize: 15,
-              lineHeight: 1.7,
-              maxWidth: 580,
-              margin: '0 0 40px',
-            }}>
+            <p className="text-ink-soft text-[15px] leading-[1.7] max-w-[580px] m-0 mb-10">
               Delta is built by a small, fast-moving team. We are looking for people who care about making career guidance honest and accessible.
             </p>
           </motion.div>
 
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: 1,
-            background: 'rgba(255,255,255,0.1)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            marginBottom: 36,
-          }}>
+          <div
+            className="grid gap-px bg-rule border border-rule mb-9"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}
+          >
             {roles.map((role, index) => {
               const Icon = role.icon;
               return (
@@ -78,45 +57,21 @@ export default function CareersPage() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: 0.08 + index * 0.06 }}
-                  style={{
-                    background: '#050505',
-                    padding: 28,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 16,
-                  }}
+                  className="bg-paper p-7 flex flex-col gap-4"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      background: 'rgba(255,255,255,0.04)',
-                    }}>
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 border border-rule bg-accent-surface flex items-center justify-center text-oxblood">
                       <Icon size={18} strokeWidth={1.8} />
                     </div>
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: 'rgba(255,255,255,0.4)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: 999,
-                      padding: '3px 10px',
-                      letterSpacing: '0.04em',
-                    }}>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft border border-rule px-2.5 py-1">
                       Coming Soon
                     </span>
                   </div>
                   <div>
-                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 650, margin: '0 0 8px' }}>
+                    <h3 className="font-display text-ink text-xl font-semibold m-0 mb-2">
                       {role.title}
                     </h3>
-                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.65, margin: 0 }}>
+                    <p className="text-ink-soft text-sm leading-[1.65] m-0">
                       {role.description}
                     </p>
                   </div>
@@ -129,12 +84,12 @@ export default function CareersPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, delay: 0.3 }}
-            style={{ color: 'rgba(255,255,255,0.44)', fontSize: 14, margin: 0 }}
+            className="text-ink-soft text-sm m-0"
           >
             Interested? Reach out at{' '}
             <a
               href="mailto:hitartht318@gmail.com"
-              style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              className="text-oxblood underline underline-offset-4"
             >
               hitartht318@gmail.com
             </a>

@@ -3,32 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 const section = { marginBottom: 36 };
-const h2 = { color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 10, marginTop: 0 };
-const h3 = { color: 'rgba(255,255,255,0.9)', fontSize: 15, fontWeight: 600, marginBottom: 6, marginTop: 18 };
-const p = { color: 'rgba(255,255,255,0.6)', fontSize: 15, lineHeight: 1.8, margin: '0 0 12px' };
-const ul = { color: 'rgba(255,255,255,0.6)', fontSize: 15, lineHeight: 1.8, paddingLeft: 22, margin: '0 0 12px' };
-const strong = { color: 'rgba(255,255,255,0.85)' };
-const link = { color: '#fff' };
+const h2 = { color: 'var(--oxblood)', fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, marginBottom: 10, marginTop: 0 };
+const h3 = { color: 'var(--ink)', fontSize: 15, fontWeight: 600, marginBottom: 6, marginTop: 18 };
+const p = { color: 'var(--ink-soft)', fontSize: 15, lineHeight: 1.8, margin: '0 0 12px' };
+const ul = { color: 'var(--ink-soft)', fontSize: 15, lineHeight: 1.8, paddingLeft: 22, margin: '0 0 12px' };
+const strong = { color: 'var(--ink)' };
+const link = { color: 'var(--oxblood)' };
 
 export default function PrivacyPolicy() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#000', fontFamily: "'Inter', sans-serif", color: '#fff' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bone)', fontFamily: "'Manrope', sans-serif", color: 'var(--ink)' }}>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '6rem 1.5rem 4rem' }}>
 
         <button
           onClick={() => navigate(-1)}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none',
-            border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+            border: 'none', color: 'var(--ink-soft)', cursor: 'pointer',
             fontSize: 14, marginBottom: 40, padding: 0,
           }}
         >
           <ArrowLeft size={15} /> Back
         </button>
 
-        <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, marginBottom: 8 }}>Privacy Policy</h1>
+        <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--oxblood)', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 600, marginBottom: 8 }}>Privacy Policy</h1>
         <p style={{ ...p, marginBottom: 8 }}>Last updated: July 2, 2026</p>
         <p style={{ ...p, marginBottom: 40 }}>
           This Privacy Policy is drafted to comply with India&apos;s Digital Personal Data Protection Act, 2023

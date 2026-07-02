@@ -56,7 +56,7 @@ function formatINR(value) {
 
 function Panel({ children, className = '' }) {
   return (
-    <GlassPanel hover={false} className={cx('p-5 rounded-lg border-white/5', className)}>
+    <GlassPanel hover={false} className={cx('p-5 rounded-lg border-rule', className)}>
       {children}
     </GlassPanel>
   );
@@ -65,28 +65,28 @@ function Panel({ children, className = '' }) {
 function SectionTitle({ icon: Icon, title, meta }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-4">
-      <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-300 flex items-center gap-2">
-        <Icon size={13} className="text-cyan-400" />
+      <h2 className="text-[11px] font-bold uppercase tracking-widest text-ink flex items-center gap-2">
+        <Icon size={13} className="text-oxblood" />
         {title}
       </h2>
-      {meta && <span className="text-[10px] text-slate-500 uppercase tracking-wider">{meta}</span>}
+      {meta && <span className="text-[10px] text-ink-soft uppercase tracking-wider">{meta}</span>}
     </div>
   );
 }
 
-function Metric({ label, value, detail, tone = 'text-white' }) {
+function Metric({ label, value, detail, tone = 'text-ink' }) {
   return (
     <Panel className="min-h-[104px]">
-      <p className="text-[10px] uppercase tracking-widest text-slate-500">{label}</p>
+      <p className="text-[10px] uppercase tracking-widest text-ink-soft">{label}</p>
       <p className={cx('mt-2 text-2xl font-black tracking-tight', tone)}>{value}</p>
-      {detail && <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{detail}</p>}
+      {detail && <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">{detail}</p>}
     </Panel>
   );
 }
 
 function EmptyLine({ children }) {
   return (
-    <div className="py-4 text-[11px] leading-relaxed text-slate-500">
+    <div className="py-4 text-[11px] leading-relaxed text-ink-soft">
       {children}
     </div>
   );
@@ -94,11 +94,11 @@ function EmptyLine({ children }) {
 
 function StatusPill({ children, tone = 'cyan' }) {
   const tones = {
-    cyan: 'border-cyan-500/20 bg-cyan-500/10 text-cyan-300',
-    emerald: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300',
-    amber: 'border-amber-500/20 bg-amber-500/10 text-amber-300',
-    rose: 'border-rose-500/20 bg-rose-500/10 text-rose-300',
-    slate: 'border-white/10 bg-white/5 text-slate-300',
+    cyan: 'border-oxblood/20 bg-oxblood/10 text-oxblood',
+    emerald: 'border-emerald-600/20 bg-emerald-600/10 text-emerald-700',
+    amber: 'border-amber-600/20 bg-amber-600/10 text-amber-700',
+    rose: 'border-oxblood/20 bg-oxblood/10 text-oxblood',
+    slate: 'border-rule bg-paper text-ink',
   };
 
   return (
@@ -110,7 +110,7 @@ function StatusPill({ children, tone = 'cyan' }) {
 
 function Row({ children, className = '' }) {
   return (
-    <div className={cx('border-t border-white/5 py-3 first:border-t-0 first:pt-0 last:pb-0', className)}>
+    <div className={cx('border-t border-rule py-3 first:border-t-0 first:pt-0 last:pb-0', className)}>
       {children}
     </div>
   );
@@ -367,10 +367,10 @@ export default function Dashboard() {
 
   if (!stats || !brief || !careerContext || !derived) {
     return (
-      <div className="min-h-screen pt-24 px-6 flex flex-col items-center justify-center bg-grid-pattern text-slate-400 font-mono">
-        <Cpu className="animate-spin text-cyan-400 mb-4" size={32} />
-        <h1 className="text-lg font-black uppercase tracking-widest text-white">Loading Career OS</h1>
-        <p className="text-[11px] text-slate-500 mt-2">Dashboard sync in progress</p>
+      <div className="min-h-screen pt-24 px-6 flex flex-col items-center justify-center bg-grid-pattern text-ink-soft font-mono">
+        <Cpu className="animate-spin text-oxblood mb-4" size={32} />
+        <h1 className="text-lg font-black uppercase tracking-widest text-ink">Loading Career OS</h1>
+        <p className="text-[11px] text-ink-soft mt-2">Dashboard sync in progress</p>
       </div>
     );
   }
@@ -404,12 +404,12 @@ export default function Dashboard() {
   const readiness = portfolio.readiness || 'unknown';
 
   return (
-    <div className="min-h-screen pt-20 px-4 sm:px-6 max-w-7xl mx-auto pb-12 text-slate-200 font-mono selection:bg-cyan-500/20">
-      <header className="mb-6 flex flex-col gap-5 border-b border-white/5 pb-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="min-h-screen pt-20 px-4 sm:px-6 max-w-7xl mx-auto pb-12 text-ink font-mono selection:bg-oxblood/20">
+      <header className="mb-6 flex flex-col gap-5 border-b border-rule pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-400">Delta Career OS</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-white">Dashboard</h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-oxblood">Delta Career OS</p>
+          <h1 className="mt-2 font-display text-4xl font-semibold tracking-tight text-oxblood">Dashboard</h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
             {targetRole}
           </p>
         </div>
@@ -422,20 +422,20 @@ export default function Dashboard() {
               className={cx(
                 'relative rounded-md border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors',
                 activeView === view.id
-                  ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
-                  : 'border-white/10 bg-white/[0.03] text-slate-400 hover:text-white'
+                  ? 'border-oxblood/40 bg-oxblood/10 text-oxblood'
+                  : 'border-rule bg-paper text-ink-soft hover:text-ink'
               )}
             >
               {view.label}
               {view.id === 'resume' && resumeSuggestionsDue && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                <span className="absolute -right-1.5 -top-1.5 flex h-2.5 w-2.5 rounded-full bg-oxblood" />
               )}
             </button>
           ))}
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:text-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition-colors hover:text-ink disabled:opacity-50"
           >
             <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
             Refresh
@@ -444,10 +444,10 @@ export default function Dashboard() {
       </header>
 
       <section className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Delta Score" value={deltaScore} detail={`${alignment}% aligned with target role`} tone="text-cyan-300" />
-        <Metric label="Weekly Capacity" value={`${hoursPerWeek}h`} detail={`${consistency}% consistency indexed`} tone="text-emerald-300" />
-        <Metric label="Portfolio" value={readiness} detail={(portfolio.missing_market_proof || []).slice(0, 2).join(', ') || 'proof stack stable'} tone="text-white" />
-        <Metric label="OS Status" value={systemStatus?.status || 'syncing'} detail={`${semanticSummary.total_nodes || 0} memory nodes`} tone="text-emerald-300" />
+        <Metric label="Delta Score" value={deltaScore} detail={`${alignment}% aligned with target role`} tone="text-oxblood" />
+        <Metric label="Weekly Capacity" value={`${hoursPerWeek}h`} detail={`${consistency}% consistency indexed`} tone="text-emerald-700" />
+        <Metric label="Portfolio" value={readiness} detail={(portfolio.missing_market_proof || []).slice(0, 2).join(', ') || 'proof stack stable'} tone="text-ink" />
+        <Metric label="OS Status" value={systemStatus?.status || 'syncing'} detail={`${semanticSummary.total_nodes || 0} memory nodes`} tone="text-emerald-700" />
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.55fr_.95fr]">
@@ -457,9 +457,9 @@ export default function Dashboard() {
             {nextNode ? (
               <div className="space-y-4">
                 <div>
-                  <p className="text-[11px] uppercase tracking-widest text-slate-500">Next checkpoint</p>
-                  <h3 className="mt-1 text-lg font-black text-white">{nextNode.label}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-400">{nextNode.description}</p>
+                  <p className="text-[11px] uppercase tracking-widest text-ink-soft">Next checkpoint</p>
+                  <h3 className="mt-1 text-lg font-black text-ink">{nextNode.label}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-soft">{nextNode.description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <StatusPill tone={nextNode.status === 'mastered' ? 'emerald' : 'cyan'}>
@@ -472,7 +472,7 @@ export default function Dashboard() {
                     setSelectedNode(nextNode);
                     setActiveView('roadmap');
                   }}
-                  className="inline-flex items-center gap-2 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-cyan-200 transition-colors hover:border-cyan-400/50"
+                  className="inline-flex items-center gap-2 rounded-md border border-oxblood/20 bg-oxblood/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-oxblood transition-colors hover:border-oxblood/50"
                 >
                   <BookOpen size={13} />
                   Open checkpoint
@@ -487,16 +487,16 @@ export default function Dashboard() {
             <SectionTitle icon={Github} title="Proof To Ship" meta={readiness} />
             {primaryProject ? (
               <div className="space-y-3">
-                <h3 className="text-base font-black text-white">{primaryProject.title}</h3>
-                <p className="text-sm leading-relaxed text-slate-400">{primaryProject.resume_headline}</p>
+                <h3 className="text-base font-black text-ink">{primaryProject.title}</h3>
+                <p className="text-sm leading-relaxed text-ink-soft">{primaryProject.resume_headline}</p>
                 <Row>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Demo bar</p>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-300">{primaryProject.demo_expectations}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-ink-soft">Demo bar</p>
+                  <p className="mt-1 text-xs leading-relaxed text-ink">{primaryProject.demo_expectations}</p>
                 </Row>
                 {primaryProject.market_signal && (
                   <Row>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Market signal</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-300">{primaryProject.market_signal}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-soft">Market signal</p>
+                    <p className="mt-1 text-xs leading-relaxed text-ink">{primaryProject.market_signal}</p>
                   </Row>
                 )}
               </div>
@@ -524,12 +524,12 @@ export default function Dashboard() {
                             <span className={cx(
                               'mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded border transition-colors',
                               complete
-                                ? 'border-emerald-400 bg-emerald-400 text-slate-950'
-                                : 'border-slate-700 text-transparent group-hover:border-cyan-400'
+                                ? 'border-emerald-600 bg-emerald-600 text-bone'
+                                : 'border-rule text-transparent group-hover:border-oxblood'
                             )}>
                               <CheckCircle size={13} />
                             </span>
-                            <span className={cx('text-sm leading-relaxed', complete ? 'text-slate-500 line-through' : 'text-slate-200')}>
+                            <span className={cx('text-sm leading-relaxed', complete ? 'text-ink-soft line-through' : 'text-ink')}>
                               {action}
                             </span>
                           </button>
@@ -546,20 +546,20 @@ export default function Dashboard() {
                         const submitted = !!submittedAnswers[idx];
                         return (
                           <Row key={`${question}-${idx}`}>
-                            <p className="text-sm leading-relaxed text-slate-300">{question}</p>
+                            <p className="text-sm leading-relaxed text-ink">{question}</p>
                             {submitted ? (
-                              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-emerald-300">Synced</p>
+                              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700">Synced</p>
                             ) : (
                               <div className="mt-3 flex gap-2">
                                 <input
                                   value={resolverAnswers[idx] || ''}
                                   onChange={(event) => setResolverAnswers((prev) => ({ ...prev, [idx]: event.target.value }))}
-                                  className="min-w-0 flex-1 rounded-md border border-white/10 bg-slate-950/80 px-3 py-2 text-xs text-white outline-none transition-colors focus:border-cyan-400"
+                                  className="min-w-0 flex-1 rounded-md border border-rule bg-bone/80 px-3 py-2 text-xs text-ink outline-none transition-colors focus:border-oxblood"
                                   placeholder="Short answer"
                                 />
                                 <button
                                   onClick={() => submitAnswer(idx, question)}
-                                  className="rounded-md bg-cyan-500 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-slate-950"
+                                  className="rounded-md bg-oxblood px-3 py-2 text-[11px] font-black uppercase tracking-wider text-bone"
                                 >
                                   Save
                                 </button>
@@ -576,10 +576,10 @@ export default function Dashboard() {
                       {primaryTension ? (
                         <div className="space-y-3">
                           <StatusPill tone="rose">{formatLabel(primaryTension.type)}</StatusPill>
-                          <p className="text-sm leading-relaxed text-slate-300">
+                          <p className="text-sm leading-relaxed text-ink">
                             {primaryTension.challenge_question || primaryTension.claim}
                           </p>
-                          <p className="text-xs leading-relaxed text-slate-500">
+                          <p className="text-xs leading-relaxed text-ink-soft">
                             {primaryTension.market_reality}
                           </p>
                         </div>
@@ -596,12 +596,12 @@ export default function Dashboard() {
                   <SectionTitle icon={BookOpen} title="Roadmap" meta={activePhase?.name || 'phase map'} />
                   <div className="space-y-5">
                     {phases.map((phase, phaseIndex) => (
-                      <section key={phase.id || phase.name} className="border-t border-white/5 pt-5 first:border-t-0 first:pt-0">
+                      <section key={phase.id || phase.name} className="border-t border-rule pt-5 first:border-t-0 first:pt-0">
                         <div className="mb-3 flex items-start justify-between gap-4">
                           <div>
-                            <p className="text-[10px] uppercase tracking-widest text-slate-500">Phase {phaseIndex + 1}</p>
-                            <h3 className="mt-1 text-base font-black text-white">{phase.name}</h3>
-                            <p className="mt-1 text-xs leading-relaxed text-slate-500">{phase.description}</p>
+                            <p className="text-[10px] uppercase tracking-widest text-ink-soft">Phase {phaseIndex + 1}</p>
+                            <h3 className="mt-1 text-base font-black text-ink">{phase.name}</h3>
+                            <p className="mt-1 text-xs leading-relaxed text-ink-soft">{phase.description}</p>
                           </div>
                           {phase.id === derived.roadmap.active_phase_id && <StatusPill tone="cyan">active</StatusPill>}
                         </div>
@@ -611,15 +611,15 @@ export default function Dashboard() {
                             <button
                               key={node.id}
                               onClick={() => setSelectedNode({ ...node, phaseIndex, phaseName: phase.name })}
-                              className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-left transition-colors hover:border-cyan-400/40"
+                              className="rounded-md border border-rule bg-paper p-3 text-left transition-colors hover:border-oxblood/40"
                             >
                               <div className="flex items-center justify-between gap-3">
-                                <span className="text-sm font-bold text-white">{node.label}</span>
+                                <span className="text-sm font-bold text-ink">{node.label}</span>
                                 <StatusPill tone={node.status === 'mastered' ? 'emerald' : node.status === 'locked' ? 'slate' : 'cyan'}>
                                   {formatLabel(node.status)}
                                 </StatusPill>
                               </div>
-                              <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">{node.description}</p>
+                              <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-ink-soft">{node.description}</p>
                             </button>
                           ))}
                         </div>
@@ -632,8 +632,8 @@ export default function Dashboard() {
               {activeView === 'resume' && (
                 <motion.div key="resume" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                   <div className="mb-4 flex items-center gap-2">
-                    <FileText size={13} className="text-cyan-400" />
-                    <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-300">Resume</h2>
+                    <FileText size={13} className="text-oxblood" />
+                    <h2 className="text-[11px] font-bold uppercase tracking-widest text-ink">Resume</h2>
                   </div>
                   <ResumeSection />
                 </motion.div>
@@ -646,7 +646,7 @@ export default function Dashboard() {
                     <button
                       onClick={handleConsolidateMemory}
                       disabled={consolidating}
-                      className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:text-white disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition-colors hover:text-ink disabled:opacity-50"
                     >
                       <RefreshCw size={13} className={consolidating ? 'animate-spin' : ''} />
                       Consolidate
@@ -658,12 +658,12 @@ export default function Dashboard() {
                       {['cognitive', 'emotional', 'temporal', 'social'].map((dimension) => (
                         <Row key={dimension}>
                           <div className="mb-2 flex items-center justify-between">
-                            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{dimension}</span>
-                            <span className="text-xs text-slate-500">{dimensionBalance[dimension] || 0}%</span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">{dimension}</span>
+                            <span className="text-xs text-ink-soft">{dimensionBalance[dimension] || 0}%</span>
                           </div>
-                          <div className="h-2 overflow-hidden rounded bg-slate-950">
+                          <div className="h-2 overflow-hidden rounded bg-bone">
                             <div
-                              className="h-full rounded bg-cyan-400"
+                              className="h-full rounded bg-oxblood"
                               style={{ width: `${Math.min(dimensionBalance[dimension] || 0, 100)}%` }}
                             />
                           </div>
@@ -673,20 +673,20 @@ export default function Dashboard() {
 
                     <div>
                       <Row>
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Latest ingestion</p>
-                        <p className="mt-1 text-sm text-slate-300">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-ink-soft">Latest ingestion</p>
+                        <p className="mt-1 text-sm text-ink">
                           {semanticSession.status
                             ? `${semanticSession.status} / round ${semanticSession.current_round || 0} / ${Math.round((semanticSession.confidence_score || 0) * 100)}%`
                             : 'No ingestion session indexed'}
                         </p>
                       </Row>
                       <Row>
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Recent nodes</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-ink-soft">Recent nodes</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {semanticNodes.slice(0, 8).map((node) => (
                             <StatusPill key={node.id} tone="slate">{node.label}</StatusPill>
                           ))}
-                          {!semanticNodes.length && <span className="text-xs text-slate-500">No nodes indexed.</span>}
+                          {!semanticNodes.length && <span className="text-xs text-ink-soft">No nodes indexed.</span>}
                         </div>
                       </Row>
                     </div>
@@ -704,16 +704,16 @@ export default function Dashboard() {
               <Row key={event.external_id || event.title || idx}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">{event.platform}</p>
-                    <p className="mt-1 text-sm font-bold leading-relaxed text-white">{event.title}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-oxblood">{event.platform}</p>
+                    <p className="mt-1 text-sm font-bold leading-relaxed text-ink">{event.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                       {(event.recommended_skills || []).slice(0, 3).join(', ') || 'skills pending'}
                     </p>
                   </div>
                   <StatusPill tone={event.recommended ? 'emerald' : 'slate'}>{event.match_percentage || 0}%</StatusPill>
                 </div>
                 {event.url && (
-                  <a href={event.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                  <a href={event.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-oxblood">
                     Open <ExternalLink size={11} />
                   </a>
                 )}
@@ -735,14 +735,14 @@ export default function Dashboard() {
           <Panel>
             <SectionTitle icon={CalendarIcon} title="Journey" meta={topJourney.length ? 'latest' : 'empty'} />
             <Row>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Hiring range</p>
-              <p className="mt-1 text-sm text-slate-300">{formatINR(dossier?.hiring_market_snapshot?.salary_trend_range)}</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-ink-soft">Hiring range</p>
+              <p className="mt-1 text-sm text-ink">{formatINR(dossier?.hiring_market_snapshot?.salary_trend_range)}</p>
             </Row>
             {topJourney.map((event) => (
               <Row key={event.id}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm leading-relaxed text-slate-300">{event.summary}</p>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-600">{event.event_date}</span>
+                  <p className="text-sm leading-relaxed text-ink">{event.summary}</p>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-soft/70">{event.event_date}</span>
                 </div>
               </Row>
             ))}
@@ -754,15 +754,15 @@ export default function Dashboard() {
             {Object.entries(modules).map(([name, module]) => (
               <Row key={name}>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{formatLabel(name)}</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">{formatLabel(name)}</span>
                   <StatusPill tone={module.ready ? 'emerald' : 'rose'}>{module.ready ? 'ready' : 'offline'}</StatusPill>
                 </div>
               </Row>
             ))}
             {sourceStatuses.length > 0 && (
               <Row>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Sources</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ink-soft">Sources</p>
+                <p className="mt-1 text-xs leading-relaxed text-ink-soft">
                   {sourceStatuses.map((source) => `${source.source}:${source.mode}`).join(' / ')}
                 </p>
               </Row>
@@ -777,52 +777,52 @@ export default function Dashboard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-8 backdrop-blur"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-bone/80 px-4 py-8 backdrop-blur"
           >
             <motion.div
               initial={{ scale: 0.96, y: 16 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.96, y: 16 }}
-              className="max-h-full w-full max-w-2xl overflow-y-auto rounded-lg border border-white/10 bg-slate-950 p-6 shadow-2xl"
+              className="max-h-full w-full max-w-2xl overflow-y-auto rounded-lg border border-rule bg-bone p-6 shadow-2xl"
             >
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-oxblood">
                     {selectedNode.phaseName || `Phase ${(selectedNode.phaseIndex || 0) + 1}`}
                   </p>
-                  <h2 className="mt-1 text-2xl font-black text-white">{selectedNode.label}</h2>
+                  <h2 className="mt-1 text-2xl font-black text-ink">{selectedNode.label}</h2>
                 </div>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="rounded-md border border-white/10 bg-white/[0.03] p-2 text-slate-400 hover:text-white"
+                  className="rounded-md border border-rule bg-paper p-2 text-ink-soft hover:text-ink"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               <div className="space-y-5">
-                <p className="text-sm leading-relaxed text-slate-300">{selectedNode.description}</p>
+                <p className="text-sm leading-relaxed text-ink">{selectedNode.description}</p>
                 {selectedNode.tech_twist && (
                   <Row>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">Tech twist</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-300">{selectedNode.tech_twist}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-oxblood">Tech twist</p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink">{selectedNode.tech_twist}</p>
                   </Row>
                 )}
                 {selectedNode.architect_warning && (
                   <Row>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-amber-300">Warning</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-300">{selectedNode.architect_warning}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-amber-700">Warning</p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink">{selectedNode.architect_warning}</p>
                   </Row>
                 )}
                 {selectedNode.certification && (
                   <Row>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-300">Credential</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-300">{selectedNode.certification}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">Credential</p>
+                    <p className="mt-1 text-sm leading-relaxed text-ink">{selectedNode.certification}</p>
                   </Row>
                 )}
 
                 <Row>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Proof link</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-ink-soft">Proof link</p>
                   {(() => {
                     const rec = brief.recommendation_items?.find((item) => {
                       const skill = item.skill?.toLowerCase();
@@ -831,12 +831,12 @@ export default function Dashboard() {
                     });
 
                     if (!rec) {
-                      return <p className="mt-2 text-sm text-slate-500">No active proof checkpoint for this node.</p>;
+                      return <p className="mt-2 text-sm text-ink-soft">No active proof checkpoint for this node.</p>;
                     }
 
                     if (rec.status === 'completed') {
                       return (
-                        <p className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-emerald-300">
+                        <p className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-emerald-700">
                           <CheckCircle size={14} />
                           Verified
                         </p>
@@ -849,13 +849,13 @@ export default function Dashboard() {
                           value={githubUrl}
                           onChange={(event) => setGithubUrl(event.target.value)}
                           disabled={verifying}
-                          className="min-w-0 flex-1 rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-cyan-400"
+                          className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-oxblood"
                           placeholder="https://github.com/user/project"
                         />
                         <button
                           onClick={() => submitMilestone(rec.id, rec.skill)}
                           disabled={verifying}
-                          className="rounded-md bg-cyan-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-950 disabled:opacity-50"
+                          className="rounded-md bg-oxblood px-4 py-2 text-xs font-black uppercase tracking-wider text-bone disabled:opacity-50"
                         >
                           {verifying ? 'Checking' : 'Verify'}
                         </button>

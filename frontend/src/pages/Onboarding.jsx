@@ -99,7 +99,7 @@ const TypingDots = () => (
         key={i}
         animate={{ opacity: [0.3, 1, 0.3] }}
         transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
-        style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', display: 'block' }}
+        style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ink-soft)', display: 'block' }}
       />
     ))}
   </div>
@@ -118,8 +118,8 @@ const Bubble = ({ msg }) => {
         style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}
       >
         <div style={{
-          background: 'rgba(255,255,255,0.07)',
-          border: '1px solid rgba(255,255,255,0.12)',
+          background: 'var(--accent-surface)',
+          border: '1px solid var(--rule)',
           borderRadius: '16px 16px 4px 16px',
           padding: '10px 16px',
           display: 'flex',
@@ -127,12 +127,12 @@ const Bubble = ({ msg }) => {
           gap: 8,
           maxWidth: '70%',
         }}>
-          <FileText size={14} style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }} />
+          <FileText size={14} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />
           <div>
-            <p style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 500, margin: 0 }}>{msg.filename}</p>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', margin: 0 }}>Resume uploaded</p>
+            <p style={{ color: 'var(--ink)', fontSize: '0.85rem', fontWeight: 500, margin: 0 }}>{msg.filename}</p>
+            <p style={{ color: 'var(--ink-soft)', fontSize: '0.75rem', margin: 0 }}>Resume uploaded</p>
           </div>
-          <CheckCircle2 size={14} style={{ color: 'rgba(255,255,255,0.72)', flexShrink: 0 }} />
+          <CheckCircle2 size={14} style={{ color: 'var(--ink)', flexShrink: 0 }} />
         </div>
       </motion.div>
     );
@@ -152,20 +152,20 @@ const Bubble = ({ msg }) => {
       {isAssistant && (
         <div style={{
           width: 30, height: 30, borderRadius: '50%',
-          background: '#fff', flexShrink: 0, marginTop: 2,
+          background: 'var(--ink)', flexShrink: 0, marginTop: 2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <ClipboardList size={14} style={{ color: '#000' }} />
+          <ClipboardList size={14} style={{ color: 'var(--bone)' }} />
         </div>
       )}
 
       <div style={{
         maxWidth: '72%',
-        background: isAssistant ? 'rgba(255,255,255,0.05)' : '#fff',
-        border: isAssistant ? '1px solid rgba(255,255,255,0.1)' : 'none',
+        background: isAssistant ? 'var(--accent-surface)' : 'var(--ink)',
+        border: isAssistant ? '1px solid var(--rule)' : 'none',
         borderRadius: isAssistant ? '4px 16px 16px 16px' : '16px 16px 4px 16px',
         padding: '12px 16px',
-        color: isAssistant ? 'rgba(255,255,255,0.88)' : '#000',
+        color: isAssistant ? 'var(--ink)' : 'var(--bone)',
         fontSize: '0.9rem',
         lineHeight: 1.6,
       }}>
@@ -177,8 +177,8 @@ const Bubble = ({ msg }) => {
               ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
               ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
               li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
-              strong: ({ children }) => <strong style={{ color: '#fff', fontWeight: 700 }}>{children}</strong>,
-              code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 5px', borderRadius: 3, fontSize: '0.8rem' }}>{children}</code>,
+              strong: ({ children }) => <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{children}</strong>,
+              code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 3, fontSize: '0.8rem' }}>{children}</code>,
             }}
           >
             {msg.content}
@@ -189,10 +189,10 @@ const Bubble = ({ msg }) => {
       {!isAssistant && (
         <div style={{
           width: 30, height: 30, borderRadius: '50%',
-          background: 'rgba(255,255,255,0.12)', flexShrink: 0, marginTop: 2,
+          background: 'var(--rule)', flexShrink: 0, marginTop: 2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <User size={14} style={{ color: '#fff' }} />
+          <User size={14} style={{ color: 'var(--ink)' }} />
         </div>
       )}
     </motion.div>
@@ -480,9 +480,9 @@ export default function Onboarding() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#000',
-        color: '#fff',
-        fontFamily: "'Inter', sans-serif",
+        background: 'var(--bone)',
+        color: 'var(--ink)',
+        fontFamily: "'Manrope', sans-serif",
         padding: '6rem 2rem 4rem',
         display: 'flex',
         flexDirection: 'column',
@@ -492,16 +492,16 @@ export default function Onboarding() {
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: 35 }}>
             <div style={{
-              width: 54, height: 54, borderRadius: '50%', background: '#fff',
+              width: 54, height: 54, borderRadius: '50%', background: 'var(--ink)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 16px',
             }}>
-              <CheckCircle2 size={26} style={{ color: '#000' }} />
+              <CheckCircle2 size={26} style={{ color: 'var(--bone)' }} />
             </div>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 8 }}>
+            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--oxblood)', fontSize: '2rem', fontWeight: 600, letterSpacing: 0, marginBottom: 8 }}>
               {reviewMode ? 'Review Your Delta Profile' : 'Onboarding Profile Sync'}
             </h1>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: 500, margin: '0 auto' }}>
+            <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: 500, margin: '0 auto' }}>
               {reviewMode
                 ? 'Check the details Delta collected. Edit anything that feels wrong or incomplete before the roadmap is created.'
                 : 'Your details are gathered. You can modify any parsed fields below to fine-tune your profile.'}
@@ -510,13 +510,13 @@ export default function Onboarding() {
 
           {/* Form / Snapshot Container */}
           <div style={{
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'var(--accent-surface)',
+            border: '1px solid var(--accent-surface)',
             borderRadius: 14,
             padding: '24px 30px',
             marginBottom: 30,
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--rule)', paddingBottom: 10 }}>
               <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
                 {isEditing ? 'Modify Intake Details' : 'Active Profile Snapshot'}
               </h2>
@@ -524,7 +524,7 @@ export default function Onboarding() {
                 <button
                   onClick={() => setIsEditing(true)}
                   style={{
-                    background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
+                    background: 'none', border: 'none', color: 'var(--ink)', cursor: 'pointer',
                     fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, opacity: 0.6,
                     transition: 'opacity 0.2s',
                   }}
@@ -539,7 +539,7 @@ export default function Onboarding() {
                     onClick={handleSaveProfile}
                     disabled={saving}
                     style={{
-                      background: '#fff', border: 'none', color: '#000', cursor: 'pointer',
+                      background: 'var(--ink)', border: 'none', color: 'var(--bone)', cursor: 'pointer',
                       fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700,
                       padding: '4px 12px', borderRadius: 4,
                     }}
@@ -550,7 +550,7 @@ export default function Onboarding() {
                   <button
                     onClick={() => { setIsEditing(false); loadProfileData(); }}
                     style={{
-                      background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)',
+                      background: 'none', border: '1px solid var(--rule)', color: 'var(--ink-soft)',
                       cursor: 'pointer', fontSize: '0.8rem', padding: '4px 12px', borderRadius: 4,
                     }}
                   >
@@ -594,7 +594,7 @@ export default function Onboarding() {
                 { key: 'exam_goal_detail', label: 'Exam / Goal Detail', type: 'text' },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                     {f.label}
                   </label>
                   {isEditing ? (
@@ -603,8 +603,8 @@ export default function Onboarding() {
                         value={profile[f.key] || ''}
                         onChange={e => handleProfileFieldChange(f.key, e.target.value)}
                         style={{
-                          width: '100%', background: '#0c0c0c', border: '1px solid rgba(255,255,255,0.15)',
-                          borderRadius: 6, color: '#fff', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
+                          width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
+                          borderRadius: 6, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
                         }}
                       >
                         <option value="">Select...</option>
@@ -616,8 +616,8 @@ export default function Onboarding() {
                         value={profile[f.key] || ''}
                         onChange={e => handleProfileFieldChange(f.key, e.target.value)}
                         style={{
-                          width: '100%', background: '#0c0c0c', border: '1px solid rgba(255,255,255,0.15)',
-                          borderRadius: 6, color: '#fff', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
+                          width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
+                          borderRadius: 6, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
                         }}
                       />
                     )
@@ -635,7 +635,7 @@ export default function Onboarding() {
                 { key: 'extracurricular_interests', label: 'Extracurricular Interests (comma-separated)' },
               ].map(f => (
                 <div key={f.key} style={{ gridColumn: 'span 2' }}>
-                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                     {f.label}
                   </label>
                   {isEditing ? (
@@ -644,8 +644,8 @@ export default function Onboarding() {
                       value={Array.isArray(profile[f.key]) ? arrayToString(profile[f.key]) : profile[f.key] || ''}
                       onChange={e => handleProfileFieldChange(f.key, e.target.value)}
                       style={{
-                        width: '100%', background: '#0c0c0c', border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: 6, color: '#fff', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
+                        width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
+                        borderRadius: 6, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
                       }}
                     />
                   ) : (
@@ -658,7 +658,7 @@ export default function Onboarding() {
 
               {/* Past Experience Description */}
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Personal Introduction / Backstory
                 </label>
                 {isEditing ? (
@@ -667,19 +667,19 @@ export default function Onboarding() {
                     value={profile.personal_introduction || profile.backstory || ''}
                     onChange={e => handleProfileFieldChange('personal_introduction', e.target.value)}
                     style={{
-                      width: '100%', background: '#0c0c0c', border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 6, color: '#fff', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
+                      width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
+                      borderRadius: 6, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
                     }}
                   />
                 ) : (
-                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>
                     {profile.personal_introduction || profile.backstory || 'No backstory captured yet.'}
                   </p>
                 )}
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Inferred Timeline Reason
                 </label>
                 {isEditing ? (
@@ -688,19 +688,19 @@ export default function Onboarding() {
                     value={profile.inferred_planning_reason || ''}
                     onChange={e => handleProfileFieldChange('inferred_planning_reason', e.target.value)}
                     style={{
-                      width: '100%', background: '#0c0c0c', border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 6, color: '#fff', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
+                      width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
+                      borderRadius: 6, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
                     }}
                   />
                 ) : (
-                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>
                     {profile.inferred_planning_reason || 'Delta has not inferred a timeline reason yet.'}
                   </p>
                 )}
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Work Experience / Academic Projects Summary
                 </label>
                 {isEditing ? (
@@ -709,12 +709,12 @@ export default function Onboarding() {
                     value={profile.past_experience || ''}
                     onChange={e => handleProfileFieldChange('past_experience', e.target.value)}
                     style={{
-                      width: '100%', background: '#0c0c0c', border: '1px solid rgba(255,255,255,0.15)',
-                      borderRadius: 6, color: '#fff', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
+                      width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
+                      borderRadius: 6, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
                     }}
                   />
                 ) : (
-                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>
                     {profile.past_experience || 'No experience summary compiled.'}
                   </p>
                 )}
@@ -728,8 +728,8 @@ export default function Onboarding() {
               onClick={handleConfirmProfile}
               disabled={isEditing}
               style={{
-                background: isEditing ? 'rgba(255,255,255,0.2)' : '#fff',
-                color: isEditing ? 'rgba(255,255,255,0.4)' : '#000',
+                background: isEditing ? 'var(--rule)' : 'var(--ink)',
+                color: isEditing ? 'var(--ink-soft)' : 'var(--bone)',
                 border: 'none',
                 padding: '12px 28px',
                 borderRadius: 8,
@@ -766,9 +766,9 @@ export default function Onboarding() {
                 });
               }}
               style={{
-                background: 'rgba(255,255,255,0.05)',
-                color: 'rgba(255,255,255,0.6)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--accent-surface)',
+                color: 'var(--ink-soft)',
+                border: '1px solid var(--rule)',
                 padding: '12px 28px',
                 borderRadius: 8,
                 fontSize: '0.9rem',
@@ -777,12 +777,12 @@ export default function Onboarding() {
                 transition: 'all 0.2s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.color = '#fff';
+                e.currentTarget.style.background = 'var(--rule)';
+                e.currentTarget.style.color = 'var(--ink)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+                e.currentTarget.style.background = 'var(--accent-surface)';
+                e.currentTarget.style.color = 'var(--ink-soft)';
               }}
             >
               Reset & Retake
@@ -796,16 +796,16 @@ export default function Onboarding() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#000',
+      background: 'var(--bone)',
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: "'Inter', sans-serif",
+      fontFamily: "'Manrope', sans-serif",
       paddingTop: '11rem',
     }}>
       {/* Progress Bar Header */}
       <div style={{
-        background: 'rgba(0,0,0,0.85)',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgb(var(--bone-rgb) / 0.92)',
+        borderBottom: '1px solid var(--rule)',
         padding: '1.25rem 2rem',
         position: 'fixed',
         top: '4rem',
@@ -816,17 +816,17 @@ export default function Onboarding() {
       }}>
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.66rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.22em', fontWeight: 500 }}>
               Profile setup
             </span>
-            <span style={{ fontSize: '0.72rem', color: '#fff', fontFamily: 'monospace', fontWeight: 700 }}>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.66rem', color: 'var(--oxblood)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 500 }}>
               {progress}% complete
             </span>
           </div>
           {/* Progress Bar track */}
           <div style={{
-            width: '100%', height: 6, background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3,
+            width: '100%', height: 4, background: 'var(--accent-surface)',
+            border: '1px solid var(--rule)', borderRadius: 0,
             overflow: 'hidden', marginBottom: 12,
           }}>
             <motion.div
@@ -835,8 +835,7 @@ export default function Onboarding() {
               transition={{ duration: 0.5, ease: 'easeOut' }}
               style={{
                 height: '100%',
-                background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.9) 100%)',
-                boxShadow: '0 0 8px rgba(255,255,255,0.4)',
+                background: 'var(--oxblood)',
               }}
             />
           </div>
@@ -850,13 +849,16 @@ export default function Onboarding() {
                 <div
                   key={key}
                   style={{
-                    fontSize: '0.62rem',
-                    fontWeight: 600,
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: '0.6rem',
+                    fontWeight: 500,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
                     padding: '3px 8px',
-                    borderRadius: 4,
-                    border: isFilled ? '1px solid rgba(255,255,255,0.2)' : '1px dashed rgba(255,255,255,0.08)',
-                    background: isFilled ? 'rgba(255,255,255,0.06)' : 'transparent',
-                    color: isFilled ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)',
+                    borderRadius: 0,
+                    border: isFilled ? '1px solid var(--oxblood)' : '1px dashed var(--rule)',
+                    background: isFilled ? 'var(--paper)' : 'transparent',
+                    color: isFilled ? 'var(--ink)' : 'var(--ink-soft)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 4,
@@ -865,7 +867,7 @@ export default function Onboarding() {
                 >
                   <div style={{
                     width: 4, height: 4, borderRadius: '50%',
-                    background: isFilled ? '#fff' : 'rgba(255,255,255,0.2)',
+                    background: isFilled ? 'var(--oxblood)' : 'var(--rule)',
                   }} />
                   {label}
                 </div>
@@ -887,16 +889,16 @@ export default function Onboarding() {
               style={{ textAlign: 'center', marginBottom: 40 }}
             >
               <div style={{
-                width: 52, height: 52, borderRadius: '50%', background: '#fff',
+                width: 52, height: 52, borderRadius: '50%', background: 'var(--ink)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 margin: '0 auto 16px',
               }}>
-                <ClipboardList size={22} style={{ color: '#000' }} />
+                <ClipboardList size={22} style={{ color: 'var(--bone)' }} />
               </div>
-              <h1 style={{ color: '#fff', fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>
+              <h1 style={{ color: 'var(--oxblood)', fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: '1.6rem', fontWeight: 600, marginBottom: 8 }}>
                 Part 1: Tell us about yourself
               </h1>
-              <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6 }}>
                 Upload your resume first if you have one. I will extract what I can,
                 then ask only the missing questions Agent 2 needs for the roadmap.
               </p>
@@ -918,14 +920,14 @@ export default function Onboarding() {
               style={{ display: 'flex', gap: 10, marginBottom: 14 }}
             >
               <div style={{
-                width: 30, height: 30, borderRadius: '50%', background: '#fff',
+                width: 30, height: 30, borderRadius: '50%', background: 'var(--ink)',
                 flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <ClipboardList size={14} style={{ color: '#000' }} />
+                <ClipboardList size={14} style={{ color: 'var(--bone)' }} />
               </div>
               <div style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--accent-surface)',
+                border: '1px solid var(--rule)',
                 borderRadius: '4px 16px 16px 16px',
                 padding: '12px 18px',
               }}>
@@ -941,9 +943,9 @@ export default function Onboarding() {
       {/* Input Area */}
       {!isDone && (
         <div style={{
-          borderTop: '1px solid rgba(255,255,255,0.07)',
+          borderTop: '1px solid var(--accent-surface)',
           padding: '1rem 1.5rem',
-          background: '#000',
+          background: 'var(--bone)',
         }}>
           <div style={{ maxWidth: 680, margin: '0 auto' }}>
 
@@ -958,18 +960,18 @@ export default function Onboarding() {
                   gap: 8,
                   marginBottom: 10,
                   padding: '8px 14px',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'var(--accent-surface)',
+                  border: '1px solid var(--accent-surface)',
                   borderRadius: 10,
                   cursor: 'pointer',
                 }}
                 onClick={() => fileRef.current?.click()}
               >
-                <Paperclip size={13} style={{ color: 'rgba(255,255,255,0.4)' }} />
-                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
+                <Paperclip size={13} style={{ color: 'var(--ink-soft)' }} />
+                <span style={{ color: 'var(--ink-soft)', fontSize: '0.8rem' }}>
                   {parsing ? 'Parsing resume...' : 'Attach your resume (PDF or TXT) — skip if you don\'t have one'}
                 </span>
-                {parsing && <Loader2 size={13} style={{ color: 'rgba(255,255,255,0.4)', animation: 'spin 1s linear infinite' }} />}
+                {parsing && <Loader2 size={13} style={{ color: 'var(--ink-soft)', animation: 'spin 1s linear infinite' }} />}
               </motion.div>
             )}
 
@@ -978,13 +980,13 @@ export default function Onboarding() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 marginBottom: 10, padding: '6px 12px',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.14)',
+                background: 'var(--accent-surface)',
+                border: '1px solid var(--rule)',
                 borderRadius: 8,
               }}>
-                <CheckCircle2 size={13} style={{ color: 'rgba(255,255,255,0.72)' }} />
-                <span style={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.8rem', flex: 1 }}>{uploadFile.name} — uploaded</span>
-                <button onClick={() => setUploadFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 0 }}>
+                <CheckCircle2 size={13} style={{ color: 'var(--ink)' }} />
+                <span style={{ color: 'var(--ink)', fontSize: '0.8rem', flex: 1 }}>{uploadFile.name} — uploaded</span>
+                <button onClick={() => setUploadFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)', padding: 0 }}>
                   <X size={13} />
                 </button>
               </div>
@@ -995,8 +997,8 @@ export default function Onboarding() {
               display: 'flex',
               alignItems: 'flex-end',
               gap: 10,
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'var(--accent-surface)',
+              border: '1px solid var(--rule)',
               borderRadius: 14,
               padding: '10px 12px',
             }}>
@@ -1005,11 +1007,11 @@ export default function Onboarding() {
                 disabled={parsing}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'rgba(255,255,255,0.35)', padding: '4px', flexShrink: 0,
+                  color: 'var(--ink-soft)', padding: '4px', flexShrink: 0,
                   transition: 'color 0.2s',
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--ink)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-soft)'}
                 title="Attach resume"
               >
                 <Paperclip size={18} />
@@ -1028,7 +1030,7 @@ export default function Onboarding() {
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  color: '#fff',
+                  color: 'var(--ink)',
                   fontSize: '0.92rem',
                   lineHeight: 1.5,
                   resize: 'none',
@@ -1036,7 +1038,7 @@ export default function Onboarding() {
                   maxHeight: 140,
                   overflowY: 'auto',
                   padding: '2px 0',
-                  placeholderColor: 'rgba(255,255,255,0.3)',
+                  placeholderColor: 'var(--ink-soft)',
                 }}
                 onInput={e => {
                   e.target.style.height = 'auto';
@@ -1049,7 +1051,7 @@ export default function Onboarding() {
                 disabled={!input.trim() || isThinking}
                 style={{
                   width: 36, height: 36, borderRadius: '50%',
-                  background: input.trim() && !isThinking ? '#fff' : 'rgba(255,255,255,0.1)',
+                  background: input.trim() && !isThinking ? 'var(--ink)' : 'var(--rule)',
                   border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: input.trim() && !isThinking ? 'pointer' : 'not-allowed',
@@ -1058,15 +1060,15 @@ export default function Onboarding() {
                 }}
               >
                 {isThinking
-                  ? <Loader2 size={16} style={{ color: 'rgba(255,255,255,0.4)', animation: 'spin 1s linear infinite' }} />
-                  : <Send size={14} style={{ color: input.trim() ? '#000' : 'rgba(255,255,255,0.3)' }} />
+                  ? <Loader2 size={16} style={{ color: 'var(--ink-soft)', animation: 'spin 1s linear infinite' }} />
+                  : <Send size={14} style={{ color: input.trim() ? 'var(--bone)' : 'var(--ink-soft)' }} />
                 }
               </button>
             </div>
 
             <p style={{
               textAlign: 'center',
-              color: 'rgba(255,255,255,0.2)',
+              color: 'var(--rule)',
               fontSize: '0.72rem',
               marginTop: 10,
             }}>
@@ -1084,16 +1086,16 @@ export default function Onboarding() {
           style={{
             padding: '1.5rem',
             textAlign: 'center',
-            borderTop: '1px solid rgba(255,255,255,0.07)',
-            background: '#000',
+            borderTop: '1px solid var(--accent-surface)',
+            background: 'var(--bone)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <div style={{
-              width: 8, height: 8, borderRadius: '50%', background: '#fff',
+              width: 8, height: 8, borderRadius: '50%', background: 'var(--ink)',
               animation: 'ping 1s cubic-bezier(0,0,0.2,1) infinite',
             }} />
-            <span style={{ color: 'rgba(255,255,255,0.78)', fontSize: '0.88rem', fontWeight: 600 }}>
+            <span style={{ color: 'var(--ink)', fontSize: '0.88rem', fontWeight: 600 }}>
               Opening Agent 2 weekly plan...
             </span>
           </div>
@@ -1112,10 +1114,10 @@ export default function Onboarding() {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
-        textarea::placeholder { color: rgba(255,255,255,0.3); }
+        textarea::placeholder { color: var(--ink-soft); }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; }
       `}</style>
     </div>
   );

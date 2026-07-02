@@ -7,8 +7,8 @@ import { useAuthStore } from '../store/authStore';
 import { fetchCareerContext } from '../hooks/useCareerOS';
 
 const panel = {
-  background: '#050505',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'var(--paper)',
+  border: '1px solid var(--rule)',
   borderRadius: 8,
 };
 
@@ -21,11 +21,11 @@ const emptyText = {
 
 function StatCard({ label, value, note, icon: Icon }) {
   return (
-    <div style={{ padding: 16, minHeight: 104, background: '#050505' }}>
-      {Icon && <Icon size={17} style={{ color: 'rgba(255,255,255,0.72)', marginBottom: 12 }} />}
-      <p style={{ margin: '0 0 7px', color: 'rgba(255,255,255,0.44)', fontSize: 13 }}>{label}</p>
-      <p style={{ margin: 0, color: '#fff', fontSize: 34, fontWeight: 850, lineHeight: 1 }}>{value}</p>
-      {note && <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.42)', fontSize: 12, lineHeight: 1.35 }}>{note}</p>}
+    <div style={{ padding: 16, minHeight: 104, background: 'var(--paper)' }}>
+      {Icon && <Icon size={17} style={{ color: 'var(--ink)', marginBottom: 12 }} />}
+      <p style={{ margin: '0 0 7px', color: 'var(--ink-soft)', fontSize: 13 }}>{label}</p>
+      <p style={{ margin: 0, color: 'var(--ink)', fontSize: 34, fontWeight: 850, lineHeight: 1 }}>{value}</p>
+      {note && <p style={{ margin: '8px 0 0', color: 'var(--ink-soft)', fontSize: 12, lineHeight: 1.35 }}>{note}</p>}
     </div>
   );
 }
@@ -38,7 +38,7 @@ function ProgressRing({ done, total }) {
         width: 108,
         height: 108,
         borderRadius: '50%',
-        background: `conic-gradient(#fff ${percent * 3.6}deg, rgba(255,255,255,0.12) 0deg)`,
+        background: `conic-gradient(var(--ink) ${percent * 3.6}deg, var(--rule) 0deg)`,
         display: 'grid',
         placeItems: 'center',
         flexShrink: 0,
@@ -47,10 +47,10 @@ function ProgressRing({ done, total }) {
           width: 78,
           height: 78,
           borderRadius: '50%',
-          background: '#050505',
+          background: 'var(--paper)',
           display: 'grid',
           placeItems: 'center',
-          color: '#fff',
+          color: 'var(--ink)',
           fontSize: 24,
           fontWeight: 850,
         }}>
@@ -59,7 +59,7 @@ function ProgressRing({ done, total }) {
       </div>
       <div>
         <p style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 800 }}>This week</p>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.5 }}>
+        <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.5 }}>
           {done} of {total} tasks completed.
         </p>
       </div>
@@ -72,11 +72,11 @@ function BarRow({ label, value, total }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 7 }}>
-        <span style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13 }}>{label}</span>
-        <span style={{ color: '#fff', fontSize: 13, fontWeight: 750 }}>{value}</span>
+        <span style={{ color: 'var(--ink)', fontSize: 13 }}>{label}</span>
+        <span style={{ color: 'var(--ink)', fontSize: 13, fontWeight: 750 }}>{value}</span>
       </div>
-      <div style={{ height: 9, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${percent}%`, background: '#fff', borderRadius: 999 }} />
+      <div style={{ height: 9, background: 'var(--rule)', borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${percent}%`, background: 'var(--ink)', borderRadius: 999 }} />
       </div>
     </div>
   );
@@ -92,8 +92,8 @@ function TaskRow({ task, tone = 'left' }) {
       gridTemplateColumns: '30px minmax(0, 1fr)',
       gap: 12,
       alignItems: 'start',
-      background: done ? 'rgba(255,255,255,0.08)' : '#0a0a0a',
-      border: '1px solid rgba(255,255,255,0.1)',
+      background: done ? 'var(--accent-surface)' : 'var(--paper)',
+      border: '1px solid var(--rule)',
       borderRadius: 8,
       padding: 14,
     }}>
@@ -104,18 +104,18 @@ function TaskRow({ task, tone = 'left' }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        border: done ? 'none' : '1px solid rgba(255,255,255,0.28)',
-        background: done ? '#fff' : 'transparent',
-        color: done ? '#000' : 'rgba(255,255,255,0.72)',
+        border: done ? 'none' : '1px solid var(--ink-soft)',
+        background: done ? 'var(--ink)' : 'transparent',
+        color: done ? 'var(--bone)' : 'var(--ink)',
       }}>
         <Icon size={15} />
       </span>
       <div>
-        <p style={{ margin: '0 0 5px', color: '#fff', fontSize: 15, fontWeight: 750, lineHeight: 1.35 }}>
+        <p style={{ margin: '0 0 5px', color: 'var(--ink)', fontSize: 15, fontWeight: 750, lineHeight: 1.35 }}>
           {task.title}
         </p>
         {task.detail && (
-          <p style={{ margin: 0, color: 'rgba(255,255,255,0.46)', fontSize: 13, lineHeight: 1.45 }}>
+          <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.45 }}>
             {task.detail}
           </p>
         )}
@@ -173,17 +173,17 @@ export default function ProgressReport() {
   ].slice(0, 4);
 
   return (
-    <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1rem 3rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1rem 3rem' }}>
       <div style={{ maxWidth: 1050, margin: '0 auto' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 22 }}>
           <div>
-            <p style={{ color: 'rgba(255,255,255,0.46)', fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>
+            <p style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>
               Progress report · Week {weekNumber}
             </p>
-            <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0 }}>
+            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0 }}>
               {studentName}'s progress
             </h1>
-            <p style={{ margin: '10px 0 0', color: 'rgba(255,255,255,0.5)', fontSize: 15 }}>
+            <p style={{ margin: '10px 0 0', color: 'var(--ink-soft)', fontSize: 15 }}>
               A simple view of weeks completed, tasks finished, skipped work, and knowledge gained.
             </p>
           </div>
@@ -191,8 +191,8 @@ export default function ProgressReport() {
             onClick={loadContext}
             disabled={loading}
             style={{
-              background: '#fff',
-              color: '#000',
+              background: 'var(--ink)',
+              color: 'var(--bone)',
               border: 'none',
               borderRadius: 999,
               padding: '10px 16px',
@@ -252,7 +252,7 @@ export default function ProgressReport() {
                 total={Math.max(...knowledgeGained.map(entry => entry.completed_tasks || 1), 1)}
               />
             )) : (
-              <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14 }}>
+              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14 }}>
                 Complete a task and Delta will show what knowledge it added.
               </p>
             )}
@@ -265,7 +265,7 @@ export default function ProgressReport() {
             <div style={{ display: 'grid', gap: 10 }}>
               {progress.done.length ? progress.done.map(task => (
                 <TaskRow key={task.id} task={task} tone="done" />
-              )) : <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14 }}>{emptyText.done}</p>}
+              )) : <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14 }}>{emptyText.done}</p>}
             </div>
           </section>
 
@@ -274,7 +274,7 @@ export default function ProgressReport() {
             <div style={{ display: 'grid', gap: 10 }}>
               {progress.left.length ? progress.left.map(task => (
                 <TaskRow key={task.id} task={task} tone="left" />
-              )) : <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14 }}>{emptyText.left}</p>}
+              )) : <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14 }}>{emptyText.left}</p>}
             </div>
           </section>
         </div>
@@ -285,7 +285,7 @@ export default function ProgressReport() {
             <div style={{ display: 'grid', gap: 10 }}>
               {progress.skipped.length ? progress.skipped.map(task => (
                 <TaskRow key={task.id} task={task} tone="changed" />
-              )) : <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14 }}>{emptyText.skipped}</p>}
+              )) : <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14 }}>{emptyText.skipped}</p>}
             </div>
           </section>
 
@@ -294,7 +294,7 @@ export default function ProgressReport() {
             <div style={{ display: 'grid', gap: 10 }}>
               {progress.changed.length ? progress.changed.map(task => (
                 <TaskRow key={task.id} task={task} tone="changed" />
-              )) : <p style={{ margin: 0, color: 'rgba(255,255,255,0.48)', fontSize: 14 }}>{emptyText.changed}</p>}
+              )) : <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14 }}>{emptyText.changed}</p>}
             </div>
           </section>
         </div>
@@ -310,9 +310,9 @@ export default function ProgressReport() {
             </div>
             <div style={{ display: 'grid', gap: 10 }}>
               {(fieldSignals.length ? fieldSignals : [{ title: 'No field updates yet.', source: 'Delta' }]).map((item, index) => (
-                <div key={`${item.title}-${index}`} style={{ borderTop: index ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingTop: index ? 10 : 0 }}>
+                <div key={`${item.title}-${index}`} style={{ borderTop: index ? '1px solid var(--rule)' : 'none', paddingTop: index ? 10 : 0 }}>
                   <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 750 }}>{item.title}</p>
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.42)', fontSize: 12 }}>{item.source}</p>
+                  <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 12 }}>{item.source}</p>
                 </div>
               ))}
             </div>

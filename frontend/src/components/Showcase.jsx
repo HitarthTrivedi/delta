@@ -27,36 +27,25 @@ const features = [
 
 const Showcase = () => {
   return (
-    <section id="showcase" style={{ background: '#000', padding: '5rem 1.5rem 4rem' }}>
-      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+    <section id="showcase" className="bg-bone px-6 pt-28 pb-20">
+      <div className="max-w-[1140px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.45 }}
-          style={{ maxWidth: 660, marginBottom: 52 }}
+          className="max-w-[760px] mb-16"
         >
-          <p style={{
-            color: 'rgba(255,255,255,0.48)',
-            fontSize: 13,
-            fontWeight: 600,
-            margin: '0 0 12px',
-          }}>
-            See it in action
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] m-0 mb-6">
+            <span className="text-oxblood">01</span>
+            <span className="text-ink-soft"> / See it in action</span>
           </p>
-          <h2 style={{
-            color: '#fff',
-            fontSize: 'clamp(2rem, 4vw, 3rem)',
-            lineHeight: 1.12,
-            fontWeight: 700,
-            letterSpacing: 0,
-            margin: 0,
-          }}>
-            Everything you need, one screen at a time.
+          <h2 className="font-display text-ink font-normal leading-[1.05] m-0 mb-5" style={{ fontSize: 'clamp(2.2rem, 5vw, 3.6rem)' }}>
+            Everything you need, <em>one screen at a time.</em>
           </h2>
         </motion.div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 72 }}>
+        <div className="flex flex-col gap-[72px]">
           {features.map((feature, index) => {
             const reversed = index % 2 === 1;
             return (
@@ -66,65 +55,28 @@ const Showcase = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-60px' }}
                 transition={{ duration: 0.5, delay: 0.08 }}
-                style={{
-                  display: 'flex',
-                  flexDirection: reversed ? 'row-reverse' : 'row',
-                  alignItems: 'center',
-                  gap: 48,
-                  flexWrap: 'wrap',
-                }}
-                className="showcase-row"
+                className={`showcase-row flex items-center gap-12 flex-wrap ${reversed ? 'flex-row-reverse' : 'flex-row'}`}
               >
                 {/* Screenshot */}
-                <div style={{ flex: '1 1 480px', minWidth: 280 }}>
-                  <div style={{
-                    borderRadius: 12,
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    overflow: 'hidden',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                    background: '#0a0a0a',
-                  }}>
+                <div className="min-w-[280px]" style={{ flex: '1 1 480px' }}>
+                  <div className="border border-rule overflow-hidden bg-paper">
                     <img
                       src={feature.image}
                       alt={feature.label}
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block',
-                      }}
+                      className="w-full h-auto block"
                     />
                   </div>
                 </div>
 
                 {/* Text */}
-                <div style={{ flex: '1 1 340px', minWidth: 260 }}>
-                  <span style={{
-                    color: 'rgba(255,255,255,0.4)',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    display: 'block',
-                    marginBottom: 12,
-                  }}>
-                    {feature.label}
+                <div className="min-w-[260px]" style={{ flex: '1 1 340px' }}>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-oxblood block mb-4">
+                    Feature &middot; 0{index + 1} &mdash; {feature.label}
                   </span>
-                  <h3 style={{
-                    color: '#fff',
-                    fontSize: 'clamp(1.4rem, 2.8vw, 1.9rem)',
-                    lineHeight: 1.2,
-                    fontWeight: 680,
-                    letterSpacing: 0,
-                    margin: '0 0 16px',
-                  }}>
+                  <h3 className="font-display text-ink leading-[1.15] font-medium m-0 mb-4" style={{ fontSize: 'clamp(1.5rem, 3vw, 2.1rem)' }}>
                     {feature.title}
                   </h3>
-                  <p style={{
-                    color: 'rgba(255,255,255,0.5)',
-                    fontSize: 15,
-                    lineHeight: 1.7,
-                    margin: 0,
-                  }}>
+                  <p className="text-ink-soft text-[15px] leading-[1.7] m-0">
                     {feature.description}
                   </p>
                 </div>

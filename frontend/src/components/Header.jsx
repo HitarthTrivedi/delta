@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Header = () => {
@@ -22,149 +22,62 @@ const Header = () => {
     { label: 'Contact', href: '/contact' },
   ];
 
-  const headerStyle = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-    height: '3.75rem',
-    transition: 'all 0.3s ease',
-    background: isScrolled ? 'rgba(0,0,0,0.85)' : 'transparent',
-    backdropFilter: isScrolled ? 'blur(14px)' : 'none',
-    borderBottom: isScrolled ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
-  };
-
   return (
-    <header style={headerStyle}>
-      <div
-        style={{
-          maxWidth: 1120,
-          margin: '0 auto',
-          padding: '0 1.5rem',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? 'bg-bone/92 backdrop-blur-md border-b border-rule'
+          : 'bg-transparent border-b border-transparent'
+      }`}
+    >
+      <div className="max-w-[1140px] mx-auto px-6 h-[72px] flex items-center justify-between">
         {/* Logo */}
         <div
-          style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+          className="flex items-baseline gap-2.5 cursor-pointer"
           onClick={() => window.location.href = '/'}
         >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            <img
-              src="/delta-bg.jpeg"
-              alt="Delta logo"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </div>
-          <span
-            style={{
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: '1rem',
-              letterSpacing: 0,
-              fontFamily: "'Inter', sans-serif",
-            }}
-          >
+          <span className="font-display text-[1.35rem] font-semibold text-ink tracking-tight">
             Delta
+          </span>
+          <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.22em] text-ink-soft">
+            by Alpha.Kore
           </span>
         </div>
 
         {/* Desktop Nav */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 32 }} className="hidden md:flex">
+        <nav className="hidden md:flex items-center gap-8">
           {navItems.map((item) => (
             <a
               key={item.label}
               href={item.href}
-              style={{
-                color: 'rgba(255,255,255,0.6)',
-                textDecoration: 'none',
-                fontSize: '0.875rem',
-                fontWeight: 450,
-                transition: 'color 0.2s',
-                fontFamily: "'Inter', sans-serif",
-              }}
-              onMouseEnter={e => e.target.style.color = '#fff'}
-              onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.6)'}
+              className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft hover:text-oxblood transition-colors no-underline"
             >
               {item.label}
             </a>
           ))}
         </nav>
 
-        {/* Desktop CTA */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }} className="hidden md:flex">
+        {/* Desktop CTA — quiet mono links, memorandum style */}
+        <div className="hidden md:flex items-center gap-7">
           <button
             onClick={() => window.location.href = '/progress-report'}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'rgba(255,255,255,0.6)',
-              fontSize: '0.875rem',
-              fontWeight: 450,
-              cursor: 'pointer',
-              padding: '6px 4px',
-              transition: 'color 0.2s',
-              fontFamily: "'Inter', sans-serif",
-            }}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.6)'}
+            className="bg-transparent border-none font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft hover:text-oxblood cursor-pointer p-0 transition-colors"
           >
             Progress
           </button>
           <button
             onClick={() => window.location.href = '/intake'}
             id="header-get-started"
-            style={{
-              background: '#fff',
-              color: '#000',
-              border: 'none',
-              borderRadius: 999,
-              padding: '7px 18px',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              transition: 'background 0.2s',
-              fontFamily: "'Inter', sans-serif",
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#e5e5e5'}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            className="bg-transparent border-none font-mono text-[10px] uppercase tracking-[0.2em] text-oxblood hover:text-ink cursor-pointer p-0 transition-colors"
           >
-            Get Started <ArrowRight size={13} />
+            Get Started &#8599;
           </button>
         </div>
 
         {/* Mobile burger */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          style={{
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 8,
-            color: '#fff',
-            padding: 8,
-            cursor: 'pointer',
-            display: 'none',
-          }}
-          className="md:hidden"
+          className="md:hidden bg-transparent border border-rule text-ink p-2 cursor-pointer"
           aria-label="Toggle menu"
         >
           {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -178,62 +91,30 @@ const Header = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            style={{
-              background: 'rgba(0,0,0,0.95)',
-              backdropFilter: 'blur(16px)',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-              padding: '1.5rem',
-              position: 'absolute',
-              top: '3.75rem',
-              left: 0,
-              right: 0,
-              zIndex: 49,
-            }}
+            className="absolute top-[72px] left-0 right-0 z-40 bg-bone border-b border-rule p-6 overflow-hidden"
           >
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+            <nav className="flex flex-col gap-4 mb-5">
               {navItems.map((item) => (
                 <a
                   key={item.label}
                   href={item.href}
-                  style={{
-                    color: 'rgba(255,255,255,0.7)',
-                    textDecoration: 'none',
-                    fontSize: '0.95rem',
-                    fontWeight: 500,
-                  }}
+                  className="font-mono text-xs uppercase tracking-[0.2em] text-ink-soft no-underline"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {item.label}
                 </a>
               ))}
             </nav>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="flex flex-col gap-2.5">
               <button
-                style={{
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 8,
-                  color: 'rgba(255,255,255,0.7)',
-                  padding: '10px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  width: '100%',
-                }}
+                onClick={() => { setIsMobileMenuOpen(false); window.location.href = '/login'; }}
+                className="bg-transparent border border-ink text-ink font-mono text-xs uppercase tracking-[0.16em] p-2.5 cursor-pointer w-full"
               >
                 Login
               </button>
               <button
                 onClick={() => { setIsMobileMenuOpen(false); window.location.href = '/intake'; }}
-                style={{
-                  background: '#fff',
-                  border: 'none',
-                  borderRadius: 8,
-                  color: '#000',
-                  padding: '10px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  width: '100%',
-                }}
+                className="bg-oxblood text-bone border border-oxblood font-mono text-xs uppercase tracking-[0.16em] p-2.5 cursor-pointer w-full"
               >
                 Get Started
               </button>

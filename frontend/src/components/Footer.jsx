@@ -1,141 +1,67 @@
 import React from 'react';
 
-const linkStyle = {
-  color: 'rgba(255,255,255,0.5)',
-  textDecoration: 'none',
-  fontSize: 13,
-  lineHeight: 2.1,
-  transition: 'color 0.2s',
-  display: 'block',
-};
-
-const colTitleStyle = {
-  color: 'rgba(255,255,255,0.8)',
-  fontSize: 13,
-  fontWeight: 650,
-  marginBottom: 10,
-  letterSpacing: '0.02em',
-};
+const FooterLink = ({ href, children }) => (
+  <a
+    href={href}
+    className="block text-ink-soft hover:text-oxblood no-underline text-[13px] leading-[2.1] transition-colors"
+  >
+    {children}
+  </a>
+);
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer style={{
-      background: '#000',
-      color: 'rgba(255,255,255,0.56)',
-      padding: '3.5rem 1.5rem 2rem',
-      borderTop: '1px solid rgba(255,255,255,0.1)',
-    }}>
-      <div style={{
-        maxWidth: 1120,
-        margin: '0 auto',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: '2.5rem',
-        marginBottom: '2.5rem',
-      }}>
+    <footer className="bg-bone text-ink-soft border-t border-rule px-6 pt-14 pb-8">
+      <div
+        className="max-w-[1120px] mx-auto grid gap-10 mb-10"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}
+      >
         {/* Brand column */}
-        <div style={{ minWidth: 180 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div style={{
-              width: 26,
-              height: 26,
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}>
-              <img
-                src="/delta-bg.jpeg"
-                alt="Delta logo"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Delta</span>
+        <div className="min-w-[180px]">
+          <div className="flex items-baseline gap-2 mb-3.5">
+            <span className="font-display text-ink font-semibold text-xl">Delta</span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink-soft">by Alpha.Kore</span>
           </div>
-          <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 13, lineHeight: 1.6, margin: 0, maxWidth: 220 }}>
+          <p className="text-ink-soft text-[13px] leading-relaxed m-0 max-w-[220px]">
             AI-powered career operating system for students.
           </p>
         </div>
 
         {/* Product */}
         <div>
-          <p style={colTitleStyle}>Product</p>
-          <a href="#features" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Features</a>
-          <a href="#how-it-works" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >How It Works</a>
-          <a href="/intake" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Get Started</a>
-          <a href="/#feedback" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Feedback</a>
+          <p className="kicker mb-2.5">Product</p>
+          <FooterLink href="#features">Features</FooterLink>
+          <FooterLink href="#how-it-works">How It Works</FooterLink>
+          <FooterLink href="/intake">Get Started</FooterLink>
+          <FooterLink href="/#feedback">Feedback</FooterLink>
         </div>
 
         {/* Company */}
         <div>
-          <p style={colTitleStyle}>Company</p>
-          <a href="/about" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >About</a>
-          <a href="/careers" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Careers</a>
-          <a href="/contact" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Contact</a>
-          <a href="/partners" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Partners</a>
-          <a href="/investors" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Investors</a>
+          <p className="kicker mb-2.5">Company</p>
+          <FooterLink href="/about">About</FooterLink>
+          <FooterLink href="/careers">Careers</FooterLink>
+          <FooterLink href="/contact">Contact</FooterLink>
+          <FooterLink href="/partners">Partners</FooterLink>
+          <FooterLink href="/investors">Investors</FooterLink>
         </div>
 
         {/* Legal */}
         <div>
-          <p style={colTitleStyle}>Legal</p>
-          <a href="/privacy" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Privacy Policy</a>
-          <a href="/terms" style={linkStyle}
-            onMouseEnter={e => e.target.style.color = '#fff'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.5)'}
-          >Terms of Service</a>
+          <p className="kicker mb-2.5">Legal</p>
+          <FooterLink href="/privacy">Privacy Policy</FooterLink>
+          <FooterLink href="/terms">Terms of Service</FooterLink>
         </div>
       </div>
 
       {/* Bottom bar */}
-      <div style={{
-        borderTop: '1px solid rgba(255,255,255,0.08)',
-        paddingTop: 20,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 12,
-      }}>
-        <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
-          &copy; {currentYear} Delta. All rights reserved.
+      <div className="max-w-[1120px] mx-auto border-t border-rule pt-5 flex justify-between items-center flex-wrap gap-3">
+        <p className="m-0 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
+          &copy; {currentYear} Delta &middot; Alpha.Kore
         </p>
-        <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.28)' }}>
+        <p className="m-0 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft/70">
           Made with purpose for students everywhere.
         </p>
       </div>

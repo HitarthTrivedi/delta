@@ -28,42 +28,24 @@ const agents = [
 
 const Features = () => {
   return (
-    <section id="features" style={{ background: '#000', padding: '5rem 1.5rem 4rem' }}>
-      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+    <section id="features" className="bg-bone px-6 pt-20 pb-16">
+      <div className="max-w-[1120px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.45 }}
-          style={{ maxWidth: 660, marginBottom: 34 }}
+          className="max-w-[660px] mb-9"
         >
-          <p style={{
-            color: 'rgba(255,255,255,0.48)',
-            fontSize: 13,
-            fontWeight: 600,
-            margin: '0 0 12px',
-          }}>
+          <p className="kicker mb-3">
             A career plan that updates only when the student is ready
           </p>
-          <h2 style={{
-            color: '#fff',
-            fontSize: 'clamp(2rem, 4vw, 3rem)',
-            lineHeight: 1.12,
-            fontWeight: 700,
-            letterSpacing: 0,
-            margin: 0,
-          }}>
+          <h2 className="font-display text-oxblood font-medium leading-[1.12] m-0" style={{ fontSize: 'clamp(2rem, 4vw, 3rem)' }}>
             Three agents, one continuously adjusted path.
           </h2>
         </motion.div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 1,
-          background: 'rgba(255,255,255,0.1)',
-          border: '1px solid rgba(255,255,255,0.1)',
-        }}>
+        <div className="grid gap-px bg-rule border border-rule" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           {agents.map((agent, index) => {
             const Icon = agent.icon;
             return (
@@ -73,54 +55,19 @@ const Features = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.42, delay: index * 0.06 }}
-                style={{
-                  minHeight: 288,
-                  background: '#050505',
-                  padding: 28,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                }}
+                className="min-h-[288px] bg-paper p-7 flex flex-col justify-between"
               >
                 <div>
-                  <div style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 8,
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    marginBottom: 28,
-                    background: 'rgba(255,255,255,0.04)',
-                  }}>
+                  <div className="w-[42px] h-[42px] border border-rule bg-accent-surface flex items-center justify-center text-oxblood mb-7">
                     <Icon size={19} strokeWidth={1.8} />
                   </div>
-                  <p style={{
-                    color: 'rgba(255,255,255,0.38)',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    margin: '0 0 8px',
-                  }}>
+                  <p className="kicker mb-2">
                     {agent.name}
                   </p>
-                  <h3 style={{
-                    color: '#fff',
-                    fontSize: 22,
-                    lineHeight: 1.25,
-                    fontWeight: 650,
-                    letterSpacing: 0,
-                    margin: '0 0 14px',
-                  }}>
+                  <h3 className="font-display text-ink text-[1.4rem] leading-[1.25] font-semibold m-0 mb-3.5">
                     {agent.title}
                   </h3>
-                  <p style={{
-                    color: 'rgba(255,255,255,0.52)',
-                    fontSize: 15,
-                    lineHeight: 1.65,
-                    margin: 0,
-                  }}>
+                  <p className="text-ink-soft text-[15px] leading-[1.65] m-0">
                     {agent.description}
                   </p>
                 </div>

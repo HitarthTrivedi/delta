@@ -1,171 +1,106 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Play } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
-const BAR_HEIGHTS = [20, 40, 65, 82, 95, 82, 65, 40, 20, 40, 65, 82, 95, 82, 65, 40, 20];
+const facts = [
+  { label: 'Intake', value: 'One conversation' },
+  { label: 'Planner', value: 'Adaptive, weekly' },
+  { label: 'Progress', value: 'Honest, for years' },
+];
 
 const Hero = () => {
   return (
-    <section
-      style={{
-        background: '#000',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '0 1.5rem',
-      }}
-    >
-      {/* Vertical bars background — centered, fading */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'center',
-          gap: '14px',
-          padding: '0 10%',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      >
-        {BAR_HEIGHTS.map((h, i) => (
-          <div
-            key={i}
-            style={{
-              flex: 1,
-              maxWidth: 36,
-              height: `${h}%`,
-              background: `linear-gradient(to top, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.06) 100%)`,
-              borderRadius: '6px 6px 0 0',
-              opacity: 0.55,
-              maskImage: 'linear-gradient(to top, transparent 0%, black 40%, black 80%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(to top, transparent 0%, black 40%, black 80%, transparent 100%)',
-            }}
-          />
-        ))}
-        {/* Bottom fade */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: '35%',
-            background: 'linear-gradient(to top, #000 0%, transparent 100%)',
-          }}
-        />
-      </div>
+    <section id="cover" className="relative min-h-screen bg-bone flex flex-col justify-center px-6 pt-28 pb-8">
+      <div className="max-w-[1140px] mx-auto w-full grid md:grid-cols-12 gap-12 items-center">
 
-      {/* Main Content */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          textAlign: 'center',
-          maxWidth: 680,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '0',
-        }}
-      >
-        {/* Hero Title */}
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.08 }}
-          style={{
-            fontSize: 'clamp(2.6rem, 7vw, 4.25rem)',
-            fontWeight: 700,
-            color: '#fff',
-            lineHeight: 1.1,
-            letterSpacing: 0,
-            fontFamily: "'Inter', sans-serif",
-            marginBottom: 20,
-          }}
-        >
-          F#CK COLLEGE!<br />Delta is here
-        </motion.h1>
+        {/* Left — headline block */}
+        <div className="md:col-span-7">
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55 }}
+            className="font-mono text-[11px] uppercase tracking-[0.22em] mb-8"
+          >
+            <span className="text-oxblood">00</span>
+            <span className="text-ink-soft"> / The AI Career Operating System</span>
+          </motion.p>
 
-        {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.16 }}
-          style={{
-            color: 'rgba(255,255,255,0.45)',
-            fontSize: '1.05rem',
-            lineHeight: 1.65,
-            maxWidth: 480,
-            marginBottom: 36,
-          }}
-        >
-          One intake conversation, one adaptive weekly planner, and one progress
-          report page that keeps your roadmap honest for years.
-        </motion.p>
+          <motion.h1
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.08 }}
+            className="font-display text-ink font-normal leading-[0.98] m-0 mb-8"
+            style={{ fontSize: 'clamp(3.5rem, 9vw, 7rem)' }}
+          >
+            F#CK COLLEGE!<br />
+            <em className="font-medium">Delta is here.</em>
+          </motion.h1>
 
-        {/* CTA Buttons */}
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.16 }}
+            className="text-ink-soft text-[1.05rem] leading-[1.7] max-w-[480px] m-0"
+          >
+            One intake conversation, one adaptive weekly planner, and one progress
+            report page that keeps your roadmap honest for years.
+          </motion.p>
+        </div>
+
+        {/* Right — facts column, vertical rule */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.24 }}
-          style={{ display: 'flex', alignItems: 'center', gap: 12 }}
+          className="md:col-span-4 md:col-start-9 md:border-l md:border-rule md:pl-10 flex flex-col gap-7"
         >
-          <button
-            onClick={() => window.location.href = '/intake'}
-            style={{
-              background: '#fff',
-              color: '#000',
-              border: 'none',
-              borderRadius: 999,
-              padding: '11px 26px',
-              fontSize: '0.92rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              transition: 'background 0.2s, transform 0.15s',
-              letterSpacing: '0.01em',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#e5e5e5'; e.currentTarget.style.transform = 'scale(1.03)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.transform = 'scale(1)'; }}
-            id="hero-get-started"
-          >
-            Get Started
-            <ArrowRight size={14} />
-          </button>
+          {facts.map((f) => (
+            <div key={f.label}>
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-soft m-0 mb-1.5">
+                {f.label}
+              </p>
+              <p className="font-display text-ink text-[1.45rem] font-medium m-0">
+                {f.value}
+              </p>
+            </div>
+          ))}
 
-          <button
-            onClick={() => window.location.href = '/roadmap'}
-            style={{
-              background: 'transparent',
-              color: 'rgba(255,255,255,0.65)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              borderRadius: 999,
-              padding: '10px 22px',
-              fontSize: '0.92rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; }}
-            id="hero-watch-demo"
-          >
-            <Play size={12} style={{ fill: 'currentColor' }} />
-            View Roadmap
-          </button>
+          <div className="flex flex-col gap-3 mt-2">
+            <button
+              onClick={() => window.location.href = '/intake'}
+              id="hero-get-started"
+              className="bg-oxblood text-bone border border-oxblood font-mono text-[11px] uppercase tracking-[0.18em] px-7 py-[15px] cursor-pointer flex items-center justify-center gap-2 hover:bg-ink hover:border-ink transition-colors"
+            >
+              Get Started <ArrowRight size={13} />
+            </button>
+            <button
+              onClick={() => window.location.href = '/roadmap'}
+              id="hero-watch-demo"
+              className="bg-transparent text-ink border border-ink font-mono text-[11px] uppercase tracking-[0.18em] px-7 py-[14px] cursor-pointer flex items-center justify-center gap-2 hover:bg-ink hover:text-bone transition-colors"
+            >
+              View Roadmap
+            </button>
+          </div>
         </motion.div>
       </div>
+
+      {/* Bottom meta bar */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+        className="max-w-[1140px] mx-auto w-full border-t border-rule mt-20 pt-4 flex items-center justify-between gap-4 flex-wrap"
+      >
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
+          Delta &mdash; Career OS &nbsp;&#8470;&nbsp; 00 &mdash; Cover
+        </span>
+        <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
+          Made with purpose for students everywhere.
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft">
+          Scroll &darr;
+        </span>
+      </motion.div>
     </section>
   );
 };

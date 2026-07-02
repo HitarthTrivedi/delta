@@ -34,15 +34,15 @@ export default function Navbar({ user }) {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-xl border-b border-white/10">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-bone/90 backdrop-blur-xl border-b border-rule">
         <div className="max-w-[1180px] mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 text-white font-bold text-sm tracking-normal shrink-0">
-            <span className="w-7 h-7 rounded-md bg-white/5 border border-white/15 overflow-hidden flex items-center justify-center">
+          <Link to="/" className="flex items-center gap-2 text-ink shrink-0 no-underline">
+            <span className="w-7 h-7 bg-paper border border-rule overflow-hidden flex items-center justify-center">
               <img src="/delta-bg.jpeg" alt="Delta" className="w-full h-full object-cover" />
             </span>
-            <span className="hidden xs:inline">Delta</span>
+            <span className="hidden xs:inline font-display text-lg font-semibold">Delta</span>
           </Link>
 
           {/* Desktop nav */}
@@ -51,10 +51,10 @@ export default function Navbar({ user }) {
               <Link
                 key={path}
                 to={path}
-                className={`relative px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 whitespace-nowrap ${
+                className={`relative px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] flex items-center gap-1.5 transition-all duration-200 whitespace-nowrap border-b-2 no-underline ${
                   isActive(path)
-                    ? 'text-white bg-white/10 border border-white/20'
-                    : 'text-white/45 hover:text-white/75 border border-transparent'
+                    ? 'text-oxblood border-oxblood'
+                    : 'text-ink-soft hover:text-ink border-transparent'
                 }`}
               >
                 <Icon size={12} />
@@ -67,16 +67,16 @@ export default function Navbar({ user }) {
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* User info — hidden on very small screens */}
             <div className="hidden sm:block text-right">
-              <p className="text-xs font-semibold text-white/50 truncate max-w-[120px]">
+              <p className="text-xs font-semibold text-ink truncate max-w-[120px]">
                 {user?.name || 'Guest'}
               </p>
-              <p className="text-[10px] text-white/30 truncate max-w-[120px]">
+              <p className="font-mono text-[10px] text-ink-soft truncate max-w-[120px]">
                 {user?.target_role || 'No target set'}
               </p>
             </div>
 
             {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-accent-surface border border-rule flex items-center justify-center text-ink font-display text-sm font-semibold shrink-0">
               {(user?.name || 'G')[0].toUpperCase()}
             </div>
 
@@ -84,7 +84,7 @@ export default function Navbar({ user }) {
             <button
               onClick={handleLogout}
               title="Sign Out"
-              className="hidden sm:flex p-2 rounded-lg bg-white/5 border border-white/10 text-white/45 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 transition-all"
+              className="hidden sm:flex p-2 bg-transparent border border-rule text-ink-soft hover:text-oxblood hover:border-oxblood transition-all"
             >
               <LogOut size={14} />
             </button>
@@ -92,7 +92,7 @@ export default function Navbar({ user }) {
             {/* Hamburger — mobile only */}
             <button
               onClick={() => setMobileOpen((o) => !o)}
-              className="md:hidden p-2 rounded-lg bg-white/5 border border-white/10 text-white/60"
+              className="md:hidden p-2 bg-transparent border border-rule text-ink-soft"
               aria-label="Toggle menu"
             >
               {mobileOpen ? <X size={16} /> : <Menu size={16} />}
@@ -107,9 +107,9 @@ export default function Navbar({ user }) {
           className="fixed inset-0 z-40 md:hidden"
           onClick={() => setMobileOpen(false)}
         >
-          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-0 bg-ink/40" />
           <div
-            className="absolute top-14 left-0 right-0 bg-black/95 border-b border-white/10 backdrop-blur-xl"
+            className="absolute top-14 left-0 right-0 bg-bone border-b border-rule"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-3 flex flex-col gap-1">
@@ -118,24 +118,24 @@ export default function Navbar({ user }) {
                   key={path}
                   to={path}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+                  className={`flex items-center gap-3 px-4 py-3 font-mono text-xs uppercase tracking-[0.12em] transition-all no-underline border-l-2 ${
                     isActive(path)
-                      ? 'text-white bg-white/10 border border-white/20'
-                      : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
+                      ? 'text-oxblood border-oxblood bg-accent-surface'
+                      : 'text-ink-soft hover:text-ink hover:bg-accent-surface border-transparent'
                   }`}
                 >
                   <Icon size={16} />
                   {label}
                 </Link>
               ))}
-              <div className="border-t border-white/10 mt-2 pt-3 flex items-center justify-between px-4 pb-2">
+              <div className="border-t border-rule mt-2 pt-3 flex items-center justify-between px-4 pb-2">
                 <div>
-                  <p className="text-sm font-semibold text-white">{user?.name || 'Guest'}</p>
-                  <p className="text-xs text-white/40">{user?.target_role || 'No target set'}</p>
+                  <p className="text-sm font-semibold text-ink">{user?.name || 'Guest'}</p>
+                  <p className="font-mono text-xs text-ink-soft">{user?.target_role || 'No target set'}</p>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold"
+                  className="flex items-center gap-2 px-3 py-2 border border-oxblood text-oxblood font-mono text-xs uppercase tracking-[0.12em] bg-transparent"
                 >
                   <LogOut size={14} /> Sign Out
                 </button>

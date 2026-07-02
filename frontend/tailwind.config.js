@@ -12,9 +12,24 @@ module.exports = {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
+  		fontFamily: {
+  			sans: ['Manrope', 'system-ui', '-apple-system', 'sans-serif'],
+  			display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+  			serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+  			mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace']
+  		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
+  			bone: 'rgb(var(--bone-rgb) / <alpha-value>)',
+  			paper: 'rgb(var(--paper-rgb) / <alpha-value>)',
+  			ink: {
+  				DEFAULT: 'rgb(var(--ink-rgb) / <alpha-value>)',
+  				soft: 'rgb(var(--ink-soft-rgb) / <alpha-value>)'
+  			},
+  			oxblood: 'rgb(var(--oxblood-rgb) / <alpha-value>)',
+  			rule: 'rgb(var(--rule-rgb) / <alpha-value>)',
+  			'accent-surface': 'rgb(var(--accent-surface-rgb) / <alpha-value>)',
   			card: {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
@@ -26,16 +41,16 @@ module.exports = {
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))',
-  				50: '#f5f7ff',
-  				100: '#eef2ff',
-  				200: '#e0e7ff',
-  				300: '#c7d2fe',
-  				400: '#818cf8',
-  				500: '#6366f1',
-  				600: '#4f46e5',
-  				700: '#4338ca',
-  				800: '#3730a3',
-  				950: '#1e1b4b',
+  				50: '#faf3f3',
+  				100: '#f4e3e4',
+  				200: '#e7c2c5',
+  				300: '#d4989d',
+  				400: '#b8646b',
+  				500: '#9a3f47',
+  				600: '#7d252b',
+  				700: '#691f24',
+  				800: '#55191d',
+  				950: '#2f0d10',
   			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',

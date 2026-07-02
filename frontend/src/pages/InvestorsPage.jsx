@@ -45,41 +45,32 @@ export default function InvestorsPage() {
     }
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 14px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 8,
-    color: '#fff',
-    fontSize: 14,
-    outline: 'none',
-    fontFamily: "'Inter', sans-serif",
-  };
+  const inputClass =
+    'w-full px-3.5 py-3 bg-paper border border-rule text-ink placeholder:text-ink-soft/70 text-sm outline-none focus:border-oxblood transition-colors';
 
   return (
-    <div style={{ background: '#000', minHeight: '100vh' }}>
+    <div className="bg-bone min-h-screen">
       <Header />
-      <main style={{ paddingTop: '5.5rem', paddingBottom: '3rem' }}>
-        <div style={{ maxWidth: 920, margin: '0 auto', padding: '0 1.5rem' }}>
+      <main className="pt-[5.5rem] pb-12">
+        <div className="max-w-[920px] mx-auto px-6">
 
           {/* Hero */}
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
-            style={{ marginBottom: 48 }}
+            className="mb-12"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <TrendingUp size={22} style={{ color: 'rgba(255,255,255,0.5)' }} />
-              <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 13, fontWeight: 600, margin: 0 }}>
+            <div className="flex items-center gap-2.5 mb-3.5">
+              <TrendingUp size={22} className="text-oxblood" />
+              <p className="kicker m-0">
                 For Investors
               </p>
             </div>
-            <h1 style={{ color: '#fff', fontSize: 'clamp(2rem, 4vw, 3rem)', lineHeight: 1.12, fontWeight: 700, margin: '0 0 16px' }}>
+            <h1 className="font-display text-oxblood font-medium leading-[1.12] m-0 mb-4" style={{ fontSize: 'clamp(2rem, 4vw, 3rem)' }}>
               The missing brain for every career
             </h1>
-            <p style={{ color: 'rgba(255,255,255,0.52)', fontSize: 16, lineHeight: 1.7, maxWidth: 640, margin: 0 }}>
+            <p className="text-ink-soft text-base leading-[1.7] max-w-[640px] m-0">
               Delta is building the AI career operating system for the next billion students. A working product, a clear wedge, and a category waiting to be defined.
             </p>
           </motion.div>
@@ -90,21 +81,16 @@ export default function InvestorsPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45 }}
-            style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 16, marginBottom: 48,
-            }}
+            className="grid gap-px bg-rule border border-rule mb-12"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
           >
             {highlights.map((h, i) => {
               const Icon = h.icon;
               return (
-                <div key={i} style={{
-                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 10, padding: '22px 20px', textAlign: 'center',
-                }}>
-                  <Icon size={20} style={{ color: 'rgba(255,255,255,0.4)', marginBottom: 10 }} />
-                  <p style={{ color: '#fff', fontSize: 24, fontWeight: 700, margin: '0 0 4px' }}>{h.stat}</p>
-                  <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, margin: 0, lineHeight: 1.4 }}>{h.label}</p>
+                <div key={i} className="bg-paper px-5 py-[22px] text-center">
+                  <Icon size={20} className="text-oxblood mb-2.5 inline-block" />
+                  <p className="font-display text-ink text-[1.75rem] font-semibold m-0 mb-1">{h.stat}</p>
+                  <p className="text-ink-soft text-[13px] leading-[1.4] m-0">{h.label}</p>
                 </div>
               );
             })}
@@ -118,35 +104,27 @@ export default function InvestorsPage() {
               viewport={{ once: true }}
               transition={{ duration: 0.45 }}
             >
-              <div style={{
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 12, padding: '36px 28px', maxWidth: 480, margin: '0 auto', textAlign: 'center',
-              }}>
-                <Lock size={28} style={{ color: 'rgba(255,255,255,0.35)', marginBottom: 16 }} />
-                <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 650, margin: '0 0 6px' }}>
+              <div className="bg-paper border border-rule px-7 py-9 max-w-[480px] mx-auto text-center">
+                <Lock size={28} className="text-ink-soft mb-4 inline-block" />
+                <h2 className="font-display text-oxblood text-2xl font-semibold m-0 mb-1.5">
                   View the full pitch
                 </h2>
-                <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
+                <p className="text-ink-soft text-sm leading-[1.6] m-0 mb-6">
                   Enter your details to access Delta's investor pitch — the full vision, market thesis, architecture, and business model.
                 </p>
 
-                <form onSubmit={handleUnlock} style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
-                  <input style={inputStyle} placeholder="Your name *" required
+                <form onSubmit={handleUnlock} className="flex flex-col gap-3 text-left">
+                  <input className={inputClass} placeholder="Your name *" required
                     value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-                  <input style={inputStyle} placeholder="Email address *" type="email" required
+                  <input className={inputClass} placeholder="Email address *" type="email" required
                     value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-                  <input style={inputStyle} placeholder="Firm / company (optional)"
+                  <input className={inputClass} placeholder="Firm / company (optional)"
                     value={form.firm} onChange={e => setForm(f => ({ ...f, firm: e.target.value }))} />
-                  <input style={inputStyle} placeholder="Your role (optional)"
+                  <input className={inputClass} placeholder="Your role (optional)"
                     value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} />
-                  <button type="submit" style={{
-                    background: '#fff', color: '#000', border: 'none', borderRadius: 999,
-                    padding: '12px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    width: '100%', marginTop: 4, transition: 'background 0.2s',
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#e5e5e5'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                  <button
+                    type="submit"
+                    className="bg-oxblood text-bone border border-oxblood font-mono text-xs uppercase tracking-[0.14em] px-6 py-3 cursor-pointer inline-flex items-center justify-center gap-1.5 w-full mt-1 hover:bg-ink hover:border-ink transition-colors"
                   >
                     <Eye size={14} /> View Pitch
                   </button>
@@ -159,13 +137,9 @@ export default function InvestorsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div style={{
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 12, padding: '8px 12px', marginBottom: 32, display: 'inline-flex',
-                alignItems: 'center', gap: 8,
-              }}>
-                <Eye size={14} style={{ color: 'rgba(255,255,255,0.5)' }} />
-                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
+              <div className="bg-paper border border-rule px-3 py-2 mb-8 inline-flex items-center gap-2">
+                <Eye size={14} className="text-ink-soft" />
+                <span className="font-mono text-[12px] text-ink-soft">
                   Viewing as {form.name} ({form.email})
                 </span>
               </div>
@@ -177,37 +151,29 @@ export default function InvestorsPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: i * 0.04 }}
-                  style={{
-                    borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.08)',
-                    padding: '28px 0',
-                  }}
+                  className={`py-7 ${i === 0 ? '' : 'border-t border-rule'}`}
                 >
-                  <h2 style={{ color: '#fff', fontSize: 22, fontWeight: 650, margin: '0 0 12px' }}>
+                  <h2 className="font-display text-oxblood text-2xl font-semibold m-0 mb-3">
                     {section.title}
                   </h2>
-                  <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.75, margin: 0 }}>
+                  <p className="text-ink-soft text-[15px] leading-[1.75] m-0">
                     {section.content}
                   </p>
                 </motion.div>
               ))}
 
               {/* CTA */}
-              <div style={{
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 12, padding: '28px 24px', marginTop: 16, textAlign: 'center',
-              }}>
-                <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>
+              <div className="bg-accent-surface border border-rule px-6 py-7 mt-4 text-center">
+                <h3 className="font-display text-ink text-xl font-semibold m-0 mb-2">
                   Interested in Delta?
                 </h3>
-                <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 14, margin: '0 0 18px' }}>
+                <p className="text-ink-soft text-sm m-0 mb-4">
                   We are raising to turn a working product into a category. Let's talk.
                 </p>
-                <a href="mailto:hitartht318@gmail.com?subject=Delta%20Investment%20Inquiry" style={{
-                  background: '#fff', color: '#000', border: 'none', borderRadius: 999,
-                  padding: '11px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none',
-                  transition: 'background 0.2s',
-                }}>
+                <a
+                  href="mailto:hitartht318@gmail.com?subject=Delta%20Investment%20Inquiry"
+                  className="bg-oxblood text-bone border border-oxblood font-mono text-xs uppercase tracking-[0.14em] px-6 py-3 cursor-pointer inline-flex items-center gap-1.5 no-underline hover:bg-ink hover:border-ink transition-colors"
+                >
                   Contact the founder <ArrowRight size={14} />
                 </a>
               </div>

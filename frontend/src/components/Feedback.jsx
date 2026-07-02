@@ -23,110 +23,130 @@ const Feedback = () => {
     setTimeout(() => { setName(''); setEmail(''); setMessage(''); setRating(0); setSubmitted(false); }, 3000);
   };
 
-  const inputStyle = {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 8, color: '#fff', padding: '10px 14px', fontSize: 14,
-    outline: 'none', width: '100%', fontFamily: "'Inter', sans-serif", transition: 'border-color 0.2s',
-  };
+  const inputClass =
+    'w-full bg-transparent border-0 border-b border-rule text-ink placeholder:text-ink-soft/60 px-0 py-2.5 text-[15px] outline-none transition-colors focus:border-oxblood';
+  const labelClass =
+    'font-mono text-[10px] uppercase tracking-[0.22em] text-ink-soft block mb-1';
 
   return (
-    <section id="feedback" style={{ background: '#000', padding: '5rem 1.5rem' }}>
-      <div style={{ maxWidth: 700, margin: '0 auto' }}>
+    <section id="feedback" className="bg-bone px-6 pt-24 pb-28">
+      <div className="max-w-[1140px] mx-auto grid md:grid-cols-12 gap-12">
 
-        {/* Beta teaser */}
+        {/* Left — heading + early access teaser */}
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.45 }}
-          style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 36, marginBottom: 40 }}
+          className="md:col-span-5"
         >
-          <h2 style={{
-            color: '#fff', fontSize: 'clamp(1.8rem, 3.6vw, 2.5rem)',
-            lineHeight: 1.15, fontWeight: 700, margin: '0 0 16px',
-          }}>
-            Delta is built for everyone. But we need your help to get there.
-          </h2>
-          <p style={{ color: 'rgba(255,255,255,0.52)', fontSize: 15, lineHeight: 1.75, margin: '0 0 14px', maxWidth: 620 }}>
-            Right now, Delta is trained and tested for <strong style={{ color: 'rgba(255,255,255,0.85)' }}>computer engineering, AI/ML, and cloud computing</strong> students. But the architecture is domain-agnostic — it works for any field. We want to expand to design, commerce, arts, medicine, law, and everything in between.
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] m-0 mb-6">
+            <span className="text-oxblood">03</span>
+            <span className="text-ink-soft"> / Correspondence</span>
           </p>
-          <p style={{ color: 'rgba(255,255,255,0.52)', fontSize: 15, lineHeight: 1.75, margin: '0 0 24px', maxWidth: 620 }}>
+          <h2 className="font-display text-ink font-normal leading-[1.05] m-0 mb-5" style={{ fontSize: 'clamp(2.2rem, 4.5vw, 3.2rem)' }}>
+            Delta is built for everyone. <em>We need your help to get there.</em>
+          </h2>
+          <p className="text-ink-soft text-[15px] leading-[1.75] m-0 mb-3.5">
+            Right now, Delta is trained and tested for <strong className="text-ink font-semibold">computer engineering, AI/ML, and cloud computing</strong> students. But the architecture is domain-agnostic — it works for any field. We want to expand to design, commerce, arts, medicine, law, and everything in between.
+          </p>
+          <p className="text-ink-soft text-[15px] leading-[1.75] m-0 mb-7">
             That is where you come in. If your domain is not covered yet, sign up and help us build it. You will get every unreleased version before anyone else, a chance to work directly with the team, and the knowledge that you helped shape the career OS for your entire field.
           </p>
           <button
             onClick={() => window.location.href = '/early-access'}
-            style={{
-              background: '#fff', color: '#000', border: 'none', borderRadius: 999,
-              padding: '11px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'background 0.2s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#e5e5e5'}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+            className="bg-oxblood text-bone border border-oxblood font-mono text-[11px] uppercase tracking-[0.18em] px-7 py-[14px] cursor-pointer inline-flex items-center gap-2 hover:bg-ink hover:border-ink transition-colors"
           >
-            Join Early Access <ArrowRight size={14} />
+            Join Early Access <ArrowRight size={13} />
           </button>
         </motion.div>
 
-        {/* Feedback form */}
+        {/* Right — feedback form on paper */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.45 }}
+          transition={{ duration: 0.45, delay: 0.08 }}
+          className="md:col-span-7"
         >
-          <h3 style={{ color: '#fff', fontSize: 20, fontWeight: 650, margin: '0 0 6px' }}>
-            Share your feedback
-          </h3>
-          <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: 14, margin: '0 0 20px' }}>
-            Tell us what to improve, fix, or build next.
-          </p>
-
-          <form onSubmit={handleSubmit} style={{
-            background: '#050505', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 10, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
-          }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <input type="text" placeholder="Name (optional)" value={name}
-                onChange={e => setName(e.target.value)} style={{ ...inputStyle, flex: '1 1 200px' }}
-                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.3)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'} />
-              <input type="email" placeholder="Email (optional)" value={email}
-                onChange={e => setEmail(e.target.value)} style={{ ...inputStyle, flex: '1 1 200px' }}
-                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.3)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'} />
+          <form onSubmit={handleSubmit} className="bg-paper px-8 py-9 sm:px-10 h-full flex flex-col gap-7">
+            <div className="flex items-center justify-between gap-4">
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-soft">
+                Form &middot; Feedback / DLT-002
+              </span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-soft">
+                Delta
+              </span>
             </div>
-            <textarea placeholder="What should we improve, fix, or build next?" value={message}
-              onChange={e => setMessage(e.target.value)} rows={3} required
-              style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }}
-              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.3)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'} />
+
+            <div className="grid sm:grid-cols-2 gap-7">
+              <div>
+                <label className={labelClass}>Name</label>
+                <input
+                  type="text"
+                  placeholder="Ada Lovelace"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Email</label>
+                <input
+                  type="email"
+                  placeholder="ada@university.edu"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
             <div>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, margin: '0 0 10px' }}>Rate your experience (optional)</p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} type="button" onClick={() => setRating(n)} style={{
-                    width: 34, height: 34, borderRadius: '50%',
-                    border: `1px solid ${n <= rating ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.12)'}`,
-                    background: n <= rating ? 'rgba(255,255,255,0.12)' : 'transparent',
-                    color: n <= rating ? '#fff' : 'rgba(255,255,255,0.3)',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>{n}</button>
+              <label className={labelClass}>Message *</label>
+              <textarea
+                placeholder="What should we improve, fix, or build next?"
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                rows={3}
+                required
+                className={`${inputClass} resize-y min-h-[80px]`}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Rate your experience</label>
+              <div className="flex gap-2 mt-2">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setRating(n)}
+                    className={`w-[34px] h-[34px] border font-mono text-[12px] cursor-pointer transition-all flex items-center justify-center ${
+                      n <= rating
+                        ? 'border-oxblood bg-oxblood text-bone'
+                        : 'border-rule bg-transparent text-ink-soft hover:border-ink-soft'
+                    }`}
+                  >
+                    {n}
+                  </button>
                 ))}
               </div>
             </div>
-            <button type="submit" disabled={sending || !message.trim()} style={{
-              background: submitted ? 'rgba(255,255,255,0.08)' : '#fff',
-              color: submitted ? 'rgba(255,255,255,0.7)' : '#000',
-              border: submitted ? '1px solid rgba(255,255,255,0.2)' : 'none',
-              borderRadius: 999, padding: '10px 22px', fontSize: 14, fontWeight: 600,
-              cursor: sending ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center',
-              gap: 8, alignSelf: 'flex-start', transition: 'all 0.2s',
-              opacity: (!message.trim() && !submitted) ? 0.5 : 1,
-            }}>
-              {submitted ? 'Thanks for your feedback!' : sending ? 'Sending...' : <><Send size={13} /> Submit</>}
-            </button>
+
+            <div className="flex justify-end mt-auto">
+              <button
+                type="submit"
+                disabled={sending || !message.trim()}
+                className={`font-mono text-[11px] uppercase tracking-[0.18em] px-8 py-[14px] inline-flex items-center gap-2 transition-colors border ${
+                  submitted
+                    ? 'bg-accent-surface text-ink-soft border-rule'
+                    : 'bg-oxblood text-bone border-oxblood hover:bg-ink hover:border-ink'
+                } ${sending ? 'cursor-wait' : 'cursor-pointer'} ${(!message.trim() && !submitted) ? 'opacity-50' : ''}`}
+              >
+                {submitted ? 'Thanks for your feedback!' : sending ? 'Sending...' : <><Send size={12} /> Send Feedback</>}
+              </button>
+            </div>
           </form>
         </motion.div>
       </div>

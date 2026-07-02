@@ -24,44 +24,28 @@ const socials = [
 
 export default function ContactPage() {
   return (
-    <div style={{ background: '#000', minHeight: '100vh' }}>
+    <div className="bg-bone min-h-screen">
       <Header />
-      <main style={{ paddingTop: '5.5rem', paddingBottom: '3rem' }}>
-        <div style={{ maxWidth: 620, margin: '0 auto', padding: '0 1.5rem' }}>
+      <main className="pt-[5.5rem] pb-12">
+        <div className="max-w-[620px] mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
-            style={{ marginBottom: 36 }}
+            className="mb-9"
           >
-            <p style={{
-              color: 'rgba(255,255,255,0.48)',
-              fontSize: 13,
-              fontWeight: 600,
-              margin: '0 0 12px',
-            }}>
+            <p className="kicker mb-3">
               Contact
             </p>
-            <h1 style={{
-              color: '#fff',
-              fontSize: 'clamp(2rem, 4.5vw, 3.2rem)',
-              lineHeight: 1.12,
-              fontWeight: 700,
-              margin: '0 0 14px',
-            }}>
+            <h1 className="font-display text-oxblood font-medium leading-[1.12] m-0 mb-3.5" style={{ fontSize: 'clamp(2rem, 4.5vw, 3.2rem)' }}>
               Get in touch.
             </h1>
-            <p style={{
-              color: 'rgba(255,255,255,0.52)',
-              fontSize: 15,
-              lineHeight: 1.7,
-              margin: 0,
-            }}>
+            <p className="text-ink-soft text-[15px] leading-[1.7] m-0">
               Questions, partnership inquiries, or just want to say hi?
             </p>
           </motion.div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div className="flex flex-col border-t border-rule">
             {socials.map((item, index) => {
               const Icon = item.icon;
               return (
@@ -73,34 +57,12 @@ export default function ContactPage() {
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.38, delay: 0.08 + index * 0.05 }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 14,
-                    padding: '18px 0',
-                    borderBottom: '1px solid rgba(255,255,255,0.08)',
-                    textDecoration: 'none',
-                    color: 'rgba(255,255,255,0.65)',
-                    fontSize: 15,
-                    transition: 'color 0.2s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                  onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.65)'}
+                  className="flex items-center gap-3.5 py-[18px] border-b border-rule no-underline text-ink hover:text-oxblood text-[15px] transition-colors"
                 >
-                  <div style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 8,
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'rgba(255,255,255,0.04)',
-                    flexShrink: 0,
-                  }}>
+                  <div className="w-[38px] h-[38px] border border-rule bg-accent-surface flex items-center justify-center shrink-0 text-oxblood">
                     <Icon size={17} strokeWidth={1.8} />
                   </div>
-                  <span style={{ fontWeight: 450 }}>{item.label}</span>
+                  <span className="font-medium">{item.label}</span>
                 </motion.a>
               );
             })}

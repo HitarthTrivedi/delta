@@ -8,8 +8,8 @@ import { opportunitiesAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
 const panelStyle = {
-  background: '#050505',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'var(--paper)',
+  border: '1px solid var(--rule)',
   borderRadius: 8,
 };
 
@@ -26,9 +26,9 @@ const ROLE_TYPE_LABEL = { internship: 'Internship', full_time: 'Full-time', part
 const DEFAULT_PREFS = { location: '', role_types: ['internship', 'full_time'], work_mode: 'any', industries: '', notes: '' };
 
 function scoreColor(score) {
-  if (score >= 75) return '#4ade80';
-  if (score >= 50) return '#fbbf24';
-  return 'rgba(255,255,255,0.55)';
+  if (score >= 75) return '#16a34a';
+  if (score >= 50) return '#d97706';
+  return 'var(--ink-soft)';
 }
 
 export default function Opportunities() {
@@ -119,19 +119,19 @@ export default function Opportunities() {
   const isEmpty = !loading && opportunities.length === 0;
 
   return (
-    <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1.5rem 3rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>
 
         {/* Header */}
         <header style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
-            <p style={{ color: 'rgba(255,255,255,0.46)', fontSize: 13, fontWeight: 650, margin: '0 0 10px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <Briefcase size={15} style={{ color: '#60a5fa' }} /> Opportunities
+            <p style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 650, margin: '0 0 10px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Briefcase size={15} style={{ color: 'var(--oxblood)' }} /> Opportunities
             </p>
-            <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.2rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0, maxWidth: 720 }}>
+            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(2rem, 5vw, 3.2rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0, maxWidth: 720 }}>
               Roles matched to where you are now.
             </h1>
-            <p style={{ margin: '14px 0 0', color: 'rgba(255,255,255,0.5)', fontSize: 15, lineHeight: 1.55, maxWidth: 640 }}>
+            <p style={{ margin: '14px 0 0', color: 'var(--ink-soft)', fontSize: 15, lineHeight: 1.55, maxWidth: 640 }}>
               AI-suggested jobs and internships based on your profile. As your skills grow, your matches sharpen. Set preferences to steer them.
             </p>
           </div>
@@ -139,8 +139,8 @@ export default function Opportunities() {
             <button
               onClick={() => setPrefsOpen((o) => !o)}
               style={{
-                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)',
-                border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999,
+                background: 'var(--accent-surface)', color: 'var(--ink)',
+                border: '1px solid var(--rule)', borderRadius: 999,
                 padding: '11px 16px', fontWeight: 600, fontSize: 13,
                 display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer',
               }}
@@ -151,7 +151,7 @@ export default function Opportunities() {
               onClick={generate}
               disabled={generating}
               style={{
-                background: '#fff', color: '#000', border: 'none', borderRadius: 999,
+                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 999,
                 padding: '11px 18px', fontWeight: 700,
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 cursor: generating ? 'not-allowed' : 'pointer', flexShrink: 0,
@@ -164,10 +164,10 @@ export default function Opportunities() {
         </header>
 
         {/* Preferences summary line */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-soft)', fontSize: 13, marginBottom: 18 }}>
           <MapPin size={13} /> {prefsSummary}
           {generatedAt && (
-            <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.3)' }}>
+            <span style={{ marginLeft: 'auto', color: 'var(--ink-soft)' }}>
               Updated {new Date(generatedAt).toLocaleDateString()}
             </span>
           )}
@@ -236,10 +236,10 @@ export default function Opportunities() {
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-              <button onClick={() => setPrefsOpen(false)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8, padding: '9px 16px', color: 'rgba(255,255,255,0.6)', fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => setPrefsOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 8, padding: '9px 16px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button onClick={savePreferences} disabled={savingPrefs} style={{ background: '#fff', color: '#000', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: savingPrefs ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+              <button onClick={savePreferences} disabled={savingPrefs} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: savingPrefs ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
                 {savingPrefs ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
                 Save preferences
               </button>
@@ -250,11 +250,11 @@ export default function Opportunities() {
         {/* Stale banner */}
         {stale && !generating && (
           <div style={{ ...panelStyle, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, borderColor: 'rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.06)' }}>
-            <TrendingUp size={16} style={{ color: '#fbbf24', flexShrink: 0 }} />
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', flex: 1 }}>
+            <TrendingUp size={16} style={{ color: '#d97706', flexShrink: 0 }} />
+            <span style={{ fontSize: 13, color: 'var(--ink)', flex: 1 }}>
               Your profile has improved since these were generated. Refresh for sharper matches.
             </span>
-            <button onClick={generate} style={{ background: '#fbbf24', color: '#000', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={generate} style={{ background: '#d97706', color: 'var(--bone)', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               Refresh
             </button>
           </div>
@@ -262,14 +262,14 @@ export default function Opportunities() {
 
         {/* Content */}
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.5)', padding: '40px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ink-soft)', padding: '40px 0' }}>
             <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading your board...
           </div>
         ) : generating ? (
           <section style={{ ...panelStyle, padding: '48px 24px', textAlign: 'center' }}>
-            <Loader2 size={26} style={{ animation: 'spin 1s linear infinite', color: '#60a5fa', marginBottom: 14 }} />
+            <Loader2 size={26} style={{ animation: 'spin 1s linear infinite', color: 'var(--oxblood)', marginBottom: 14 }} />
             <h2 style={{ margin: '0 0 8px', fontSize: 19 }}>Matching roles to your profile...</h2>
-            <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Reading your skills, experience, and preferences. This takes a few seconds.</p>
+            <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14 }}>Reading your skills, experience, and preferences. This takes a few seconds.</p>
           </section>
         ) : isEmpty ? (
           <section style={{ ...panelStyle, padding: '48px 24px', textAlign: 'center' }}>
@@ -278,15 +278,15 @@ export default function Opportunities() {
               background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Sparkles size={24} style={{ color: '#60a5fa' }} />
+              <Sparkles size={24} style={{ color: 'var(--oxblood)' }} />
             </div>
             <h2 style={{ margin: '0 0 8px', fontSize: 20 }}>No suggestions yet</h2>
-            <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.55 }}>
+            <p style={{ margin: '0 0 20px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55 }}>
               Set your preferences, then let Delta match jobs and internships to your current profile.
             </p>
             <button
               onClick={generate}
-              style={{ background: '#fff', color: '#000', border: 'none', borderRadius: 8, padding: '11px 18px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 8, padding: '11px 18px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               <Sparkles size={16} /> Find my opportunities
             </button>
@@ -298,7 +298,7 @@ export default function Opportunities() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                   <div>
                     <span style={{
-                      display: 'inline-block', background: 'rgba(96,165,250,0.12)', color: '#60a5fa',
+                      display: 'inline-block', background: 'rgba(96,165,250,0.12)', color: 'var(--oxblood)',
                       borderRadius: 999, padding: '3px 9px', fontSize: 10, fontWeight: 700,
                       textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8,
                     }}>
@@ -308,11 +308,11 @@ export default function Opportunities() {
                   </div>
                   <div style={{ textAlign: 'center', flexShrink: 0 }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: scoreColor(op.match_score), lineHeight: 1 }}>{op.match_score}</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>match</div>
+                    <div style={{ fontSize: 9, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>match</div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, color: 'var(--ink-soft)', fontSize: 12 }}>
                   {op.target_companies && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                       <Building2 size={12} /> {op.target_companies}
@@ -326,15 +326,15 @@ export default function Opportunities() {
                 </div>
 
                 {op.why_it_fits && (
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.65)', fontSize: 13, lineHeight: 1.55 }}>{op.why_it_fits}</p>
+                  <p style={{ margin: 0, color: 'var(--ink)', fontSize: 13, lineHeight: 1.55 }}>{op.why_it_fits}</p>
                 )}
 
                 {op.skills_matched?.length > 0 && (
                   <div>
-                    <p style={{ margin: '0 0 6px', fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>You have</p>
+                    <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>You have</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {op.skills_matched.map((s, j) => (
-                        <span key={j} style={{ background: 'rgba(74,222,128,0.12)', color: '#4ade80', borderRadius: 6, padding: '3px 8px', fontSize: 11 }}>{s}</span>
+                        <span key={j} style={{ background: 'rgba(22,163,74,0.12)', color: '#16a34a', borderRadius: 6, padding: '3px 8px', fontSize: 11 }}>{s}</span>
                       ))}
                     </div>
                   </div>
@@ -342,10 +342,10 @@ export default function Opportunities() {
 
                 {op.skills_to_build?.length > 0 && (
                   <div>
-                    <p style={{ margin: '0 0 6px', fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Build to stand out</p>
+                    <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Build to stand out</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {op.skills_to_build.map((s, j) => (
-                        <span key={j} style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '3px 8px', fontSize: 11, border: '1px solid rgba(255,255,255,0.1)' }}>{s}</span>
+                        <span key={j} style={{ background: 'var(--accent-surface)', color: 'var(--ink-soft)', borderRadius: 6, padding: '3px 8px', fontSize: 11, border: '1px solid var(--rule)' }}>{s}</span>
                       ))}
                     </div>
                   </div>
@@ -358,8 +358,8 @@ export default function Opportunities() {
                     rel="noreferrer"
                     style={{
                       marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8,
-                      padding: '9px 12px', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                      background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 8,
+                      padding: '9px 12px', color: 'var(--ink)', fontSize: 13, fontWeight: 600, textDecoration: 'none',
                     }}
                   >
                     <ExternalLink size={13} /> View live openings
@@ -372,7 +372,7 @@ export default function Opportunities() {
 
         {/* Honest note about how suggestions work */}
         {!loading && !generating && opportunities.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 20, color: 'rgba(255,255,255,0.35)', fontSize: 12, lineHeight: 1.5 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 20, color: 'var(--ink-soft)', fontSize: 12, lineHeight: 1.5 }}>
             <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 2 }} />
             <span>These are AI role matches for your current profile, each linking to live job-board search results. They aren't specific verified postings — always confirm details on the employer's page.</span>
           </div>
@@ -387,27 +387,27 @@ export default function Opportunities() {
 const labelStyle = {
   display: 'block',
   fontSize: 12,
-  color: 'rgba(255,255,255,0.5)',
+  color: 'var(--ink-soft)',
   marginBottom: 6,
   fontWeight: 600,
 };
 
 const inputStyle = {
   width: '100%',
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.14)',
+  background: 'var(--accent-surface)',
+  border: '1px solid var(--rule)',
   borderRadius: 8,
   padding: '10px 12px',
-  color: '#fff',
+  color: 'var(--ink)',
   fontSize: 14,
   outline: 'none',
   boxSizing: 'border-box',
 };
 
 const chipStyle = (active) => ({
-  background: active ? '#fff' : 'rgba(255,255,255,0.05)',
-  color: active ? '#000' : 'rgba(255,255,255,0.7)',
-  border: '1px solid rgba(255,255,255,0.14)',
+  background: active ? 'var(--ink)' : 'var(--accent-surface)',
+  color: active ? 'var(--bone)' : 'var(--ink)',
+  border: '1px solid var(--rule)',
   borderRadius: 999,
   padding: '7px 12px',
   fontSize: 12,

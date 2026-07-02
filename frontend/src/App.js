@@ -13,6 +13,7 @@ import HowItWorks from "./components/HowItWorks";
 import Showcase from "./components/Showcase";
 import Feedback from "./components/Feedback";
 import Footer from "./components/Footer";
+import SectionRail from "./components/SectionRail";
 
 // UI Layout Components (eager — always rendered)
 import Navbar from "./components/ui/Navbar";
@@ -68,6 +69,7 @@ const LandingPage = () => {
   return (
     <div style={{ background: 'var(--bg-page)' }}>
       <Header />
+      <SectionRail />
       <Hero />
       <Showcase />
       <HowItWorks />
@@ -88,7 +90,7 @@ function LayoutWrapper({ children }) {
   const isPublicPage = ["/about", "/careers", "/contact", "/partners", "/investors", "/early-access"].includes(location.pathname);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-primary-500/30 selection:text-white">
+    <div className="min-h-screen bg-bone text-ink selection:bg-primary-500/30 selection:text-ink">
       {!isLanding && !isLogin && !isPublicPage && <Navbar user={user} />}
       <div className={(!isLanding && !isLogin && !isPublicPage) ? "pb-12" : ""}>
         {children}
@@ -106,7 +108,7 @@ function RequireAuth({ children }) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#000',
+        background: 'var(--bone)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -116,7 +118,7 @@ function RequireAuth({ children }) {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <Loader2 style={{ animation: 'spin 1s linear infinite', color: '#fff' }} size={24} />
-          <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem' }}>Authenticating session...</span>
+          <span style={{ color: 'var(--ink-soft)', fontSize: '0.85rem' }}>Authenticating session...</span>
         </div>
       </div>
     );
@@ -138,7 +140,7 @@ function ProtectedRoute({ children }) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#000',
+        background: 'var(--bone)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -148,7 +150,7 @@ function ProtectedRoute({ children }) {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <Loader2 style={{ animation: 'spin 1s linear infinite', color: '#fff' }} size={24} />
-          <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem' }}>Loading profile status...</span>
+          <span style={{ color: 'var(--ink-soft)', fontSize: '0.85rem' }}>Loading profile status...</span>
         </div>
       </div>
     );
@@ -168,7 +170,7 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+      <div className="min-h-screen bg-bone flex flex-col items-center justify-center text-ink">
         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
       </div>
     );
@@ -177,7 +179,7 @@ function AppContent() {
   return (
     <LayoutWrapper>
       <Suspense fallback={
-        <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="min-h-screen bg-bone flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
         </div>
       }>

@@ -1,163 +1,147 @@
-/* Core Visual System - Premium Cyber Dark Theme */
+/* Core Visual System — Editorial Memorandum Theme (bone / ink / oxblood) */
 
 :root {
-  /* Backgrounds - Sleek High-End Dark Palette */
-  --bg-page: #030712; /* Deep Slate Black */
-  --bg-card: #0b0f19; /* Futuristic Dark Card Gray */
-  --bg-section: rgba(3, 7, 18, 0.8);
-  --bg-overlay: rgba(3, 7, 18, 0.95);
-  
-  /* Text - High Contrast Silver/White */
-  --text-primary: #f9fafb;
-  --text-secondary: #d1d5db;
-  --text-muted: #9ca3af;
-  
+  /* Backgrounds */
+  --bg-page: var(--bone);
+  --bg-card: var(--paper);
+  --bg-section: var(--bone);
+  --bg-overlay: rgba(247, 245, 240, 0.92);
+
+  /* Text */
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink);
+  --text-muted: var(--ink-soft);
+
   /* Borders */
-  --border-primary: #1f2937;
-  --border-input: #374151;
-  --border-input-focus: #3b82f6;
-  --border-light: rgba(255, 255, 255, 0.08);
+  --border-primary: var(--rule);
+  --border-input: var(--rule);
+  --border-input-focus: var(--oxblood);
+  --border-light: var(--rule);
 
-  /* AI Accents */
-  --accent-purple-400: #c084fc;
-  --accent-purple-200: #3b0764;
-  --accent-blue-400: #60a5fa;
-  --accent-blue-200: #1e3a8a;
-  --accent-orange-400: #fb923c;
-  --accent-orange-200: #7c2d12;
-  --accent-pink-200: #500724;
-  --accent-green-200: #064e3b;
-  --accent-grey-200: #1f2937;
+  /* Accents — mapped onto the editorial palette */
+  --accent-purple-400: var(--oxblood);
+  --accent-purple-200: var(--accent-surface);
+  --accent-blue-400: var(--oxblood);
+  --accent-blue-200: var(--accent-surface);
+  --accent-orange-400: var(--oxblood);
+  --accent-orange-200: var(--accent-surface);
+  --accent-pink-200: var(--accent-surface);
+  --accent-green-200: var(--accent-surface);
+  --accent-grey-200: var(--accent-surface);
 
-  /* Glass Effects */
-  --glass-bg: rgba(17, 24, 39, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
+  /* Flat paper surfaces (formerly glass) */
+  --glass-bg: var(--paper);
+  --glass-border: var(--rule);
 
   /* Gradients */
-  --gradient-hero-warm: radial-gradient(circle at top, rgba(99, 102, 241, 0.15) 0%, rgba(3, 7, 18, 1) 70%);
+  --gradient-hero-warm: var(--bone);
 }
 
-/* Global Font Readability Overrides */
-.text-xs {
-  font-size: 0.875rem !important; /* Scale up 12px -> 14px */
+.dark :root,
+.dark {
+  --bg-overlay: rgba(22, 21, 20, 0.92);
 }
-.text-sm {
-  font-size: 1rem !important; /* Scale up 14px -> 16px */
-}
-.text-base {
-  font-size: 1.125rem !important; /* Scale up 16px -> 18px */
-}
-.text-lg {
-  font-size: 1.25rem !important; /* Scale up 18px -> 20px */
-}
-
-/* Microscopic font overrides for high-fidelity HUD readability */
-.text-\[7px\] {
-  font-size: 0.75rem !important; /* 7px -> 12px */
-}
-.text-\[8px\] {
-  font-size: 0.8125rem !important; /* 8px -> 13px */
-}
-.text-\[9px\] {
-  font-size: 0.875rem !important; /* 9px -> 14px */
-}
-.text-\[10px\] {
-  font-size: 0.9375rem !important; /* 10px -> 15px */
-}
-
 
 /* Typography Classes */
 .font-mono {
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
 }
 
-.heading-hero { 
-  font-size: clamp(2.5rem, 6vw, 4.5rem); 
-  line-height: 1.15; 
-  font-weight: 700; 
-  letter-spacing: -0.02em; 
-  color: var(--text-primary);
+.font-display {
+  font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
-.heading-1 { 
-  font-size: clamp(1.75rem, 3.5vw, 2.25rem); 
-  line-height: 1.35; 
-  font-weight: 600; 
-  letter-spacing: -0.01em; 
-  color: var(--text-primary);
+.heading-hero {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(3rem, 8vw, 6rem);
+  line-height: 1.05;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--oxblood);
 }
 
-.heading-2 { 
-  font-size: clamp(1.5rem, 3vw, 1.75rem); 
-  line-height: 1.4; 
+.heading-1 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--oxblood);
+}
+
+.heading-2 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.25;
+  font-weight: 500;
+  color: var(--oxblood);
+}
+
+.heading-3 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+  line-height: 1.3;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.heading-3 { 
-  font-size: clamp(1.25rem, 2.5vw, 1.5rem); 
-  line-height: 1.4; 
-  font-weight: 500; 
+.body-large {
+  font-size: clamp(1.0625rem, 2vw, 1.1875rem);
+  line-height: 1.7;
+  font-weight: 400;
   color: var(--text-primary);
 }
 
-.body-large { 
-  font-size: clamp(1.125rem, 2.5vw, 1.25rem); 
-  line-height: 1.65; 
-  font-weight: 400; 
+.body-medium {
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  font-weight: 400;
   color: var(--text-primary);
 }
 
-.body-medium { 
-  font-size: 1.125rem; 
-  line-height: 1.6; 
-  font-weight: 400; 
-  color: var(--text-primary);
-}
-
-.body-small { 
-  font-size: 1rem; 
-  line-height: 1.5; 
-  font-weight: 400; 
-  color: var(--text-secondary);
-}
-
-.caption { 
-  font-size: 0.875rem; 
-  line-height: 1.4; 
-  font-weight: 400; 
+.body-small {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  font-weight: 400;
   color: var(--text-muted);
 }
 
-.button-text { 
-  font-family: 'SF Mono', monospace; 
-  font-size: 1rem; 
-  font-weight: 500; 
-  text-transform: uppercase; 
-  letter-spacing: 0.025em;
+.caption {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
-.mono-text { 
-  font-family: 'SF Mono', monospace; 
-  font-size: 1rem; 
-  font-weight: 400; 
+.button-text {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.mono-text {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.875rem;
+  font-weight: 400;
   color: var(--text-muted);
 }
 
 /* Button Components */
 .btn-primary {
-  background: var(--text-primary);
-  color: var(--bg-page) !important;
-  border: none;
-  border-radius: 2rem;
-  padding: 0.75rem 1.5rem;
-  font-family: 'SF Mono', monospace;
-  font-size: 0.875rem;
+  background: var(--oxblood);
+  color: var(--bone) !important;
+  border: 1px solid var(--oxblood);
+  border-radius: 0;
+  padding: 0.75rem 1.75rem;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.8125rem;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.14em;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   min-height: 2.75rem;
   display: inline-flex;
   align-items: center;
@@ -167,9 +151,9 @@
 }
 
 .btn-primary:hover {
-  background: var(--text-secondary);
-  color: var(--bg-page) !important;
-  transform: scale(1.02);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bone) !important;
 }
 
 .btn-primary:active {
@@ -177,21 +161,19 @@
 }
 
 .btn-secondary {
-  background: var(--glass-bg);
+  background: transparent;
   color: var(--text-primary);
-  border: 1px solid var(--glass-border);
-  border-radius: 2rem;
-  padding: 0.75rem 1.5rem;
-  font-family: 'SF Mono', monospace;
-  font-size: 0.875rem;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  padding: 0.75rem 1.75rem;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.8125rem;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.14em;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   min-height: 2.75rem;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,9 +182,8 @@
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(0, 0, 0, 0.2);
-  transform: scale(1.02);
+  background: var(--ink);
+  color: var(--bg-page);
 }
 
 .btn-secondary:active {
@@ -212,7 +193,7 @@
 .btn-nav {
   background: transparent;
   color: var(--text-primary);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--rule);
   border-radius: 50%;
   width: 2.25rem;
   height: 2.25rem;
@@ -224,52 +205,54 @@
 }
 
 .btn-nav:hover {
-  background: var(--text-primary);
-  color: white;
-  border-color: var(--text-primary);
+  background: var(--ink);
+  color: var(--bg-page);
+  border-color: var(--ink);
 }
 
 .btn-nav:active {
   transform: scale(0.95);
 }
 
-/* Voice Interface Cards */
+/* Paper Cards (formerly voice cards) */
 .voice-card {
   background: var(--bg-card);
-  border-radius: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 0;
   padding: 1.5rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color 0.3s ease;
   cursor: pointer;
   position: relative;
   overflow: hidden;
 }
 
 .voice-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-color: var(--ink-soft);
 }
 
 .voice-card-title {
-  font-size: 1.25rem;
-  font-weight: 500;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.375rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
   color: var(--text-primary);
 }
 
 .voice-card-description {
   font-size: 0.875rem;
-  line-height: 1.4;
-  color: var(--text-secondary);
+  line-height: 1.55;
+  color: var(--text-muted);
   margin-bottom: 1rem;
 }
 
-.voice-card.accent-purple { background: var(--accent-purple-200); }
-.voice-card.accent-blue { background: var(--accent-blue-200); }
-.voice-card.accent-orange { background: var(--accent-orange-200); }
-.voice-card.accent-pink { background: var(--accent-pink-200); }
-.voice-card.accent-green { background: var(--accent-green-200); }
-.voice-card.accent-grey { background: var(--accent-grey-200); }
+.voice-card.accent-purple,
+.voice-card.accent-blue,
+.voice-card.accent-orange,
+.voice-card.accent-pink,
+.voice-card.accent-green,
+.voice-card.accent-grey {
+  background: var(--accent-surface);
+}
 
 /* Header Navigation */
 .header-nav {
@@ -278,20 +261,20 @@
   left: 0;
   right: 0;
   z-index: 999;
-  height: 80px;
+  height: 72px;
   background: var(--bg-overlay);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.5rem;
-  transition: box-shadow 0.3s ease;
 }
 
 /* Hero Section */
 .hero-section {
-  background: var(--gradient-hero-warm);
+  background: var(--bg-page);
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -312,16 +295,16 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 2rem;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
   padding: 0.375rem 1rem;
   margin-bottom: 1.5rem;
-  font-family: 'SF Mono', monospace;
-  font-size: 0.75rem;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
 }
 
 .hero-title {
@@ -366,7 +349,7 @@ body {
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
   }
-  
+
   .container {
     padding: 0 2.25rem;
   }
@@ -376,11 +359,6 @@ body {
   .voice-grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 2rem;
-  }
-  
-  .voice-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
   }
 }
 

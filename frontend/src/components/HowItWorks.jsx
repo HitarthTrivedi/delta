@@ -31,84 +31,47 @@ const steps = [
 
 const HowItWorks = () => {
   return (
-    <section id="how-it-works" style={{ background: '#000', padding: '4rem 1.5rem 6rem' }}>
-      <div style={{ maxWidth: 920, margin: '0 auto' }}>
+    <section id="how-it-works" className="bg-bone px-6 pt-24 pb-28">
+      <div className="max-w-[1140px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.45 }}
-          style={{
-            borderTop: '1px solid rgba(255,255,255,0.12)',
-            paddingTop: 36,
-            marginBottom: 22,
-          }}
+          className="max-w-[820px] mb-14"
         >
-          <h2 style={{
-            color: '#fff',
-            fontSize: 'clamp(1.8rem, 3.6vw, 2.7rem)',
-            lineHeight: 1.15,
-            fontWeight: 700,
-            letterSpacing: 0,
-            margin: '0 0 14px',
-          }}>
-            Built for years of guidance, but planned one week at a time.
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] m-0 mb-6">
+            <span className="text-oxblood">02</span>
+            <span className="text-ink-soft"> / Workflow</span>
+          </p>
+          <h2 className="font-display text-ink font-normal leading-[1.05] m-0 mb-5" style={{ fontSize: 'clamp(2.2rem, 5vw, 3.6rem)' }}>
+            Built for years of guidance, <em>planned one week at a time.</em>
           </h2>
-          <p style={{
-            color: 'rgba(255,255,255,0.52)',
-            fontSize: 16,
-            lineHeight: 1.7,
-            maxWidth: 660,
-            margin: 0,
-          }}>
+          <p className="font-display italic text-ink-soft text-[1.15rem] leading-[1.6] max-w-[660px] m-0">
             Delta should understand long timelines like masters abroad, fourth-year deadlines, German classes, placements, and exam seasons without forcing the student into a rigid template.
           </p>
         </motion.div>
 
-        <div style={{ display: 'grid', gap: 0, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="border-t border-rule">
           {steps.map((step, index) => (
             <motion.div
               key={step.label}
-              initial={{ opacity: 0, x: -12 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.38, delay: index * 0.05 }}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '110px minmax(0, 1fr)',
-                gap: 24,
-                padding: '26px 0',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-              }}
-              className="delta-workflow-row"
+              className="delta-workflow-row grid gap-8 py-10 border-b border-rule items-start"
+              style={{ gridTemplateColumns: '120px minmax(0, 380px) minmax(0, 1fr)' }}
             >
-              <span style={{
-                color: 'rgba(255,255,255,0.42)',
-                fontSize: 13,
-                fontWeight: 700,
-              }}>
-                {step.label}
+              <span className="font-display text-oxblood font-normal leading-none" style={{ fontSize: 'clamp(2.6rem, 5vw, 4rem)' }}>
+                0{index + 1}
               </span>
-              <div>
-                <h3 style={{
-                  color: '#fff',
-                  fontSize: 20,
-                  lineHeight: 1.3,
-                  fontWeight: 650,
-                  letterSpacing: 0,
-                  margin: '0 0 8px',
-                }}>
-                  {step.title}
-                </h3>
-                <p style={{
-                  color: 'rgba(255,255,255,0.5)',
-                  fontSize: 15,
-                  lineHeight: 1.65,
-                  margin: 0,
-                }}>
-                  {step.detail}
-                </p>
-              </div>
+              <h3 className="font-display text-ink font-medium leading-[1.2] m-0" style={{ fontSize: 'clamp(1.4rem, 2.6vw, 1.9rem)' }}>
+                {step.title}
+              </h3>
+              <p className="text-ink-soft text-[15px] leading-[1.7] m-0">
+                {step.detail}
+              </p>
             </motion.div>
           ))}
         </div>
@@ -118,35 +81,23 @@ const HowItWorks = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.45 }}
-          style={{ marginTop: 32 }}
+          className="mt-12"
         >
           <button
             onClick={() => window.location.href = '/intake'}
-            style={{
-              background: '#fff',
-              color: '#000',
-              border: 'none',
-              borderRadius: 999,
-              padding: '12px 22px',
-              fontSize: 15,
-              fontWeight: 650,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
+            className="bg-oxblood text-bone border border-oxblood font-mono text-[11px] uppercase tracking-[0.18em] px-8 py-[15px] cursor-pointer inline-flex items-center gap-2 hover:bg-ink hover:border-ink transition-colors"
           >
             Start intake
-            <ArrowRight size={15} />
+            <ArrowRight size={14} />
           </button>
         </motion.div>
       </div>
 
       <style>{`
-        @media (max-width: 640px) {
+        @media (max-width: 860px) {
           .delta-workflow-row {
             grid-template-columns: 1fr !important;
-            gap: 8px !important;
+            gap: 12px !important;
           }
         }
       `}</style>
