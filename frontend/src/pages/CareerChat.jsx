@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { Send, Zap, Cpu, Sparkles, BookOpen, User } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
@@ -13,7 +16,8 @@ import { toast } from 'sonner';
 function ChatMarkdown({ content }) {
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
       components={{
         p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
         ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
@@ -41,6 +45,20 @@ function ChatMarkdown({ content }) {
           <blockquote className="border-l-2 border-primary-500/50 pl-3 text-ink-soft italic my-2">{children}</blockquote>
         ),
         hr: () => <hr className="border-rule my-3" />,
+        table: ({ children }) => (
+          <div className="my-2 overflow-x-auto border border-rule rounded-lg">
+            <table className="w-full border-collapse text-[12px]">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead className="bg-accent-surface">{children}</thead>,
+        tbody: ({ children }) => <tbody>{children}</tbody>,
+        tr: ({ children }) => <tr className="border-b border-rule last:border-b-0">{children}</tr>,
+        th: ({ children }) => (
+          <th className="px-2.5 py-1.5 text-left font-semibold text-ink border-r border-rule last:border-r-0">{children}</th>
+        ),
+        td: ({ children }) => (
+          <td className="px-2.5 py-1.5 align-top text-ink-soft border-r border-rule last:border-r-0">{children}</td>
+        ),
       }}
     >
       {content}

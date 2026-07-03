@@ -1,6 +1,32 @@
 import { create } from 'zustand';
 import supabase from '../lib/supabaseClient';
 
+// Mirror keys must respect the same "remember me" flag as Supabase's own
+// session storage (see customStorage in lib/supabaseClient.js), otherwise the
+// two can disagree: e.g. remember=false lets the real session expire with the
+// tab, but a stale mirror in localStorage still says "logged in", so the next
+// API call 401s and force-logs-out the user — looking exactly like "remember
+// me never works" regardless of the checkbox.
+function rememberEnabled() {
+  return localStorage.getItem('delta_remember_me') === 'true';
+}
+
+function persistSession(session) {
+  const store = rememberEnabled() ? localStorage : sessionStorage;
+  const other = store === localStorage ? sessionStorage : localStorage;
+  store.setItem('delta_user_id', session.user.id);
+  store.setItem('delta_access_token', session.access_token);
+  other.removeItem('delta_user_id');
+  other.removeItem('delta_access_token');
+}
+
+function clearPersistedSession() {
+  localStorage.removeItem('delta_user_id');
+  sessionStorage.removeItem('delta_user_id');
+  localStorage.removeItem('delta_access_token');
+  sessionStorage.removeItem('delta_access_token');
+}
+
 export const useAuthStore = create((set) => ({
   userId: localStorage.getItem('delta_user_id') || sessionStorage.getItem('delta_user_id') || null,
   token: localStorage.getItem('delta_access_token') || sessionStorage.getItem('delta_access_token') || null,
@@ -9,7 +35,8 @@ export const useAuthStore = create((set) => ({
 
   setUserId: (id) => {
     if (id) {
-      localStorage.setItem('delta_user_id', id);
+      const store = rememberEnabled() ? localStorage : sessionStorage;
+      store.setItem('delta_user_id', id);
     } else {
       localStorage.removeItem('delta_user_id');
       sessionStorage.removeItem('delta_user_id');
@@ -19,7 +46,8 @@ export const useAuthStore = create((set) => ({
 
   setToken: (token) => {
     if (token) {
-      localStorage.setItem('delta_access_token', token);
+      const store = rememberEnabled() ? localStorage : sessionStorage;
+      store.setItem('delta_access_token', token);
     } else {
       localStorage.removeItem('delta_access_token');
       sessionStorage.removeItem('delta_access_token');
@@ -30,12 +58,10 @@ export const useAuthStore = create((set) => ({
   // Initialize session state from Supabase
   initializeAuth: async () => {
     set({ loading: true });
-    
+
     // Get initial session
-    const { data: { session }, error } = await supabase.auth.getSession();
-    const remember = localStorage.getItem('delta_remember_me') === 'true';
-    const storage = remember ? localStorage : sessionStorage;
-    
+    const { data: { session } } = await supabase.auth.getSession();
+
     if (session) {
       set({
         userId: session.user.id,
@@ -43,14 +69,10 @@ export const useAuthStore = create((set) => ({
         user: session.user,
         loading: false
       });
-      localStorage.setItem('delta_user_id', session.user.id);
-      localStorage.setItem('delta_access_token', session.access_token);
+      persistSession(session);
     } else {
       set({ userId: null, token: null, user: null, loading: false });
-      localStorage.removeItem('delta_user_id');
-      sessionStorage.removeItem('delta_user_id');
-      localStorage.removeItem('delta_access_token');
-      sessionStorage.removeItem('delta_access_token');
+      clearPersistedSession();
     }
 
     // Listen for auth state changes (login, logout, token refresh, etc)
@@ -62,14 +84,10 @@ export const useAuthStore = create((set) => ({
           user: session.user,
           loading: false
         });
-        localStorage.setItem('delta_user_id', session.user.id);
-        localStorage.setItem('delta_access_token', session.access_token);
+        persistSession(session);
       } else {
         set({ userId: null, token: null, user: null, loading: false });
-        localStorage.removeItem('delta_user_id');
-        sessionStorage.removeItem('delta_user_id');
-        localStorage.removeItem('delta_access_token');
-        sessionStorage.removeItem('delta_access_token');
+        clearPersistedSession();
       }
     });
   },
@@ -92,8 +110,7 @@ export const useAuthStore = create((set) => ({
         user: data.session.user,
         loading: false
       });
-      localStorage.setItem('delta_user_id', data.session.user.id);
-      localStorage.setItem('delta_access_token', data.session.access_token);
+      persistSession(data.session);
     }
     return data;
   },
@@ -136,10 +153,7 @@ export const useAuthStore = create((set) => ({
     set({ loading: true });
     await supabase.auth.signOut();
     set({ userId: null, token: null, user: null, loading: false });
-    localStorage.removeItem('delta_user_id');
-    sessionStorage.removeItem('delta_user_id');
-    localStorage.removeItem('delta_access_token');
-    sessionStorage.removeItem('delta_access_token');
+    clearPersistedSession();
     localStorage.removeItem('delta_remember_me');
   }
 }));

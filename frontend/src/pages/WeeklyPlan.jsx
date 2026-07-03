@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, Bell, X, Pencil, Plus, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -398,6 +401,20 @@ export default function WeeklyPlan() {
     strong: ({ children }) => <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{children}</strong>,
     code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{children}</code>,
     a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>{children}</a>,
+    table: ({ children }) => (
+      <div style={{ margin: '6px 0', overflowX: 'auto', border: '1px solid var(--rule)', borderRadius: 8 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => <thead style={{ background: 'var(--accent-surface)' }}>{children}</thead>,
+    tbody: ({ children }) => <tbody>{children}</tbody>,
+    tr: ({ children }) => <tr style={{ borderBottom: '1px solid var(--rule)' }}>{children}</tr>,
+    th: ({ children }) => (
+      <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--ink)', borderRight: '1px solid var(--rule)' }}>{children}</th>
+    ),
+    td: ({ children }) => (
+      <td style={{ padding: '6px 10px', verticalAlign: 'top', color: 'var(--ink-soft)', borderRight: '1px solid var(--rule)' }}>{children}</td>
+    ),
   };
 
   return (
@@ -981,7 +998,7 @@ export default function WeeklyPlan() {
                     padding: '10px 12px', fontSize: 14, lineHeight: 1.55,
                   }}>
                     {isUser ? msg.content : (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={mdComponents}>
                         {msg.content}
                       </ReactMarkdown>
                     )}

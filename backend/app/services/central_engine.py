@@ -1546,10 +1546,27 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         profile_says_advanced = _has_prior_profile_depth(profile, skills_for_profile, user)
         if has_stable_actions:
             if blocking_events:
+                # Never discard the real week's tasks — stash them once so they can be
+                # restored when the blocking event ends, instead of being lost forever.
+                if not weekly_focus.get("event_blocked"):
+                    weekly_focus["primary_actions_before_event_block"] = actions
                 weekly_focus["primary_actions"] = _event_block_actions(blocking_events)
                 weekly_focus["phase_name"] = "Event-focused week"
+                weekly_focus["event_blocked"] = True
                 roadmap.weekly_focus = _dump(weekly_focus)
                 roadmap.last_replanned_reason = "Adjusted for active event in Agent 2 upcoming-events memory."
+                db.commit()
+                db.refresh(roadmap)
+            elif weekly_focus.get("event_blocked"):
+                # The blocking event window has ended — restore the real tasks rather
+                # than leaving the single placeholder action in place.
+                restored = weekly_focus.get("primary_actions_before_event_block") or actions
+                weekly_focus["primary_actions"] = restored
+                weekly_focus["event_blocked"] = False
+                weekly_focus.pop("primary_actions_before_event_block", None)
+                weekly_focus["phase_name"] = weekly_focus.get("phase_name") or "Resumed week"
+                roadmap.weekly_focus = _dump(weekly_focus)
+                roadmap.last_replanned_reason = "Restored the regular week after the blocking event ended."
                 db.commit()
                 db.refresh(roadmap)
             elif profile_says_advanced and low_level_start:
@@ -1579,7 +1596,9 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                     if str(action.get("id")) not in existing_ids
                 ]
                 if durable_actions:
-                    weekly_focus["primary_actions"] = durable_actions + actions[:3]
+                    # Prepend new durable lanes without ever truncating the tasks
+                    # the user already has this week.
+                    weekly_focus["primary_actions"] = durable_actions + actions
                 long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
                 weekly_focus["long_horizon_lanes"] = long_plan["lanes"]
                 weekly_focus["selection_reason"] = "Upgraded existing week with durable habit and trend lanes."
