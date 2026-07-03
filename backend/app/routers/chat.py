@@ -85,10 +85,12 @@ def _extract_updated_actions(response_text: str) -> tuple[str, list[dict] | None
     if not response_text:
         return "", None
 
+    from app.services.ai_service import sanitize_llm_json_text
+
     blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", response_text, flags=re.IGNORECASE)
     candidates = blocks + [response_text.strip()]
     for candidate in reversed(candidates):
-        text = candidate.strip()
+        text = sanitize_llm_json_text(candidate.strip())
         try:
             parsed = json.loads(text)
         except Exception:
@@ -1298,6 +1300,7 @@ When updating tasks, output ONLY at the very end of your response:
 }}
 ```
 Rules: max one active course at a time · every course needs a real URL · if student already knows a skill, skip beginner content and assign a proof/project instead · unfinished tasks carry over · skipped tasks are removed.
+"description" is displayed as plain text, not rendered math — never use LaTeX/math notation (no "\rightarrow", "\times", "$...$"); write step sequences with a plain arrow (→) or the word "then".
 {leetcode_rule}
 Current tasks:
 {json.dumps(current_actions, indent=2)}"""

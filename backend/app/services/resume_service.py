@@ -117,8 +117,8 @@ def build_resume_from_profile(user_id: str, db: Session) -> dict:
     for evt in completed_events:
         summary = evt.summary or ""
         if summary and len(summary) > 10:
-            # Clean up internal prefix
-            clean = re.sub(r"^(Completed action item:|Reopened action item:)\s*", "", summary, flags=re.IGNORECASE).strip().strip('"')
+            # Clean up internal prefix (e.g. "Completed Agent 2 task: ...")
+            clean = re.sub(r"^(Completed|Reopened)\s+(Agent\s*2\s+task|action item):\s*", "", summary, flags=re.IGNORECASE).strip().strip('"')
             if clean and clean not in achievements:
                 achievements.append(clean)
 
@@ -267,7 +267,7 @@ def generate_suggestions(user_id: str, db: Session, resume: ResumeProfile) -> di
     for evt in new_events:
         summary = evt.summary or ""
         clean = re.sub(
-            r"^(Completed action item:|Reopened action item:)\s*", "", summary, flags=re.IGNORECASE
+            r"^(Completed|Reopened)\s+(Agent\s*2\s+task|action item):\s*", "", summary, flags=re.IGNORECASE
         ).strip().strip('"')
         if clean and len(clean) > 10 and clean not in existing_achievements:
             to_add.append({
@@ -451,6 +451,20 @@ def export_to_docx(structured: dict) -> bytes:
         pBdr.append(bottom)
         pPr.append(pBdr)
 
+    def _add_description_bullets(desc):
+        """Split a description into one "List Bullet" paragraph per line —
+        LLM-extracted descriptions often pack multiple sentences/bullets into
+        one string (with embedded "\\n" or leading "-"/"•"), which otherwise
+        renders as a single jammed bullet in the exported doc."""
+        if isinstance(desc, list):
+            lines = [str(item).strip() for item in desc]
+        else:
+            lines = re.split(r"\n+", str(desc))
+        for line in lines:
+            line = re.sub(r"^[\-•*]\s*", "", line.strip())
+            if line:
+                doc.add_paragraph(line, style="List Bullet")
+
     # ── Professional Summary ──
     summary = structured.get("summary") or ""
     if summary:
@@ -478,7 +492,7 @@ def export_to_docx(structured: dict) -> bytes:
                 p.add_run(f"  |  {exp['date']}")
             desc = exp.get("description") or ""
             if desc:
-                doc.add_paragraph(desc, style="List Bullet")
+                _add_description_bullets(desc)
 
     # ── Projects ──
     projects = structured.get("projects") or []
@@ -495,7 +509,7 @@ def export_to_docx(structured: dict) -> bytes:
                 p.add_run(f"  |  {tech}")
             desc = proj.get("description") or ""
             if desc:
-                doc.add_paragraph(desc, style="List Bullet")
+                _add_description_bullets(desc)
 
     # ── Achievements / Accomplishments ──
     achievements = structured.get("achievements") or []

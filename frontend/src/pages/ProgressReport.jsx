@@ -9,7 +9,7 @@ import { fetchCareerContext } from '../hooks/useCareerOS';
 const panel = {
   background: 'var(--paper)',
   border: '1px solid var(--rule)',
-  borderRadius: 8,
+  borderRadius: 0,
 };
 
 const emptyText = {
@@ -75,8 +75,8 @@ function BarRow({ label, value, total }) {
         <span style={{ color: 'var(--ink)', fontSize: 13 }}>{label}</span>
         <span style={{ color: 'var(--ink)', fontSize: 13, fontWeight: 750 }}>{value}</span>
       </div>
-      <div style={{ height: 9, background: 'var(--rule)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${percent}%`, background: 'var(--ink)', borderRadius: 999 }} />
+      <div style={{ height: 9, background: 'var(--rule)', borderRadius: 0, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${percent}%`, background: 'var(--ink)', borderRadius: 0 }} />
       </div>
     </div>
   );
@@ -94,13 +94,13 @@ function TaskRow({ task, tone = 'left' }) {
       alignItems: 'start',
       background: done ? 'var(--accent-surface)' : 'var(--paper)',
       border: '1px solid var(--rule)',
-      borderRadius: 8,
+      borderRadius: 0,
       padding: 14,
     }}>
       <span style={{
         width: 24,
         height: 24,
-        borderRadius: 999,
+        borderRadius: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -194,7 +194,7 @@ export default function ProgressReport() {
               background: 'var(--ink)',
               color: 'var(--bone)',
               border: 'none',
-              borderRadius: 999,
+              borderRadius: 0,
               padding: '10px 16px',
               fontWeight: 750,
               display: 'inline-flex',

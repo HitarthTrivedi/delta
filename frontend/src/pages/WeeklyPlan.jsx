@@ -18,7 +18,7 @@ import { seedCareerContext } from '../hooks/useCareerOS';
 const panelStyle = {
   background: 'var(--paper)',
   border: '1px solid var(--rule)',
-  borderRadius: 8,
+  borderRadius: 0,
 };
 
 const fallbackActions = [
@@ -42,7 +42,6 @@ export default function WeeklyPlan() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [advancing, setAdvancing] = useState(false);
-  const [advanceStep, setAdvanceStep] = useState(0);
   const [checked, setChecked] = useState({});
   const [skipped, setSkipped] = useState({});
   const [chatOpen, setChatOpen] = useState(false);
@@ -352,29 +351,10 @@ export default function WeeklyPlan() {
     else if (perm === 'denied') toast.error('Browser blocked notifications. Enable them in browser settings.');
   };
 
-  const ADVANCE_STEPS = [
-    'Reading your profile and past activity...',
-    'Checking your Agent 2 conversations...',
-    'Analysing completed and skipped tasks...',
-    'Scanning market signals for your role...',
-    'Agent 2 is curating your next week...',
-    'Finalising your personalised task list...',
-  ];
-
   const requestNextWeek = async () => {
     setAdvancing(true);
-    setAdvanceStep(0);
-    const stepInterval = setInterval(() => {
-      setAdvanceStep(prev => {
-        if (prev < ADVANCE_STEPS.length - 2) return prev + 1;
-        clearInterval(stepInterval);
-        return prev;
-      });
-    }, 4000);
     try {
       const data = await careerOSAPI.runWeeklyCycle(userId);
-      clearInterval(stepInterval);
-      setAdvanceStep(ADVANCE_STEPS.length - 1);
       setContext(data);
       seedCareerContext(queryClient, userId, data);
       const progress = getTaskProgress(data, fallbackActions);
@@ -383,13 +363,11 @@ export default function WeeklyPlan() {
       resetAgent2Chat('New week loaded. Tell me if anything has changed — exams, pace, priorities.');
       toast.success('Next week loaded — Agent 2 has updated your tasks.');
     } catch (err) {
-      clearInterval(stepInterval);
       console.error(err);
       const detail = err?.response?.data?.detail || err?.message || 'Something went wrong. Try again in a moment.';
       toast.error(detail);
     } finally {
       setAdvancing(false);
-      setAdvanceStep(0);
     }
   };
 
@@ -399,10 +377,10 @@ export default function WeeklyPlan() {
     ol: ({ children }) => <ol style={{ margin: '4px 0 8px', paddingLeft: 20 }}>{children}</ol>,
     li: ({ children }) => <li style={{ marginBottom: 4, paddingLeft: 2 }}>{children}</li>,
     strong: ({ children }) => <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{children}</strong>,
-    code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{children}</code>,
+    code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 0, fontSize: 12 }}>{children}</code>,
     a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>{children}</a>,
     table: ({ children }) => (
-      <div style={{ margin: '6px 0', overflowX: 'auto', border: '1px solid var(--rule)', borderRadius: 8 }}>
+      <div style={{ margin: '6px 0', overflowX: 'auto', border: '1px solid var(--rule)', borderRadius: 0 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>{children}</table>
       </div>
     ),
@@ -437,7 +415,7 @@ export default function WeeklyPlan() {
                 onClick={handleEnableReminders}
                 style={{
                   background: 'var(--accent-surface)', color: 'var(--ink)',
-                  border: '1px solid var(--rule)', borderRadius: 999,
+                  border: '1px solid var(--rule)', borderRadius: 0,
                   padding: '11px 16px', fontWeight: 600, fontSize: 13,
                   display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
                 }}
@@ -449,7 +427,7 @@ export default function WeeklyPlan() {
               onClick={refreshWeek}
               disabled={refreshing || advancing}
               style={{
-                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 999,
+                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0,
                 padding: '11px 18px', fontWeight: 700,
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 cursor: refreshing ? 'not-allowed' : 'pointer',
@@ -499,7 +477,7 @@ export default function WeeklyPlan() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
               {longHorizonLanes.map((lane) => (
-                <div key={lane.name} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 8, padding: 14 }}>
+                <div key={lane.name} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
                   <p style={{ margin: '0 0 6px', color: 'var(--ink)', fontSize: 14, fontWeight: 700 }}>{lane.name}</p>
                   <p style={{ margin: '0 0 8px', color: 'var(--ink-soft)', fontSize: 12 }}>{lane.cadence}</p>
                   <p style={{ margin: 0, color: 'var(--ink)', fontSize: 13, lineHeight: 1.45 }}>{lane.rule}</p>
@@ -521,33 +499,13 @@ export default function WeeklyPlan() {
             {loading && <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
           </div>
 
-          {/* Advance progress steps */}
+          {/* Advance progress — one honest status line, not a simulated multi-step sequence */}
           {advancing && (
-            <div style={{ display: 'grid', gap: 14, padding: '8px 0' }}>
-              {ADVANCE_STEPS.map((step, i) => {
-                const done = i < advanceStep;
-                const active = i === advanceStep;
-                return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, opacity: i > advanceStep ? 0.25 : 1, transition: 'opacity 0.4s ease' }}>
-                    <span style={{
-                      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: done ? 'var(--rule)' : active ? 'var(--accent-surface)' : 'transparent',
-                      border: `1px solid ${done ? 'var(--ink-soft)' : active ? 'var(--rule)' : 'var(--rule)'}`,
-                    }}>
-                      {done
-                        ? <Check size={13} color="var(--ink)" />
-                        : active
-                          ? <Loader2 size={13} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
-                          : <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--rule)' }} />
-                      }
-                    </span>
-                    <span style={{ fontSize: 14, color: done ? 'var(--ink-soft)' : active ? 'var(--ink)' : 'var(--rule)', fontWeight: active ? 600 : 400 }}>
-                      {step}
-                    </span>
-                  </div>
-                );
-              })}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 0' }}>
+              <Loader2 size={16} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontSize: 14, color: 'var(--ink)' }}>
+                Agent 2 is preparing your next week — reviewing what you completed, skipped, and any preferences you saved.
+              </span>
             </div>
           )}
 
@@ -564,12 +522,12 @@ export default function WeeklyPlan() {
                     display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: 14,
                     textAlign: 'left', width: '100%',
                     background: isDone ? 'var(--rule)' : isSkipped ? 'var(--accent-surface)' : 'var(--paper)',
-                    border: '1px solid var(--rule)', borderRadius: 8, padding: 16,
+                    border: '1px solid var(--rule)', borderRadius: 0, padding: 16,
                     color: 'var(--ink)', cursor: advancing ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <span style={{
-                    width: 28, height: 28, borderRadius: 6,
+                    width: 28, height: 28, borderRadius: 0,
                     border: '1px solid var(--rule)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isDone ? 'var(--ink)' : 'transparent', color: 'var(--bone)', flexShrink: 0,
@@ -596,9 +554,9 @@ export default function WeeklyPlan() {
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none', fontSize: 13 }}
                             >
                               <span style={{
-                                fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
-                                background: p.difficulty === 'Easy' ? 'rgba(22,163,74,0.15)' : p.difficulty === 'Medium' ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
-                                color: p.difficulty === 'Easy' ? '#16a34a' : p.difficulty === 'Medium' ? '#d97706' : 'var(--oxblood)',
+                                fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 0, flexShrink: 0,
+                                background: 'var(--accent-surface)', border: '1px solid var(--rule)',
+                                color: 'var(--ink-soft)',
                               }}>{p.difficulty}</span>
                               <span style={{ color: 'var(--ink)', textDecoration: 'underline' }}>#{p.id} {p.title}</span>
                             </a>
@@ -644,7 +602,7 @@ export default function WeeklyPlan() {
 
           {/* Request next week */}
           {!advancing && actions.length > 0 && actions.every((_, i) => checked[i] || skipped[i]) && (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 8, background: 'var(--accent-surface)', border: '1px solid var(--accent-surface)' }}>
+            <div style={{ marginTop: 20, padding: 16, borderRadius: 0, background: 'var(--accent-surface)', border: '1px solid var(--accent-surface)' }}>
               <p style={{ margin: '0 0 12px', color: 'var(--ink)', fontSize: 14, lineHeight: 1.5 }}>
                 <strong>All current tasks are checked.</strong> Request the next week only after you have genuinely finished the work and proof.
               </p>
@@ -653,7 +611,7 @@ export default function WeeklyPlan() {
                 disabled={advancing}
                 style={{
                   width: '100%', background: 'var(--ink)', color: 'var(--bone)', border: 'none',
-                  borderRadius: 6, padding: 14, fontWeight: 700, fontSize: 15,
+                  borderRadius: 0, padding: 14, fontWeight: 700, fontSize: 15,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                   cursor: 'pointer',
                 }}
@@ -677,16 +635,16 @@ export default function WeeklyPlan() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {/* Permanent */}
-            <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 8, padding: 14 }}>
+            <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
               <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Permanent Rules</p>
               {contextDocs.permanent.length === 0 && (
                 <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No permanent rules yet. Add one below.</p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                 {contextDocs.permanent.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 6, padding: '7px 10px' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 0, padding: '7px 10px' }}>
                     <span style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.4 }}>{item}</span>
-                    <button onClick={() => removePermanent(i)} style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
+                    <button onClick={() => removePermanent(i)} aria-label="Remove rule" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 8, flexShrink: 0 }}>
                       <Trash2 size={12} />
                     </button>
                   </div>
@@ -698,15 +656,15 @@ export default function WeeklyPlan() {
                   onChange={e => setNewPermanent(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addPermanent()}
                   placeholder="e.g. Never more than 2 tasks"
-                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 6, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
+                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
                 />
-                <button onClick={addPermanent} style={{ background: 'var(--rule)', border: 'none', borderRadius: 6, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
+                <button onClick={addPermanent} style={{ background: 'var(--rule)', border: 'none', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
                   <Plus size={14} />
                 </button>
               </div>
             </div>
             {/* Next week requests */}
-            <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 8, padding: 14 }}>
+            <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
               <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Next Week Requests</p>
               {contextDocs.next_week.length === 0 && (
                 <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No requests yet. Add one below or tell Agent 2.</p>
@@ -716,12 +674,12 @@ export default function WeeklyPlan() {
                   const text = typeof item === 'string' ? item : item.text;
                   const weeksLeft = typeof item === 'object' ? item.weeks_remaining : 1;
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 6, padding: '7px 10px' }}>
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 0, padding: '7px 10px' }}>
                       <span style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.4 }}>{text}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: weeksLeft <= 1 ? 'rgba(251,191,36,0.18)' : 'var(--accent-surface)', color: weeksLeft <= 1 ? '#d97706' : 'var(--ink-soft)', flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 0, background: 'var(--accent-surface)', color: weeksLeft <= 1 ? 'var(--oxblood)' : 'var(--ink-soft)', flexShrink: 0 }}>
                         {weeksLeft}w
                       </span>
-                      <button onClick={() => removeNextWeek(i)} style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
+                      <button onClick={() => removeNextWeek(i)} aria-label="Remove request" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 8, flexShrink: 0 }}>
                         <Trash2 size={12} />
                       </button>
                     </div>
@@ -734,7 +692,7 @@ export default function WeeklyPlan() {
                   onChange={e => setNewNextWeek(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addNextWeek()}
                   placeholder="e.g. Include a REST API project"
-                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 6, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
+                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <input
@@ -744,11 +702,11 @@ export default function WeeklyPlan() {
                     value={newNextWeekWeeks}
                     onChange={e => setNewNextWeekWeeks(e.target.value)}
                     title="Number of weeks to keep this instruction active"
-                    style={{ width: 44, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 6, padding: '7px 6px', color: 'var(--ink)', fontSize: 12, outline: 'none', textAlign: 'center' }}
+                    style={{ width: 44, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 6px', color: 'var(--ink)', fontSize: 12, outline: 'none', textAlign: 'center' }}
                   />
                   <span style={{ fontSize: 11, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>wk</span>
                 </div>
-                <button onClick={addNextWeek} style={{ background: 'var(--rule)', border: 'none', borderRadius: 6, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
+                <button onClick={addNextWeek} style={{ background: 'var(--rule)', border: 'none', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
                   <Plus size={14} />
                 </button>
               </div>
@@ -768,14 +726,14 @@ export default function WeeklyPlan() {
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => { setFeedbackOpen(o => !o); setEditingTasks(false); }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-surface)', color: 'var(--ink)', border: '1px solid var(--rule)', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-surface)', color: 'var(--ink)', border: '1px solid var(--rule)', borderRadius: 0, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
               >
                 <ThumbsUp size={13} /> Feedback
               </button>
               <button
                 onClick={() => { startEditTasks(); setFeedbackOpen(false); }}
                 disabled={editingTasks}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: editingTasks ? 'var(--rule)' : 'var(--ink)', color: editingTasks ? 'var(--ink-soft)' : 'var(--bone)', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: editingTasks ? 'not-allowed' : 'pointer', fontWeight: 700 }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: editingTasks ? 'var(--rule)' : 'var(--ink)', color: editingTasks ? 'var(--ink-soft)' : 'var(--bone)', border: 'none', borderRadius: 0, padding: '9px 14px', fontSize: 13, cursor: editingTasks ? 'not-allowed' : 'pointer', fontWeight: 700 }}
               >
                 <Pencil size={13} /> Edit Tasks
               </button>
@@ -793,11 +751,11 @@ export default function WeeklyPlan() {
                 onChange={e => setFeedbackText(e.target.value)}
                 placeholder="e.g. The LeetCode task is too hard, I'd prefer easier problems. The FastAPI task has no clear goal."
                 rows={3}
-                style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 6, padding: '10px 12px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '10px 12px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
               />
               <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
-                <button onClick={() => setFeedbackOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 6, padding: '8px 14px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={submitFeedback} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Send to Agent 2</button>
+                <button onClick={() => setFeedbackOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '8px 14px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={submitFeedback} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Send to Agent 2</button>
               </div>
             </div>
           )}
@@ -807,15 +765,15 @@ export default function WeeklyPlan() {
             <div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {editableTasks.map((task, i) => (
-                  <div key={i} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 8, padding: 12 }}>
+                  <div key={i} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 12 }}>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                       <input
                         value={task.title || ''}
                         onChange={e => setEditableTasks(prev => prev.map((t, idx) => idx === i ? { ...t, title: e.target.value } : t))}
                         placeholder="Task title"
-                        style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 6, padding: '7px 10px', color: 'var(--ink)', fontSize: 14, fontWeight: 700, outline: 'none' }}
+                        style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 14, fontWeight: 700, outline: 'none' }}
                       />
-                      <button onClick={() => setEditableTasks(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 4 }}>
+                      <button onClick={() => setEditableTasks(prev => prev.filter((_, idx) => idx !== i))} aria-label="Remove task" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 8 }}>
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -824,7 +782,7 @@ export default function WeeklyPlan() {
                       onChange={e => setEditableTasks(prev => prev.map((t, idx) => idx === i ? { ...t, detail: e.target.value, description: e.target.value } : t))}
                       placeholder="Task description"
                       rows={2}
-                      style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 6, padding: '7px 10px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
                 ))}
@@ -832,13 +790,13 @@ export default function WeeklyPlan() {
               <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
                 <button
                   onClick={() => setEditableTasks(prev => [...prev, { id: `manual-${Date.now()}`, title: '', detail: '', type: 'project' }])}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 6, padding: '8px 12px', color: 'var(--ink)', fontSize: 13, cursor: 'pointer' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '8px 12px', color: 'var(--ink)', fontSize: 13, cursor: 'pointer' }}
                 >
                   <Plus size={13} /> Add task
                 </button>
                 <div style={{ flex: 1 }} />
-                <button onClick={() => setEditingTasks(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 6, padding: '8px 14px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={saveEditedTasks} disabled={savingTasks} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 6, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: savingTasks ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <button onClick={() => setEditingTasks(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '8px 14px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={saveEditedTasks} disabled={savingTasks} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: savingTasks ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {savingTasks ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
                   Save
                 </button>
@@ -861,7 +819,7 @@ export default function WeeklyPlan() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 background: 'var(--ink)', color: 'var(--bone)', border: 'none',
-                borderRadius: 8, padding: '10px 16px', fontWeight: 700, fontSize: 13,
+                borderRadius: 0, padding: '10px 16px', fontWeight: 700, fontSize: 13,
                 cursor: 'pointer', flexShrink: 0,
               }}
             >
@@ -876,7 +834,7 @@ export default function WeeklyPlan() {
                 onClick={() => openChatWithSuggestion(s)}
                 style={{
                   background: 'var(--accent-surface)', color: 'var(--ink)',
-                  border: '1px solid var(--rule)', borderRadius: 999,
+                  border: '1px solid var(--rule)', borderRadius: 0,
                   padding: '7px 14px', fontSize: 13, cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--rule)'; }}
@@ -894,7 +852,7 @@ export default function WeeklyPlan() {
             <h2 style={{ margin: '0 0 14px', fontSize: 18 }}>Opportunities</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               {opportunities.slice(0, 4).map((item, i) => (
-                <div key={i} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 8, padding: 14 }}>
+                <div key={i} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
                   <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>{item.title || item.name}</p>
                   <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 12 }}>
                     {item.platform}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
@@ -910,20 +868,20 @@ export default function WeeklyPlan() {
       {skipDialog && (
         <>
           <div onClick={() => setSkipDialog(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(26,25,24,0.45)', zIndex: 80 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 81, background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 12, padding: 28, width: 'min(90vw, 420px)' }}>
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 81, background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 28, width: 'min(90vw, 420px)' }}>
             <p style={{ color: 'var(--ink-soft)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px' }}>Skipping task</p>
             <p style={{ color: 'var(--ink)', fontSize: 15, fontWeight: 600, margin: '0 0 20px', lineHeight: 1.4 }}>{skipDialog.action.title}</p>
             <p style={{ color: 'var(--ink-soft)', fontSize: 13, margin: '0 0 18px' }}>What do you want to do with this task?</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button onClick={() => confirmSkip('next_week')} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 8, padding: '12px 16px', color: 'var(--ink)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
+              <button onClick={() => confirmSkip('next_week')} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '12px 16px', color: 'var(--ink)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>Move to next week</span>
                 <span style={{ color: 'var(--ink-soft)', display: 'block', fontSize: 12, marginTop: 2 }}>Agent 2 will include it in your next weekly plan</span>
               </button>
-              <button onClick={() => confirmSkip('remove')} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 8, padding: '12px 16px', color: 'var(--ink)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
+              <button onClick={() => confirmSkip('remove')} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '12px 16px', color: 'var(--ink)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>Permanently remove</span>
                 <span style={{ color: 'var(--ink-soft)', display: 'block', fontSize: 12, marginTop: 2 }}>Remove from your plan entirely — won't come back</span>
               </button>
-              <button onClick={() => confirmSkip('skip_once')} style={{ background: 'none', border: '1px solid var(--accent-surface)', borderRadius: 8, padding: '10px 16px', color: 'var(--ink-soft)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
+              <button onClick={() => confirmSkip('skip_once')} style={{ background: 'none', border: '1px solid var(--accent-surface)', borderRadius: 0, padding: '10px 16px', color: 'var(--ink-soft)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
                 Just skip this week — no action
               </button>
             </div>
@@ -955,7 +913,7 @@ export default function WeeklyPlan() {
               <button
                 onClick={() => setChatOpen(false)}
                 style={{
-                  width: 32, height: 32, borderRadius: 8,
+                  width: 32, height: 32, borderRadius: 0,
                   border: '1px solid var(--rule)',
                   background: 'var(--accent-surface)', color: 'var(--ink)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -976,7 +934,7 @@ export default function WeeklyPlan() {
                   style={{
                     alignSelf: 'center', marginBottom: 4,
                     background: 'var(--accent-surface)', border: '1px solid var(--rule)',
-                    borderRadius: 999, padding: '6px 14px', color: 'var(--ink-soft)',
+                    borderRadius: 0, padding: '6px 14px', color: 'var(--ink-soft)',
                     fontSize: 12, cursor: loadingHistory ? 'default' : 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                   }}
@@ -994,7 +952,7 @@ export default function WeeklyPlan() {
                     background: isUser ? 'var(--ink)' : 'var(--accent-surface)',
                     color: isUser ? 'var(--bone)' : 'var(--ink)',
                     border: isUser ? 'none' : '1px solid var(--rule)',
-                    borderRadius: isUser ? '14px 14px 4px 14px' : '4px 14px 14px 14px',
+                    borderRadius: 0,
                     padding: '10px 12px', fontSize: 14, lineHeight: 1.55,
                   }}>
                     {isUser ? msg.content : (
@@ -1021,7 +979,7 @@ export default function WeeklyPlan() {
                 autoFocus
                 style={{
                   flex: 1, background: 'var(--paper)', color: 'var(--ink)',
-                  border: '1px solid var(--rule)', borderRadius: 8,
+                  border: '1px solid var(--rule)', borderRadius: 0,
                   padding: '11px 12px', outline: 'none', fontSize: 14,
                 }}
               />
@@ -1029,7 +987,7 @@ export default function WeeklyPlan() {
                 type="submit"
                 disabled={!input.trim() || sending}
                 style={{
-                  width: 42, borderRadius: 8, border: 'none',
+                  width: 42, borderRadius: 0, border: 'none',
                   background: input.trim() && !sending ? 'var(--ink)' : 'var(--rule)',
                   color: 'var(--bone)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: input.trim() && !sending ? 'pointer' : 'not-allowed',

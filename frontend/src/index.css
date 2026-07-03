@@ -159,13 +159,6 @@ code {
     }
 }
 
-/* Editorial surface accents (former cyberpunk classes, re-skinned) */
-.bg-grid-pattern {
-  background-size: 24px 24px;
-  background-image:
-    radial-gradient(circle, rgba(26, 25, 24, 0.05) 1px, transparent 1px);
-}
-
 .scan-line {
   position: relative;
   overflow: hidden;

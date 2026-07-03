@@ -26,13 +26,13 @@ function cx(...parts) { return parts.filter(Boolean).join(' '); }
 function Pill({ children, tone = 'slate' }) {
   const tones = {
     cyan:    'border-oxblood/20 bg-oxblood/10 text-oxblood',
-    emerald: 'border-emerald-600/20 bg-emerald-600/10 text-emerald-700',
+    emerald: 'border-ink/20 bg-ink/5 text-ink',
     rose:    'border-oxblood/20 bg-oxblood/10 text-oxblood',
-    amber:   'border-amber-600/20 bg-amber-600/10 text-amber-700',
+    amber:   'border-rule bg-accent-surface text-ink-soft',
     slate:   'border-rule bg-paper text-ink',
   };
   return (
-    <span className={cx('inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', tones[tone])}>
+    <span className={cx('inline-flex items-center border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', tones[tone])}>
       {children}
     </span>
   );
@@ -74,7 +74,7 @@ function EmptyState({ onGenerate, onUpload, generating }) {
       exit={{ opacity: 0, y: -10 }}
       className="flex flex-col items-center justify-center gap-8 py-16 text-center"
     >
-      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-oxblood/20 bg-oxblood/5">
+      <div className="flex h-20 w-20 items-center justify-center border border-oxblood/20 bg-oxblood/5">
         <FileText size={36} className="text-oxblood" />
       </div>
       <div>
@@ -89,7 +89,7 @@ function EmptyState({ onGenerate, onUpload, generating }) {
           onClick={onGenerate}
           disabled={generating}
           id="resume-generate-btn"
-          className="inline-flex items-center gap-2 rounded-lg border border-oxblood/30 bg-oxblood/10 px-5 py-3 text-sm font-bold text-oxblood transition hover:border-oxblood/60 hover:bg-oxblood/20 disabled:opacity-50"
+          className="inline-flex items-center gap-2 border border-oxblood/30 bg-oxblood/10 px-5 py-3 text-sm font-bold text-oxblood transition hover:border-oxblood/60 hover:bg-oxblood/20 disabled:opacity-50"
         >
           {generating
             ? <Loader2 size={15} className="animate-spin" />
@@ -100,7 +100,7 @@ function EmptyState({ onGenerate, onUpload, generating }) {
         <button
           onClick={() => fileRef.current?.click()}
           id="resume-upload-btn"
-          className="inline-flex items-center gap-2 rounded-lg border border-rule bg-paper px-5 py-3 text-sm font-bold text-ink transition hover:border-rule hover:text-ink"
+          className="inline-flex items-center gap-2 border border-rule bg-paper px-5 py-3 text-sm font-bold text-ink transition hover:border-rule hover:text-ink"
         >
           <Upload size={15} />
           Upload existing resume
@@ -116,7 +116,7 @@ function EmptyState({ onGenerate, onUpload, generating }) {
 
       <div className="mt-2 grid max-w-md grid-cols-3 gap-3 text-center">
         {['Skills & proficiency', 'Completed projects', 'Journey achievements'].map(item => (
-          <div key={item} className="rounded-lg border border-rule bg-paper px-3 py-3">
+          <div key={item} className="border border-rule bg-paper px-3 py-3">
             <p className="text-xs text-ink-soft">{item}</p>
           </div>
         ))}
@@ -141,7 +141,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
       className="space-y-6"
     >
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rule bg-paper p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border border-rule bg-paper p-3">
         <div className="flex items-center gap-3">
           <Pill tone={atsColor}>ATS {atsScore}%</Pill>
           <Pill tone={resume?.source === 'uploaded' ? 'amber' : 'cyan'}>
@@ -156,7 +156,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
             disabled={suggestionsLoading}
             id="resume-suggestions-btn"
             className={cx(
-              'relative inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition',
+              'relative inline-flex items-center gap-2 border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition',
               suggestionsBadge
                 ? 'border-oxblood/40 bg-oxblood/10 text-oxblood'
                 : 'border-rule bg-paper text-ink-soft hover:text-ink'
@@ -165,7 +165,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
             {suggestionsLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             Check for updates
             {suggestionsBadge && (
-              <span className="absolute -right-1.5 -top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-oxblood text-[8px] font-black text-bone">
+              <span className="absolute -right-1.5 -top-1.5 flex h-3 w-3 items-center justify-center bg-oxblood text-[8px] font-black text-bone">
                 !
               </span>
             )}
@@ -175,7 +175,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
             onClick={onAts}
             disabled={atsLoading}
             id="resume-ats-btn"
-            className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition hover:border-emerald-600/40 hover:text-emerald-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition hover:border-oxblood/40 hover:text-oxblood disabled:opacity-50"
           >
             {atsLoading ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
             ATS Mode
@@ -185,7 +185,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
             onClick={onDownload}
             disabled={downloading}
             id="resume-download-btn"
-            className="inline-flex items-center gap-2 rounded-md border border-oxblood/30 bg-oxblood/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-oxblood transition hover:border-oxblood/60 disabled:opacity-50"
+            className="inline-flex items-center gap-2 border border-oxblood/30 bg-oxblood/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-oxblood transition hover:border-oxblood/60 disabled:opacity-50"
           >
             {downloading ? <Loader2 size={12} className="animate-spin" /> : <ArrowDownToLine size={12} />}
             Download .docx
@@ -194,7 +194,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
       </div>
 
       {/* Resume card */}
-      <div className="rounded-lg border border-rule bg-paper p-6 space-y-5">
+      <div className="border border-rule bg-paper p-6 space-y-5">
         {/* Header */}
         <div className="border-b border-rule pb-4">
           <h2 className="text-2xl font-black text-ink">{contact.name || 'Your Name'}</h2>
@@ -214,7 +214,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
           <ResumeBlock title={`Skills (${(data.skills || []).length})`}>
             <div className="flex flex-wrap gap-2">
               {(data.skills || []).map(skill => (
-                <span key={skill} className="rounded border border-rule bg-paper px-2 py-1 text-xs text-ink">
+                <span key={skill} className="border border-rule bg-paper px-2 py-1 text-xs text-ink">
                   {skill}
                 </span>
               ))}
@@ -228,7 +228,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
             <ul className="space-y-2">
               {(data.achievements || []).map((ach, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm leading-relaxed text-ink">
-                  <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-emerald-700" />
+                  <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-ink" />
                   {ach}
                 </li>
               ))}
@@ -247,7 +247,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
                   {proj.tech && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {(Array.isArray(proj.tech) ? proj.tech : [proj.tech]).map(t => (
-                        <span key={t} className="rounded bg-paper px-1.5 py-0.5 text-[10px] text-ink-soft">{t}</span>
+                        <span key={t} className="bg-paper px-1.5 py-0.5 text-[10px] text-ink-soft">{t}</span>
                       ))}
                     </div>
                   )}
@@ -264,7 +264,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
               <div key={i} className="text-sm text-ink">
                 <span className="font-bold">{edu.degree}</span>
                 {edu.institution && <span className="text-ink-soft"> · {edu.institution}</span>}
-                {edu.year && <span className="text-ink-soft/70"> · {edu.year}</span>}
+                {edu.year && <span className="text-ink-soft"> · {edu.year}</span>}
               </div>
             ))}
           </ResumeBlock>
@@ -275,7 +275,7 @@ function ResumePreview({ resume, onAts, atsLoading, onDownload, downloading, onR
           <ResumeBlock title="ATS Keywords Applied" defaultOpen={false}>
             <div className="flex flex-wrap gap-2">
               {data._ats_keywords.map(kw => (
-                <span key={kw} className="rounded border border-emerald-600/20 bg-emerald-600/10 px-2 py-0.5 text-[10px] text-emerald-700">{kw}</span>
+                <span key={kw} className="border border-rule bg-accent-surface px-2 py-0.5 text-[10px] text-ink-soft">{kw}</span>
               ))}
             </div>
           </ResumeBlock>
@@ -318,7 +318,7 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
       className="space-y-6"
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 rounded-lg border border-oxblood/20 bg-oxblood/5 p-4">
+      <div className="flex items-start justify-between gap-4 border border-oxblood/20 bg-oxblood/5 p-4">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-widest text-oxblood">
             Bi-weekly Resume Update
@@ -330,7 +330,7 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
             Review each suggestion. Select what to keep, then click "Apply selected".
           </p>
         </div>
-        <button onClick={onClose} className="rounded-md border border-rule p-1.5 text-ink-soft hover:text-ink">
+        <button onClick={onClose} aria-label="Close" className="border border-rule p-1.5 text-ink-soft hover:text-ink">
           <X size={14} />
         </button>
       </div>
@@ -340,7 +340,7 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
         <div>
           <SectionLabel>
             <span className="flex items-center gap-1.5">
-              <Plus size={11} className="text-emerald-700" />
+              <Plus size={11} className="text-ink" />
               To add ({to_add.length})
             </span>
           </SectionLabel>
@@ -355,35 +355,35 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
                     key={i}
                     onClick={() => toggleAdd(i)}
                     className={cx(
-                      'w-full rounded-lg border p-3 text-left transition',
+                      'w-full border p-3 text-left transition',
                       accepted
-                        ? 'border-emerald-500/40 bg-emerald-600/10'
+                        ? 'border-ink/40 bg-ink/5'
                         : 'border-rule bg-paper hover:border-rule'
                     )}
                   >
                     <div className="flex items-start gap-2">
                       <span className={cx(
-                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition',
+                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border transition',
                         accepted
-                          ? 'border-emerald-600 bg-emerald-600 text-bone'
+                          ? 'border-ink bg-ink text-bone'
                           : 'border-rule'
                       )}>
                         {accepted && <CheckCircle2 size={11} />}
                       </span>
                       <div className="min-w-0">
-                        <p className={cx('text-xs font-semibold leading-relaxed', accepted ? 'text-emerald-700' : 'text-ink')}>
+                        <p className="text-xs font-semibold leading-relaxed text-ink">
                           {item.value}
                         </p>
                         <div className="mt-1 flex items-center gap-2">
                           <span className={cx(
-                            'rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider',
+                            'px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider',
                             item.type === 'skill'
                               ? 'bg-oxblood/10 text-oxblood'
-                              : 'bg-emerald-600/10 text-emerald-700'
+                              : 'bg-accent-surface text-ink-soft'
                           )}>
                             {item.type}
                           </span>
-                          {item.date && <span className="text-[9px] text-ink-soft/70">{item.date}</span>}
+                          {item.date && <span className="text-[9px] text-ink-soft">{item.date}</span>}
                         </div>
                       </div>
                     </div>
@@ -413,17 +413,17 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
                     key={i}
                     onClick={() => toggleRemove(i)}
                     className={cx(
-                      'w-full rounded-lg border p-3 text-left transition',
+                      'w-full border p-3 text-left transition',
                       accepted
-                        ? 'border-rose-500/40 bg-oxblood/10'
+                        ? 'border-oxblood/40 bg-oxblood/10'
                         : 'border-rule bg-paper hover:border-rule'
                     )}
                   >
                     <div className="flex items-start gap-2">
                       <span className={cx(
-                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition',
+                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border transition',
                         accepted
-                          ? 'border-rose-400 bg-rose-400 text-ink'
+                          ? 'border-oxblood bg-oxblood text-bone'
                           : 'border-rule'
                       )}>
                         {accepted && <XCircle size={11} />}
@@ -435,12 +435,7 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
                         {item.reason && (
                           <p className="mt-1 text-[10px] leading-relaxed text-ink-soft">{item.reason}</p>
                         )}
-                        <span className={cx(
-                          'mt-1 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider',
-                          item.type === 'skill'
-                            ? 'bg-oxblood/10 text-oxblood'
-                            : 'bg-oxblood/10 text-oxblood'
-                        )}>
+                        <span className="mt-1 bg-oxblood/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-oxblood">
                           {item.type}
                         </span>
                       </div>
@@ -454,14 +449,14 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
       </div>
 
       {/* Action bar */}
-      <div className="flex items-center justify-between gap-4 rounded-lg border border-rule bg-paper p-4">
+      <div className="flex items-center justify-between gap-4 border border-rule bg-paper p-4">
         <p className="text-xs text-ink-soft">
           {acceptedAdds.size} addition{acceptedAdds.size !== 1 ? 's' : ''} · {acceptedRemoves.size} removal{acceptedRemoves.size !== 1 ? 's' : ''} selected
         </p>
         <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="rounded-md border border-rule px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-ink-soft hover:text-ink"
+            className="border border-rule px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-ink-soft hover:text-ink"
           >
             Skip for now
           </button>
@@ -469,7 +464,7 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
             onClick={handleApply}
             disabled={applying || (acceptedAdds.size === 0 && acceptedRemoves.size === 0)}
             id="resume-apply-suggestions-btn"
-            className="inline-flex items-center gap-2 rounded-md border border-oxblood/30 bg-oxblood/10 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-oxblood transition hover:border-oxblood/60 disabled:opacity-40"
+            className="inline-flex items-center gap-2 border border-oxblood/30 bg-oxblood/10 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-oxblood transition hover:border-oxblood/60 disabled:opacity-40"
           >
             {applying && <Loader2 size={12} className="animate-spin" />}
             Apply selected changes
@@ -671,10 +666,10 @@ export default function ResumeSection() {
       {/* Hidden file input for toolbar upload */}
       {hasResume && (
         <div className="mt-4 flex items-center gap-2 border-t border-rule pt-4">
-          <p className="text-[10px] text-ink-soft/70">Replace resume:</p>
+          <p className="text-[10px] text-ink-soft">Replace resume:</p>
           <button
             onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center gap-1.5 rounded border border-rule px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-ink-soft hover:text-ink"
+            className="inline-flex items-center gap-1.5 border border-rule px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-ink-soft hover:text-ink"
           >
             <Upload size={10} /> Upload new
           </button>
@@ -686,7 +681,7 @@ export default function ResumeSection() {
             onChange={e => handleUpload(e.target.files?.[0])}
           />
           {resumeData?.resume?.updated_at && (
-            <p className="ml-auto text-[10px] text-ink-soft/70">
+            <p className="ml-auto text-[10px] text-ink-soft">
               Updated {new Date(resumeData.resume.updated_at).toLocaleDateString()}
             </p>
           )}

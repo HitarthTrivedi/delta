@@ -9,6 +9,7 @@ import {
   ExternalLink,
   FileText,
   Github,
+  Loader2,
   Network,
   RefreshCw,
   ShieldAlert,
@@ -56,7 +57,7 @@ function formatINR(value) {
 
 function Panel({ children, className = '' }) {
   return (
-    <GlassPanel hover={false} className={cx('p-5 rounded-lg border-rule', className)}>
+    <GlassPanel hover={false} className={cx('p-5 border-rule', className)}>
       {children}
     </GlassPanel>
   );
@@ -95,14 +96,14 @@ function EmptyLine({ children }) {
 function StatusPill({ children, tone = 'cyan' }) {
   const tones = {
     cyan: 'border-oxblood/20 bg-oxblood/10 text-oxblood',
-    emerald: 'border-emerald-600/20 bg-emerald-600/10 text-emerald-700',
-    amber: 'border-amber-600/20 bg-amber-600/10 text-amber-700',
+    emerald: 'border-ink/20 bg-ink/5 text-ink',
+    amber: 'border-rule bg-accent-surface text-ink-soft',
     rose: 'border-oxblood/20 bg-oxblood/10 text-oxblood',
     slate: 'border-rule bg-paper text-ink',
   };
 
   return (
-    <span className={cx('inline-flex items-center rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-wider', tones[tone])}>
+    <span className={cx('inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-wider', tones[tone])}>
       {children}
     </span>
   );
@@ -367,10 +368,9 @@ export default function Dashboard() {
 
   if (!stats || !brief || !careerContext || !derived) {
     return (
-      <div className="min-h-screen pt-24 px-6 flex flex-col items-center justify-center bg-grid-pattern text-ink-soft font-mono">
-        <Cpu className="animate-spin text-oxblood mb-4" size={32} />
-        <h1 className="text-lg font-black uppercase tracking-widest text-ink">Loading Career OS</h1>
-        <p className="text-[11px] text-ink-soft mt-2">Dashboard sync in progress</p>
+      <div className="min-h-screen pt-24 px-6 flex flex-col items-center justify-center bg-bone text-ink-soft">
+        <Loader2 className="animate-spin mb-4" size={24} />
+        <p className="text-sm">Loading your dashboard...</p>
       </div>
     );
   }
@@ -404,7 +404,7 @@ export default function Dashboard() {
   const readiness = portfolio.readiness || 'unknown';
 
   return (
-    <div className="min-h-screen pt-20 px-4 sm:px-6 max-w-7xl mx-auto pb-12 text-ink font-mono selection:bg-oxblood/20">
+    <div className="min-h-screen pt-20 px-4 sm:px-6 max-w-7xl mx-auto pb-12 text-ink selection:bg-oxblood/20">
       <header className="mb-6 flex flex-col gap-5 border-b border-rule pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-oxblood">Delta Career OS</p>
@@ -420,7 +420,7 @@ export default function Dashboard() {
               key={view.id}
               onClick={() => setActiveView(view.id)}
               className={cx(
-                'relative rounded-md border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors',
+                'relative border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors',
                 activeView === view.id
                   ? 'border-oxblood/40 bg-oxblood/10 text-oxblood'
                   : 'border-rule bg-paper text-ink-soft hover:text-ink'
@@ -428,14 +428,14 @@ export default function Dashboard() {
             >
               {view.label}
               {view.id === 'resume' && resumeSuggestionsDue && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-2.5 w-2.5 rounded-full bg-oxblood" />
+                <span className="absolute -right-1.5 -top-1.5 flex h-2.5 w-2.5 bg-oxblood" />
               )}
             </button>
           ))}
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition-colors hover:text-ink disabled:opacity-50"
+            className="inline-flex items-center gap-2 border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition-colors hover:text-ink disabled:opacity-50"
           >
             <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
             Refresh
@@ -445,9 +445,9 @@ export default function Dashboard() {
 
       <section className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Metric label="Delta Score" value={deltaScore} detail={`${alignment}% aligned with target role`} tone="text-oxblood" />
-        <Metric label="Weekly Capacity" value={`${hoursPerWeek}h`} detail={`${consistency}% consistency indexed`} tone="text-emerald-700" />
+        <Metric label="Weekly Capacity" value={`${hoursPerWeek}h`} detail={`${consistency}% consistency indexed`} tone="text-ink" />
         <Metric label="Portfolio" value={readiness} detail={(portfolio.missing_market_proof || []).slice(0, 2).join(', ') || 'proof stack stable'} tone="text-ink" />
-        <Metric label="OS Status" value={systemStatus?.status || 'syncing'} detail={`${semanticSummary.total_nodes || 0} memory nodes`} tone="text-emerald-700" />
+        <Metric label="OS Status" value={systemStatus?.status || 'syncing'} detail={`${semanticSummary.total_nodes || 0} memory nodes`} tone="text-ink" />
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.55fr_.95fr]">
@@ -472,7 +472,7 @@ export default function Dashboard() {
                     setSelectedNode(nextNode);
                     setActiveView('roadmap');
                   }}
-                  className="inline-flex items-center gap-2 rounded-md border border-oxblood/20 bg-oxblood/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-oxblood transition-colors hover:border-oxblood/50"
+                  className="inline-flex items-center gap-2 border border-oxblood/20 bg-oxblood/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-oxblood transition-colors hover:border-oxblood/50"
                 >
                   <BookOpen size={13} />
                   Open checkpoint
@@ -522,9 +522,9 @@ export default function Dashboard() {
                             className="group flex w-full items-start gap-3 text-left"
                           >
                             <span className={cx(
-                              'mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded border transition-colors',
+                              'mt-0.5 flex h-5 w-5 flex-none items-center justify-center border transition-colors',
                               complete
-                                ? 'border-emerald-600 bg-emerald-600 text-bone'
+                                ? 'border-ink bg-ink text-bone'
                                 : 'border-rule text-transparent group-hover:border-oxblood'
                             )}>
                               <CheckCircle size={13} />
@@ -548,18 +548,18 @@ export default function Dashboard() {
                           <Row key={`${question}-${idx}`}>
                             <p className="text-sm leading-relaxed text-ink">{question}</p>
                             {submitted ? (
-                              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700">Synced</p>
+                              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-ink-soft">Synced</p>
                             ) : (
                               <div className="mt-3 flex gap-2">
                                 <input
                                   value={resolverAnswers[idx] || ''}
                                   onChange={(event) => setResolverAnswers((prev) => ({ ...prev, [idx]: event.target.value }))}
-                                  className="min-w-0 flex-1 rounded-md border border-rule bg-bone/80 px-3 py-2 text-xs text-ink outline-none transition-colors focus:border-oxblood"
+                                  className="min-w-0 flex-1 border border-rule bg-bone/80 px-3 py-2 text-xs text-ink outline-none transition-colors focus:border-oxblood"
                                   placeholder="Short answer"
                                 />
                                 <button
                                   onClick={() => submitAnswer(idx, question)}
-                                  className="rounded-md bg-oxblood px-3 py-2 text-[11px] font-black uppercase tracking-wider text-bone"
+                                  className="bg-oxblood px-3 py-2 text-[11px] font-black uppercase tracking-wider text-bone"
                                 >
                                   Save
                                 </button>
@@ -611,7 +611,7 @@ export default function Dashboard() {
                             <button
                               key={node.id}
                               onClick={() => setSelectedNode({ ...node, phaseIndex, phaseName: phase.name })}
-                              className="rounded-md border border-rule bg-paper p-3 text-left transition-colors hover:border-oxblood/40"
+                              className="border border-rule bg-paper p-3 text-left transition-colors hover:border-oxblood/40"
                             >
                               <div className="flex items-center justify-between gap-3">
                                 <span className="text-sm font-bold text-ink">{node.label}</span>
@@ -646,7 +646,7 @@ export default function Dashboard() {
                     <button
                       onClick={handleConsolidateMemory}
                       disabled={consolidating}
-                      className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition-colors hover:text-ink disabled:opacity-50"
+                      className="inline-flex items-center gap-2 border border-rule bg-paper px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition-colors hover:text-ink disabled:opacity-50"
                     >
                       <RefreshCw size={13} className={consolidating ? 'animate-spin' : ''} />
                       Consolidate
@@ -661,9 +661,9 @@ export default function Dashboard() {
                             <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">{dimension}</span>
                             <span className="text-xs text-ink-soft">{dimensionBalance[dimension] || 0}%</span>
                           </div>
-                          <div className="h-2 overflow-hidden rounded bg-bone">
+                          <div className="h-2 overflow-hidden bg-bone">
                             <div
-                              className="h-full rounded bg-oxblood"
+                              className="h-full bg-oxblood"
                               style={{ width: `${Math.min(dimensionBalance[dimension] || 0, 100)}%` }}
                             />
                           </div>
@@ -742,7 +742,7 @@ export default function Dashboard() {
               <Row key={event.id}>
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm leading-relaxed text-ink">{event.summary}</p>
-                  <span className="text-[10px] uppercase tracking-wider text-ink-soft/70">{event.event_date}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-soft">{event.event_date}</span>
                 </div>
               </Row>
             ))}
@@ -783,7 +783,7 @@ export default function Dashboard() {
               initial={{ scale: 0.96, y: 16 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.96, y: 16 }}
-              className="max-h-full w-full max-w-2xl overflow-y-auto rounded-lg border border-rule bg-bone p-6 shadow-2xl"
+              className="max-h-full w-full max-w-2xl overflow-y-auto border border-rule bg-bone p-6"
             >
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
@@ -794,7 +794,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="rounded-md border border-rule bg-paper p-2 text-ink-soft hover:text-ink"
+                  className="border border-rule bg-paper p-2 text-ink-soft hover:text-ink"
                 >
                   <X size={16} />
                 </button>
@@ -810,13 +810,13 @@ export default function Dashboard() {
                 )}
                 {selectedNode.architect_warning && (
                   <Row>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-amber-700">Warning</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-oxblood">Warning</p>
                     <p className="mt-1 text-sm leading-relaxed text-ink">{selectedNode.architect_warning}</p>
                   </Row>
                 )}
                 {selectedNode.certification && (
                   <Row>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">Credential</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink">Credential</p>
                     <p className="mt-1 text-sm leading-relaxed text-ink">{selectedNode.certification}</p>
                   </Row>
                 )}
@@ -836,7 +836,7 @@ export default function Dashboard() {
 
                     if (rec.status === 'completed') {
                       return (
-                        <p className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-emerald-700">
+                        <p className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-ink">
                           <CheckCircle size={14} />
                           Verified
                         </p>
@@ -849,13 +849,13 @@ export default function Dashboard() {
                           value={githubUrl}
                           onChange={(event) => setGithubUrl(event.target.value)}
                           disabled={verifying}
-                          className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-oxblood"
+                          className="min-w-0 flex-1 border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-oxblood"
                           placeholder="https://github.com/user/project"
                         />
                         <button
                           onClick={() => submitMilestone(rec.id, rec.skill)}
                           disabled={verifying}
-                          className="rounded-md bg-oxblood px-4 py-2 text-xs font-black uppercase tracking-wider text-bone disabled:opacity-50"
+                          className="bg-oxblood px-4 py-2 text-xs font-black uppercase tracking-wider text-bone disabled:opacity-50"
                         >
                           {verifying ? 'Checking' : 'Verify'}
                         </button>

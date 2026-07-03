@@ -149,8 +149,12 @@ export default function LoginPage() {
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 {/* Custom checkbox */}
                 <div
+                  role="checkbox"
+                  aria-checked={rememberMe}
+                  tabIndex={0}
                   onClick={() => setRememberMe(!rememberMe)}
-                  className={`w-[17px] h-[17px] border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRememberMe(!rememberMe); } }}
+                  className={`w-[17px] h-[17px] border flex items-center justify-center transition-all cursor-pointer shrink-0 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-oxblood ${
                     rememberMe ? 'border-ink bg-ink' : 'border-rule bg-transparent'
                   }`}
                 >
@@ -229,7 +233,7 @@ export default function LoginPage() {
           </button>
 
           {/* Footer */}
-          <p className="mt-8 text-center text-[11px] text-ink-soft/70 leading-relaxed">
+          <p className="mt-8 text-center text-[11px] text-ink-soft leading-relaxed">
             By continuing, you agree to Delta's{' '}
             <span
               onClick={() => window.open('/terms', '_blank')}
@@ -285,10 +289,10 @@ export default function LoginPage() {
 }
 
 /* ── Shared class strings ── */
-const iconClass = 'absolute left-3.5 text-ink-soft/60 pointer-events-none shrink-0';
+const iconClass = 'absolute left-3.5 text-ink-soft pointer-events-none shrink-0';
 
 const inputClass =
-  'w-full bg-paper border border-rule py-[13px] pl-[42px] pr-3.5 text-ink placeholder:text-ink-soft/70 text-sm outline-none transition-colors focus:border-oxblood box-border';
+  'w-full bg-paper border border-rule py-[13px] pl-[42px] pr-3.5 text-ink placeholder:text-ink-soft text-sm outline-none transition-colors focus:border-oxblood box-border';
 
 const linkClass =
   'text-oxblood font-medium bg-transparent border-none cursor-pointer text-sm no-underline p-0 hover:underline';

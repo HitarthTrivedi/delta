@@ -10,7 +10,7 @@ import { useAuthStore } from '../store/authStore';
 const panelStyle = {
   background: 'var(--paper)',
   border: '1px solid var(--rule)',
-  borderRadius: 8,
+  borderRadius: 0,
 };
 
 const ROLE_TYPE_OPTIONS = [
@@ -26,8 +26,7 @@ const ROLE_TYPE_LABEL = { internship: 'Internship', full_time: 'Full-time', part
 const DEFAULT_PREFS = { location: '', role_types: ['internship', 'full_time'], work_mode: 'any', industries: '', notes: '' };
 
 function scoreColor(score) {
-  if (score >= 75) return '#16a34a';
-  if (score >= 50) return '#d97706';
+  if (score >= 75) return 'var(--oxblood)';
   return 'var(--ink-soft)';
 }
 
@@ -140,7 +139,7 @@ export default function Opportunities() {
               onClick={() => setPrefsOpen((o) => !o)}
               style={{
                 background: 'var(--accent-surface)', color: 'var(--ink)',
-                border: '1px solid var(--rule)', borderRadius: 999,
+                border: '1px solid var(--rule)', borderRadius: 0,
                 padding: '11px 16px', fontWeight: 600, fontSize: 13,
                 display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer',
               }}
@@ -151,7 +150,7 @@ export default function Opportunities() {
               onClick={generate}
               disabled={generating}
               style={{
-                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 999,
+                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0,
                 padding: '11px 18px', fontWeight: 700,
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 cursor: generating ? 'not-allowed' : 'pointer', flexShrink: 0,
@@ -236,10 +235,10 @@ export default function Opportunities() {
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-              <button onClick={() => setPrefsOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 8, padding: '9px 16px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={() => setPrefsOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '9px 16px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button onClick={savePreferences} disabled={savingPrefs} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 8, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: savingPrefs ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+              <button onClick={savePreferences} disabled={savingPrefs} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: savingPrefs ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
                 {savingPrefs ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
                 Save preferences
               </button>
@@ -249,12 +248,12 @@ export default function Opportunities() {
 
         {/* Stale banner */}
         {stale && !generating && (
-          <div style={{ ...panelStyle, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, borderColor: 'rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.06)' }}>
-            <TrendingUp size={16} style={{ color: '#d97706', flexShrink: 0 }} />
+          <div style={{ ...panelStyle, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--accent-surface)' }}>
+            <TrendingUp size={16} style={{ color: 'var(--oxblood)', flexShrink: 0 }} />
             <span style={{ fontSize: 13, color: 'var(--ink)', flex: 1 }}>
               Your profile has improved since these were generated. Refresh for sharper matches.
             </span>
-            <button onClick={generate} style={{ background: '#d97706', color: 'var(--bone)', border: 'none', borderRadius: 6, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={generate} style={{ background: 'var(--oxblood)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               Refresh
             </button>
           </div>
@@ -274,8 +273,8 @@ export default function Opportunities() {
         ) : isEmpty ? (
           <section style={{ ...panelStyle, padding: '48px 24px', textAlign: 'center' }}>
             <div style={{
-              width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px',
-              background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)',
+              width: 56, height: 56, borderRadius: 0, margin: '0 auto 16px',
+              background: 'var(--accent-surface)', border: '1px solid var(--rule)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Sparkles size={24} style={{ color: 'var(--oxblood)' }} />
@@ -286,7 +285,7 @@ export default function Opportunities() {
             </p>
             <button
               onClick={generate}
-              style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 8, padding: '11px 18px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '11px 18px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               <Sparkles size={16} /> Find my opportunities
             </button>
@@ -298,8 +297,8 @@ export default function Opportunities() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                   <div>
                     <span style={{
-                      display: 'inline-block', background: 'rgba(96,165,250,0.12)', color: 'var(--oxblood)',
-                      borderRadius: 999, padding: '3px 9px', fontSize: 10, fontWeight: 700,
+                      display: 'inline-block', background: 'var(--accent-surface)', color: 'var(--oxblood)',
+                      borderRadius: 0, padding: '3px 9px', fontSize: 10, fontWeight: 700,
                       textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8,
                     }}>
                       {ROLE_TYPE_LABEL[op.role_type] || op.role_type}
@@ -334,7 +333,7 @@ export default function Opportunities() {
                     <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>You have</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {op.skills_matched.map((s, j) => (
-                        <span key={j} style={{ background: 'rgba(22,163,74,0.12)', color: '#16a34a', borderRadius: 6, padding: '3px 8px', fontSize: 11 }}>{s}</span>
+                        <span key={j} style={{ background: 'var(--accent-surface)', color: 'var(--ink)', borderRadius: 0, padding: '3px 8px', fontSize: 11, border: '1px solid var(--rule)' }}>{s}</span>
                       ))}
                     </div>
                   </div>
@@ -345,7 +344,7 @@ export default function Opportunities() {
                     <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Build to stand out</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {op.skills_to_build.map((s, j) => (
-                        <span key={j} style={{ background: 'var(--accent-surface)', color: 'var(--ink-soft)', borderRadius: 6, padding: '3px 8px', fontSize: 11, border: '1px solid var(--rule)' }}>{s}</span>
+                        <span key={j} style={{ background: 'var(--accent-surface)', color: 'var(--ink-soft)', borderRadius: 0, padding: '3px 8px', fontSize: 11, border: '1px solid var(--rule)' }}>{s}</span>
                       ))}
                     </div>
                   </div>
@@ -358,7 +357,7 @@ export default function Opportunities() {
                     rel="noreferrer"
                     style={{
                       marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                      background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 8,
+                      background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0,
                       padding: '9px 12px', color: 'var(--ink)', fontSize: 13, fontWeight: 600, textDecoration: 'none',
                     }}
                   >
@@ -396,7 +395,7 @@ const inputStyle = {
   width: '100%',
   background: 'var(--accent-surface)',
   border: '1px solid var(--rule)',
-  borderRadius: 8,
+  borderRadius: 0,
   padding: '10px 12px',
   color: 'var(--ink)',
   fontSize: 14,
@@ -408,7 +407,7 @@ const chipStyle = (active) => ({
   background: active ? 'var(--ink)' : 'var(--accent-surface)',
   color: active ? 'var(--bone)' : 'var(--ink)',
   border: '1px solid var(--rule)',
-  borderRadius: 999,
+  borderRadius: 0,
   padding: '7px 12px',
   fontSize: 12,
   fontWeight: 600,

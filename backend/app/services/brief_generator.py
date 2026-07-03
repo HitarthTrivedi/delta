@@ -3,7 +3,7 @@ import json
 import logging
 import uuid
 import re
-from app.services.ai_service import generate_response
+from app.services.ai_service import generate_response, sanitize_llm_json_text
 
 logger = logging.getLogger("delta.brief_generator")
 RESUME_MODEL = "gemini-2.5-flash"
@@ -220,6 +220,7 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
     - "questions_for_user": 2 deep reflection questions to help the AI resolve profile ambiguity.
 
     Output strictly as a valid, standard, parsable JSON object. Do not wrap in markdown tags like ```json or ```, do not include comments, and do not add trailing commas.
+    All text fields are displayed as plain text, not rendered math — never use LaTeX/math notation (no "\\rightarrow", "\\times", "$...$"); write step sequences with a plain arrow (→) or the word "then".
     Your output MUST have the following top-level keys:
     {{
       "phases": [
@@ -269,7 +270,7 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
         elif "```" in response_text:
             response_text = response_text.split("```")[1].split("```")[0]
             
-        data = json.loads(response_text.strip())
+        data = json.loads(sanitize_llm_json_text(response_text.strip()))
         
         # Self-healing: if LLM nested under "curriculum" or "brief", flatten it to top-level!
         if "curriculum" in data and isinstance(data["curriculum"], dict):

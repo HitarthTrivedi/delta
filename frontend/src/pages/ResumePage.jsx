@@ -17,7 +17,7 @@ export default function ResumePage() {
           </p>
         </header>
 
-        <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 8, padding: 22 }}>
+        <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 22 }}>
           <ResumeSection />
         </div>
       </div>

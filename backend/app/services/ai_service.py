@@ -178,6 +178,27 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
         yield _mock_structured_response(prompt)
 
 
+_LATEX_ARROWS = {
+    r"\rightarrow": "→", r"\to": "→", r"\Rightarrow": "⇒",
+    r"\longrightarrow": "→", r"\leftarrow": "←", r"\Leftarrow": "⇐",
+}
+
+
+def sanitize_llm_json_text(text: str) -> str:
+    """
+    Models occasionally write LaTeX (e.g. "$\\rightarrow$") inside plain JSON
+    string fields without doubling the backslash. json.loads then silently
+    treats "\r" / "\t" as real control-char escapes, swallowing the backslash
+    and the next letter (turning "\rightarrow" into "ightarrow"). Normalize
+    common arrow macros to unicode first, then double any remaining backslash
+    that precedes 2+ letters — never a valid single-char JSON escape — so it
+    round-trips as literal text instead of corrupting the string.
+    """
+    for macro, symbol in _LATEX_ARROWS.items():
+        text = text.replace(f"${macro}$", symbol).replace(macro, symbol)
+    return re.sub(r"\\(?=[A-Za-z]{2,})", r"\\\\", text)
+
+
 def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None) -> dict | list:
     """
     Generate a JSON response. Strips markdown fences and parses automatically.
@@ -189,7 +210,7 @@ def generate_json(prompt: str, temperature: float = 0.3, model: str | None = Non
         clean = clean.split("```json")[1].split("```")[0]
     elif "```" in clean:
         clean = clean.split("```")[1].split("```")[0]
-    clean = clean.strip()
+    clean = sanitize_llm_json_text(clean.strip())
 
     try:
         return json.loads(clean)

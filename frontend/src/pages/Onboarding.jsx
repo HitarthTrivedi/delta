@@ -99,7 +99,7 @@ const TypingDots = () => (
         key={i}
         animate={{ opacity: [0.3, 1, 0.3] }}
         transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
-        style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ink-soft)', display: 'block' }}
+        style={{ width: 6, height: 6, borderRadius: 0, background: 'var(--ink-soft)', display: 'block' }}
       />
     ))}
   </div>
@@ -120,7 +120,7 @@ const Bubble = ({ msg }) => {
         <div style={{
           background: 'var(--accent-surface)',
           border: '1px solid var(--rule)',
-          borderRadius: '16px 16px 4px 16px',
+          borderRadius: 0,
           padding: '10px 16px',
           display: 'flex',
           alignItems: 'center',
@@ -151,7 +151,7 @@ const Bubble = ({ msg }) => {
     >
       {isAssistant && (
         <div style={{
-          width: 30, height: 30, borderRadius: '50%',
+          width: 30, height: 30, borderRadius: 0,
           background: 'var(--ink)', flexShrink: 0, marginTop: 2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -163,7 +163,7 @@ const Bubble = ({ msg }) => {
         maxWidth: '72%',
         background: isAssistant ? 'var(--accent-surface)' : 'var(--ink)',
         border: isAssistant ? '1px solid var(--rule)' : 'none',
-        borderRadius: isAssistant ? '4px 16px 16px 16px' : '16px 16px 4px 16px',
+        borderRadius: 0,
         padding: '12px 16px',
         color: isAssistant ? 'var(--ink)' : 'var(--bone)',
         fontSize: '0.9rem',
@@ -178,7 +178,7 @@ const Bubble = ({ msg }) => {
               ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
               li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
               strong: ({ children }) => <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{children}</strong>,
-              code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 3, fontSize: '0.8rem' }}>{children}</code>,
+              code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 0, fontSize: '0.8rem' }}>{children}</code>,
             }}
           >
             {msg.content}
@@ -188,7 +188,7 @@ const Bubble = ({ msg }) => {
 
       {!isAssistant && (
         <div style={{
-          width: 30, height: 30, borderRadius: '50%',
+          width: 30, height: 30, borderRadius: 0,
           background: 'var(--rule)', flexShrink: 0, marginTop: 2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -492,7 +492,7 @@ export default function Onboarding() {
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: 35 }}>
             <div style={{
-              width: 54, height: 54, borderRadius: '50%', background: 'var(--ink)',
+              width: 54, height: 54, borderRadius: 0, background: 'var(--ink)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 16px',
             }}>
@@ -512,7 +512,7 @@ export default function Onboarding() {
           <div style={{
             background: 'var(--accent-surface)',
             border: '1px solid var(--accent-surface)',
-            borderRadius: 14,
+            borderRadius: 0,
             padding: '24px 30px',
             marginBottom: 30,
           }}>
@@ -541,7 +541,7 @@ export default function Onboarding() {
                     style={{
                       background: 'var(--ink)', border: 'none', color: 'var(--bone)', cursor: 'pointer',
                       fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700,
-                      padding: '4px 12px', borderRadius: 4,
+                      padding: '4px 12px', borderRadius: 0,
                     }}
                   >
                     {saving ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />}
@@ -551,7 +551,7 @@ export default function Onboarding() {
                     onClick={() => { setIsEditing(false); loadProfileData(); }}
                     style={{
                       background: 'none', border: '1px solid var(--rule)', color: 'var(--ink-soft)',
-                      cursor: 'pointer', fontSize: '0.8rem', padding: '4px 12px', borderRadius: 4,
+                      cursor: 'pointer', fontSize: '0.8rem', padding: '4px 12px', borderRadius: 0,
                     }}
                   >
                     Cancel
@@ -604,7 +604,7 @@ export default function Onboarding() {
                         onChange={e => handleProfileFieldChange(f.key, e.target.value)}
                         style={{
                           width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
-                          borderRadius: 6, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
+                          borderRadius: 0, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
                         }}
                       >
                         <option value="">Select...</option>
@@ -617,7 +617,7 @@ export default function Onboarding() {
                         onChange={e => handleProfileFieldChange(f.key, e.target.value)}
                         style={{
                           width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
-                          borderRadius: 6, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
+                          borderRadius: 0, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
                         }}
                       />
                     )
@@ -645,7 +645,7 @@ export default function Onboarding() {
                       onChange={e => handleProfileFieldChange(f.key, e.target.value)}
                       style={{
                         width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
-                        borderRadius: 6, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
+                        borderRadius: 0, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
                       }}
                     />
                   ) : (
@@ -668,7 +668,7 @@ export default function Onboarding() {
                     onChange={e => handleProfileFieldChange('personal_introduction', e.target.value)}
                     style={{
                       width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
-                      borderRadius: 6, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
+                      borderRadius: 0, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
                     }}
                   />
                 ) : (
@@ -689,7 +689,7 @@ export default function Onboarding() {
                     onChange={e => handleProfileFieldChange('inferred_planning_reason', e.target.value)}
                     style={{
                       width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
-                      borderRadius: 6, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
+                      borderRadius: 0, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
                     }}
                   />
                 ) : (
@@ -710,7 +710,7 @@ export default function Onboarding() {
                     onChange={e => handleProfileFieldChange('past_experience', e.target.value)}
                     style={{
                       width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
-                      borderRadius: 6, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
+                      borderRadius: 0, color: 'var(--ink)', padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical',
                     }}
                   />
                 ) : (
@@ -732,7 +732,7 @@ export default function Onboarding() {
                 color: isEditing ? 'var(--ink-soft)' : 'var(--bone)',
                 border: 'none',
                 padding: '12px 28px',
-                borderRadius: 8,
+                borderRadius: 0,
                 fontSize: '0.9rem',
                 fontWeight: 700,
                 cursor: isEditing ? 'not-allowed' : 'pointer',
@@ -770,7 +770,7 @@ export default function Onboarding() {
                 color: 'var(--ink-soft)',
                 border: '1px solid var(--rule)',
                 padding: '12px 28px',
-                borderRadius: 8,
+                borderRadius: 0,
                 fontSize: '0.9rem',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -866,7 +866,7 @@ export default function Onboarding() {
                   }}
                 >
                   <div style={{
-                    width: 4, height: 4, borderRadius: '50%',
+                    width: 4, height: 4, borderRadius: 0,
                     background: isFilled ? 'var(--oxblood)' : 'var(--rule)',
                   }} />
                   {label}
@@ -889,7 +889,7 @@ export default function Onboarding() {
               style={{ textAlign: 'center', marginBottom: 40 }}
             >
               <div style={{
-                width: 52, height: 52, borderRadius: '50%', background: 'var(--ink)',
+                width: 52, height: 52, borderRadius: 0, background: 'var(--ink)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 margin: '0 auto 16px',
               }}>
@@ -920,7 +920,7 @@ export default function Onboarding() {
               style={{ display: 'flex', gap: 10, marginBottom: 14 }}
             >
               <div style={{
-                width: 30, height: 30, borderRadius: '50%', background: 'var(--ink)',
+                width: 30, height: 30, borderRadius: 0, background: 'var(--ink)',
                 flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <ClipboardList size={14} style={{ color: 'var(--bone)' }} />
@@ -928,7 +928,7 @@ export default function Onboarding() {
               <div style={{
                 background: 'var(--accent-surface)',
                 border: '1px solid var(--rule)',
-                borderRadius: '4px 16px 16px 16px',
+                borderRadius: 0,
                 padding: '12px 18px',
               }}>
                 <TypingDots />
@@ -962,7 +962,7 @@ export default function Onboarding() {
                   padding: '8px 14px',
                   background: 'var(--accent-surface)',
                   border: '1px solid var(--accent-surface)',
-                  borderRadius: 10,
+                  borderRadius: 0,
                   cursor: 'pointer',
                 }}
                 onClick={() => fileRef.current?.click()}
@@ -982,7 +982,7 @@ export default function Onboarding() {
                 marginBottom: 10, padding: '6px 12px',
                 background: 'var(--accent-surface)',
                 border: '1px solid var(--rule)',
-                borderRadius: 8,
+                borderRadius: 0,
               }}>
                 <CheckCircle2 size={13} style={{ color: 'var(--ink)' }} />
                 <span style={{ color: 'var(--ink)', fontSize: '0.8rem', flex: 1 }}>{uploadFile.name} — uploaded</span>
@@ -999,7 +999,7 @@ export default function Onboarding() {
               gap: 10,
               background: 'var(--accent-surface)',
               border: '1px solid var(--rule)',
-              borderRadius: 14,
+              borderRadius: 0,
               padding: '10px 12px',
             }}>
               <button
@@ -1007,12 +1007,13 @@ export default function Onboarding() {
                 disabled={parsing}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--ink-soft)', padding: '4px', flexShrink: 0,
+                  color: 'var(--ink-soft)', padding: '10px', flexShrink: 0,
                   transition: 'color 0.2s',
                 }}
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--ink)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-soft)'}
                 title="Attach resume"
+                aria-label="Attach resume"
               >
                 <Paperclip size={18} />
               </button>
@@ -1050,7 +1051,7 @@ export default function Onboarding() {
                 onClick={() => handleSend()}
                 disabled={!input.trim() || isThinking}
                 style={{
-                  width: 36, height: 36, borderRadius: '50%',
+                  width: 36, height: 36, borderRadius: 0,
                   background: input.trim() && !isThinking ? 'var(--ink)' : 'var(--rule)',
                   border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1092,7 +1093,7 @@ export default function Onboarding() {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <div style={{
-              width: 8, height: 8, borderRadius: '50%', background: 'var(--ink)',
+              width: 8, height: 8, borderRadius: 0, background: 'var(--ink)',
               animation: 'ping 1s cubic-bezier(0,0,0.2,1) infinite',
             }} />
             <span style={{ color: 'var(--ink)', fontSize: '0.88rem', fontWeight: 600 }}>
@@ -1117,7 +1118,7 @@ export default function Onboarding() {
         textarea::placeholder { color: var(--ink-soft); }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 0; }
       `}</style>
     </div>
   );
