@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { Send, Zap, Cpu, Sparkles, BookOpen, User } from 'lucide-react';
+import { Send, Cpu, Sparkles, BookOpen } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import GlassPanel from '../components/ui/GlassPanel';
@@ -12,57 +12,71 @@ import { chatAPI, briefsAPI } from '../lib/api';
 import { fetchCareerContext } from '../hooks/useCareerOS';
 import { toast } from 'sonner';
 
-// Markdown component styled for dark chat bubbles
+// Markdown renderer for Agent 2 answers. Nested list depth is differentiated
+// via the .chat-markdown CSS below (react-markdown gives one component per
+// tag regardless of depth, so per-level marker/indent steps live in CSS).
 function ChatMarkdown({ content }) {
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeKatex]}
-      components={{
-        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-        li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-        strong: ({ children }) => <strong className="font-semibold text-ink">{children}</strong>,
-        em: ({ children }) => <em className="italic text-ink">{children}</em>,
-        code: ({ inline, children }) =>
-          inline ? (
-            <code className="bg-accent-surface text-oxblood px-1 py-0.5 rounded text-[11px] font-mono">{children}</code>
-          ) : (
-            <pre className="bg-paper border border-rule rounded-lg p-3 overflow-x-auto my-2">
-              <code className="text-oxblood text-[11px] font-mono">{children}</code>
-            </pre>
+    <div className="chat-markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc pl-5 mb-3 last:mb-0 space-y-1.5">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-5 mb-3 last:mb-0 space-y-1.5">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed pl-1">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold text-ink">{children}</strong>,
+          em: ({ children }) => <em className="italic text-ink">{children}</em>,
+          code: ({ inline, children }) =>
+            inline ? (
+              <code className="bg-accent-surface text-oxblood px-1 py-0.5 text-[12px] font-mono">{children}</code>
+            ) : (
+              <pre className="bg-accent-surface border border-rule p-3 overflow-x-auto my-3">
+                <code className="text-oxblood text-[12px] font-mono">{children}</code>
+              </pre>
+            ),
+          h1: ({ children }) => <h1 className="font-display text-lg font-semibold text-ink mb-2 mt-4 first:mt-0">{children}</h1>,
+          h2: ({ children }) => <h2 className="font-display text-base font-semibold text-ink mb-2 mt-4 first:mt-0">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-sm font-semibold text-ink mb-1.5 mt-3 first:mt-0">{children}</h3>,
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-oxblood underline hover:text-ink">
+              {children}
+            </a>
           ),
-        h1: ({ children }) => <h1 className="text-base font-bold text-ink mb-1 mt-2">{children}</h1>,
-        h2: ({ children }) => <h2 className="text-sm font-bold text-ink mb-1 mt-2">{children}</h2>,
-        h3: ({ children }) => <h3 className="text-sm font-semibold text-ink mb-1 mt-2">{children}</h3>,
-        a: ({ href, children }) => (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary-400 underline hover:text-primary-300">
-            {children}
-          </a>
-        ),
-        blockquote: ({ children }) => (
-          <blockquote className="border-l-2 border-primary-500/50 pl-3 text-ink-soft italic my-2">{children}</blockquote>
-        ),
-        hr: () => <hr className="border-rule my-3" />,
-        table: ({ children }) => (
-          <div className="my-2 overflow-x-auto border border-rule rounded-lg">
-            <table className="w-full border-collapse text-[12px]">{children}</table>
-          </div>
-        ),
-        thead: ({ children }) => <thead className="bg-accent-surface">{children}</thead>,
-        tbody: ({ children }) => <tbody>{children}</tbody>,
-        tr: ({ children }) => <tr className="border-b border-rule last:border-b-0">{children}</tr>,
-        th: ({ children }) => (
-          <th className="px-2.5 py-1.5 text-left font-semibold text-ink border-r border-rule last:border-r-0">{children}</th>
-        ),
-        td: ({ children }) => (
-          <td className="px-2.5 py-1.5 align-top text-ink-soft border-r border-rule last:border-r-0">{children}</td>
-        ),
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+          blockquote: ({ children }) => (
+            <blockquote className="border border-rule bg-accent-surface px-3 py-2 text-ink-soft italic my-3">{children}</blockquote>
+          ),
+          hr: () => <hr className="border-rule my-4" />,
+          table: ({ children }) => (
+            <div className="my-3 overflow-x-auto border border-rule">
+              <table className="w-full border-collapse text-[13px]">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="bg-accent-surface">{children}</thead>,
+          tbody: ({ children }) => <tbody>{children}</tbody>,
+          tr: ({ children }) => <tr className="border-b border-rule last:border-b-0">{children}</tr>,
+          th: ({ children }) => (
+            <th className="px-3 py-2 text-left font-semibold text-ink border-r border-rule last:border-r-0">{children}</th>
+          ),
+          td: ({ children }) => (
+            <td className="px-3 py-2 align-top text-ink-soft border-r border-rule last:border-r-0">{children}</td>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+      <style>{`
+        /* Each nesting level steps in by one more pl-5 (20px) and swaps marker
+           style, matching how Perplexity differentiates sub-points instead of
+           repeating the same disc/indent at every depth. */
+        .chat-markdown ul ul, .chat-markdown ol ul { list-style-type: circle; margin: 6px 0 0; }
+        .chat-markdown ul ul ul, .chat-markdown ol ul ul { list-style-type: square; }
+        .chat-markdown ul ol, .chat-markdown ol ol { margin: 6px 0 0; }
+        .chat-markdown li > ul, .chat-markdown li > ol { margin-bottom: 0; }
+        .chat-markdown li::marker { color: var(--ink-soft); }
+      `}</style>
+    </div>
   );
 }
 
@@ -106,7 +120,7 @@ export default function CareerChat() {
     setSending(true);
 
     let acc = '';
-    // Append the assistant bubble on the first token, then keep updating it.
+    // Append the assistant turn on the first token, then keep updating it.
     const renderAssistant = (content) => setMessages(prev => {
       const copy = [...prev];
       const last = copy[copy.length - 1];
@@ -149,7 +163,7 @@ export default function CareerChat() {
     <div className="pt-20 pb-8 px-4 sm:px-6 max-w-7xl mx-auto min-h-screen text-ink flex flex-col">
       {/* Header */}
       <div className="mb-5 flex items-center gap-3 border-b border-rule pb-4">
-        <Cpu className="text-primary-400 shrink-0" size={20} />
+        <Cpu className="text-oxblood shrink-0" size={20} />
         <div>
           <h1 className="font-display text-xl font-semibold text-oxblood">Delta Career AI</h1>
           <p className="text-xs text-ink-soft">Your personal career co-pilot — ask anything about your roadmap, skills, or next steps</p>
@@ -160,9 +174,9 @@ export default function CareerChat() {
 
         {/* Left panel — context & chips (hidden on mobile, shown as row on md+) */}
         <div className="hidden lg:flex lg:col-span-3 flex-col gap-4">
-          <GlassPanel className="p-4 border-rule flex flex-col gap-4 flex-1">
+          <GlassPanel className="p-4 flex flex-col gap-4 flex-1">
             <div>
-              <p className="text-[10px] font-bold uppercase text-ink-soft tracking-widest flex items-center gap-1 mb-2">
+              <p className="font-mono text-[10px] uppercase text-ink-soft tracking-[0.18em] flex items-center gap-1.5 mb-2">
                 <BookOpen size={10} /> Context
               </p>
               {targetRole && (
@@ -175,15 +189,15 @@ export default function CareerChat() {
 
             {activeBrief?.demanded_skills?.length > 0 && (
               <div>
-                <p className="text-[10px] font-bold uppercase text-ink-soft tracking-widest mb-2">Ask about</p>
+                <p className="font-mono text-[10px] uppercase text-ink-soft tracking-[0.18em] mb-2">Ask about</p>
                 <div className="flex flex-wrap gap-1.5">
                   {activeBrief.demanded_skills.slice(0, 8).map((skill) => (
                     <button
                       key={skill}
                       onClick={() => autofillChip(skill)}
-                      className="px-2 py-1 rounded bg-paper hover:bg-primary-500/10 border border-rule hover:border-primary-500/20 text-[10px] text-ink transition-all flex items-center gap-1"
+                      className="px-2.5 py-1 bg-paper hover:bg-accent-surface border border-rule hover:border-oxblood/40 text-[10px] text-ink transition-colors flex items-center gap-1"
                     >
-                      <Sparkles size={8} className="text-primary-400" /> {skill}
+                      <Sparkles size={8} className="text-oxblood" /> {skill}
                     </button>
                   ))}
                 </div>
@@ -192,15 +206,15 @@ export default function CareerChat() {
 
             {proofProjects.length > 0 && (
               <div>
-                <p className="text-[10px] font-bold uppercase text-ink-soft tracking-widest mb-2">Proof Projects</p>
+                <p className="font-mono text-[10px] uppercase text-ink-soft tracking-[0.18em] mb-2">Proof Projects</p>
                 <div className="space-y-1.5">
                   {proofProjects.slice(0, 3).map((project) => (
                     <button
                       key={project.id}
                       onClick={() => setInput(`Help me build: ${project.title}. Give me exact milestones and a README structure.`)}
-                      className="w-full text-left p-2 rounded bg-bone/60 border border-rule hover:border-primary-500/20 transition-colors"
+                      className="w-full text-left p-2 bg-accent-surface border border-rule hover:border-oxblood/40 transition-colors"
                     >
-                      <span className="block text-xs text-primary-400 font-medium truncate">{project.title}</span>
+                      <span className="block text-xs text-oxblood font-medium truncate">{project.title}</span>
                       <span className="block text-[10px] text-ink-soft mt-0.5 truncate">{project.resume_headline}</span>
                     </button>
                   ))}
@@ -210,9 +224,9 @@ export default function CareerChat() {
 
             {Object.keys(portfolio).length > 0 && (
               <div className="border-t border-rule pt-3">
-                <p className="text-[10px] font-bold uppercase text-ink-soft tracking-widest mb-1.5">Portfolio</p>
+                <p className="font-mono text-[10px] uppercase text-ink-soft tracking-[0.18em] mb-1.5">Portfolio</p>
                 <p className="text-[11px] text-ink-soft">
-                  Status: <span className="text-primary-400 font-medium">{portfolio.readiness || 'unknown'}</span>
+                  Status: <span className="text-oxblood font-medium">{portfolio.readiness || 'unknown'}</span>
                 </p>
               </div>
             )}
@@ -221,14 +235,16 @@ export default function CareerChat() {
 
         {/* Chat panel */}
         <div className="lg:col-span-9 flex flex-col flex-1 min-h-[500px]">
-          <GlassPanel className="flex-1 flex flex-col p-4 sm:p-5 border-primary-500/10 min-h-0">
+          <GlassPanel className="flex-1 flex flex-col p-4 sm:p-6 min-h-0" hover={false}>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-hide" style={{ maxHeight: 'calc(100vh - 280px)', minHeight: 300 }}>
+            {/* Turns — flowing Q&A, not chat bubbles: each turn is a query line
+                followed by the answer flowing directly below it, divided by a
+                rule from the next turn. */}
+            <div className="flex-1 overflow-y-auto pr-1 scrollbar-hide" style={{ maxHeight: 'calc(100vh - 280px)', minHeight: 300 }}>
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Zap className="text-primary-400 mb-3" size={28} />
-                  <p className="text-sm font-semibold text-ink mb-1">Ask me anything</p>
+                  <Sparkles className="text-oxblood mb-3" size={26} />
+                  <p className="font-display text-lg font-medium text-ink mb-1.5">Ask me anything</p>
                   <p className="text-xs text-ink-soft max-w-sm">
                     I know your profile, skills, roadmap, and weekly tasks. Ask about your next steps, how to build a project, what to put on your resume, or anything career-related.
                   </p>
@@ -243,7 +259,7 @@ export default function CareerChat() {
                       <button
                         key={q}
                         onClick={() => handleSend(q)}
-                        className="px-3 py-1.5 rounded-full bg-paper border border-rule text-xs text-ink hover:bg-primary-500/10 hover:border-primary-500/20 transition-all"
+                        className="px-3.5 py-2 bg-paper border border-rule text-xs text-ink hover:border-oxblood/40 hover:bg-accent-surface transition-colors"
                       >
                         {q}
                       </button>
@@ -251,49 +267,41 @@ export default function CareerChat() {
                   </div>
                 </div>
               ) : (
-                messages.map((msg, idx) => {
-                  const isUser = msg.role === 'user';
-                  return (
-                    <div key={idx} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
-                      {!isUser && (
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-primary-500/15 border border-primary-500/30 text-primary-400 mt-0.5">
-                          <Cpu size={13} />
+                messages.reduce((turns, msg, idx) => {
+                  // Group each user message with the assistant reply that follows it
+                  // into one "turn" block, matching Perplexity's per-question layout.
+                  if (msg.role === 'user') turns.push({ query: msg, answer: null });
+                  else if (turns.length) turns[turns.length - 1].answer = msg;
+                  else turns.push({ query: null, answer: msg });
+                  return turns;
+                }, []).map((turn, idx) => (
+                  <div key={idx} className={`py-6 first:pt-0 ${idx === 0 ? '' : 'border-t border-rule'}`}>
+                    {turn.query && (
+                      <h2 className="font-display text-xl font-medium text-ink leading-snug mb-3">
+                        {turn.query.content}
+                      </h2>
+                    )}
+                    {turn.answer ? (
+                      <div className="flex gap-3">
+                        <Cpu size={14} className="text-oxblood shrink-0 mt-1" />
+                        <div className="text-sm text-ink min-w-0 flex-1">
+                          <ChatMarkdown content={turn.answer.content} />
                         </div>
-                      )}
-                      <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
-                        isUser
-                          ? 'bg-primary-600/20 border border-primary-500/20 text-ink rounded-tr-sm'
-                          : 'bg-bone/80 border border-rule text-ink rounded-tl-sm'
-                      }`}>
-                        {isUser ? (
-                          <p className="leading-relaxed">{msg.content}</p>
-                        ) : (
-                          <ChatMarkdown content={msg.content} />
-                        )}
                       </div>
-                      {isUser && (
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-accent-surface border border-rule text-ink-soft mt-0.5">
-                          <User size={13} />
+                    ) : (
+                      idx === messages.reduce((c, m) => c + (m.role === 'user' ? 1 : 0), 0) - 1 && sending && (
+                        <div className="flex items-center gap-2.5 text-ink-soft">
+                          <Cpu size={14} className="text-oxblood animate-spin shrink-0" />
+                          <div className="flex gap-1 items-center">
+                            <span className="w-1.5 h-1.5 bg-oxblood animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-1.5 h-1.5 bg-oxblood animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-1.5 h-1.5 bg-oxblood animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-
-              {sending && (messages.length === 0 || messages[messages.length - 1].role !== 'assistant') && (
-                <div className="flex gap-3 justify-start">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-primary-500/15 border border-primary-500/30 text-primary-400">
-                    <Cpu size={13} className="animate-spin" />
+                      )
+                    )}
                   </div>
-                  <div className="bg-bone/80 border border-rule rounded-2xl rounded-tl-sm px-4 py-3">
-                    <div className="flex gap-1 items-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
-                </div>
+                ))
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -309,12 +317,12 @@ export default function CareerChat() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask anything about your career, roadmap, or next steps..."
                 disabled={sending}
-                className="flex-1 bg-paper border border-rule rounded-xl px-4 py-3 text-sm text-ink placeholder-ink-soft focus:outline-none focus:border-primary-500/50 transition-colors"
+                className="flex-1 bg-paper border border-rule px-4 py-3 text-sm text-ink placeholder-ink-soft focus:outline-none focus:border-oxblood transition-colors"
               />
               <button
                 type="submit"
                 disabled={sending || !input.trim()}
-                className="px-4 py-3 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-40 disabled:cursor-not-allowed text-ink transition-colors shrink-0"
+                className="px-4 py-3 bg-oxblood hover:bg-ink disabled:opacity-40 disabled:cursor-not-allowed text-bone transition-colors shrink-0"
               >
                 <Send size={16} />
               </button>

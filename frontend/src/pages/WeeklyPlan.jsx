@@ -395,9 +395,9 @@ export default function WeeklyPlan() {
 
   const mdComponents = {
     p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
-    ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
-    ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
-    li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
+    ul: ({ children }) => <ul style={{ margin: '4px 0 8px', paddingLeft: 20 }}>{children}</ul>,
+    ol: ({ children }) => <ol style={{ margin: '4px 0 8px', paddingLeft: 20 }}>{children}</ol>,
+    li: ({ children }) => <li style={{ marginBottom: 4, paddingLeft: 2 }}>{children}</li>,
     strong: ({ children }) => <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{children}</strong>,
     code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{children}</code>,
     a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>{children}</a>,

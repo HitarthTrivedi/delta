@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-03T00:00:00Z",
+  "title": "Design System: Delta",
+  "extensions": {
+    "colorMeta": {
+      "oxblood": { "role": "primary", "displayName": "Oxblood", "canonical": "#7d252b", "tonalRamp": ["#2f0d10", "#55191d", "#691f24", "#7d252b", "#9a3f47", "#b8646b", "#d4989d", "#f4e3e4"] },
+      "bone": { "role": "neutral", "displayName": "Bone", "canonical": "#f7f5f0", "tonalRamp": ["#161514", "#2e2c29", "#66645e", "#a8a59e", "#d8d5cd", "#e6e4df", "#f0ede5", "#f7f5f0"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#ffffff", "tonalRamp": ["#1e1d1b", "#3a3835", "#66645e", "#a8a59e", "#d8d5cd", "#efece6", "#f9f8f5", "#ffffff"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1a1918", "tonalRamp": ["#0d0c0c", "#1a1918", "#2e2c29", "#4a4842", "#66645e", "#8a877f", "#c4c0b6", "#f0eee9"] },
+      "rule": { "role": "neutral", "displayName": "Rule", "canonical": "#e6e4df" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles and hero headlines only — Cormorant Garamond." },
+      "body": { "displayName": "Body", "purpose": "All reading copy — Manrope." },
+      "label": { "displayName": "Label", "purpose": "Buttons, kickers, nav items, badges — IBM Plex Mono, uppercase." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for hover/active color and border transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Filled call-to-action button. Oxblood fill, bone label, hover shifts to ink.",
+      "html": "<button class=\"ds-btn-primary\">GET STARTED</button>",
+      "css": ".ds-btn-primary { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.18em; background: #7d252b; color: #f7f5f0; border: 1px solid #7d252b; border-radius: 0; padding: 12px 28px; cursor: pointer; transition: background 0.2s ease, border-color 0.2s ease; } .ds-btn-primary:hover { background: #1a1918; border-color: #1a1918; } .ds-btn-primary:focus-visible { outline: 2px solid #7d252b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Outlined button for secondary actions. Ink border, fills to ink on hover.",
+      "html": "<button class=\"ds-btn-secondary\">VIEW ROADMAP</button>",
+      "css": ".ds-btn-secondary { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.18em; background: transparent; color: #1a1918; border: 1px solid #1a1918; border-radius: 0; padding: 12px 28px; cursor: pointer; transition: background 0.2s ease, color 0.2s ease; } .ds-btn-secondary:hover { background: #1a1918; color: #f7f5f0; } .ds-btn-secondary:focus-visible { outline: 2px solid #7d252b; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Paper-surface text field with a rule border, focuses to oxblood.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Email address\" />",
+      "css": ".ds-input { font-family: 'Manrope', system-ui, sans-serif; font-size: 14px; background: #ffffff; color: #1a1918; border: 1px solid #e6e4df; border-radius: 0; padding: 12px 14px; width: 100%; transition: border-color 0.2s ease; } .ds-input::placeholder { color: #66645e; } .ds-input:focus { outline: none; border-color: #7d252b; }"
+    },
+    {
+      "name": "Paper Card",
+      "kind": "card",
+      "refersTo": "card-paper",
+      "description": "Rule-bordered paper surface on a bone page background. No shadow.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-label\">Feature · 01</p><h3 class=\"ds-card-title\">Weekly Roadmap</h3><p class=\"ds-card-body\">Agent 2 builds your next set of tasks based on pace, goals, and the market.</p></div>",
+      "css": ".ds-card { background: #ffffff; border: 1px solid #e6e4df; border-radius: 0; padding: 28px; } .ds-card-label { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.22em; color: #7d252b; margin: 0 0 12px; } .ds-card-title { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: 600; color: #1a1918; margin: 0 0 10px; } .ds-card-body { font-family: 'Manrope', system-ui, sans-serif; font-size: 14px; line-height: 1.6; color: #66645e; margin: 0; }"
+    },
+    {
+      "name": "Nav Link (active)",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Mono-uppercase nav item; active state uses a colored underline, not a filled pill.",
+      "html": "<a class=\"ds-nav-link ds-nav-link--active\" href=\"#\">Roadmap</a>",
+      "css": ".ds-nav-link { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; color: #66645e; text-decoration: none; padding-bottom: 4px; border-bottom: 2px solid transparent; transition: color 0.2s ease, border-color 0.2s ease; } .ds-nav-link:hover { color: #1a1918; } .ds-nav-link--active { color: #7d252b; border-bottom-color: #7d252b; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Weekly Memorandum",
+    "overview": "Delta reads like a well-kept paper file, not a SaaS dashboard: warm bone/paper surfaces, a single serif display face for anything that deserves weight, a plain sans for reading, and a small mono label style reserved for state and metadata (week numbers, kickers, button labels). The one saturated color, oxblood, is spent deliberately — primary actions, active states, and the handful of headings that should carry authority — never as generic decoration. The system explicitly rejects the earlier cyberpunk-dark, neon-accent dashboard aesthetic this product used before: no glassmorphic panels, no glowing borders, no gradient-filled stat tiles. Warmth here comes from tone of voice and generous whitespace, not from color noise or motion flourish.",
+    "keyCharacteristics": [
+      "Square corners everywhere (0px radius) — the one deliberate geometric rule of the system.",
+      "Serif display type for anything that should read as a heading; sans for body; mono-uppercase for labels and buttons only.",
+      "Oxblood is spent on interaction and hierarchy signals, not on backgrounds or large fills.",
+      "Hairline rule borders do the separating work that shadows or heavy borders would otherwise do."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Oxblood is the only saturated color in the system. If a screen needs a second meaning-bearing color, desaturate it toward the neutral ramp rather than introducing a new hue family.", "section": "colors" },
+      { "name": "The Serif-Only-For-Weight Rule", "body": "Cormorant Garamond appears only on headings and the occasional italic emphasis line — never on body paragraphs, buttons, or labels.", "section": "typography" },
+      { "name": "The No-Shadow Rule", "body": "Structure comes from a 1px rule border and a background-color step (bone -> paper -> accent-surface), never from box-shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep corners square (0px) everywhere — buttons, cards, inputs, chips.",
+      "Do spend oxblood only on the interactive/hierarchy-bearing element — most of a screen should have none of it.",
+      "Do use Cormorant Garamond exclusively for headings; Manrope for body copy; IBM Plex Mono only for short uppercase labels.",
+      "Do separate content with a 1px rule border rather than a shadow or heavy divider.",
+      "Do keep read-only views free of side effects on the user's underlying data."
+    ],
+    "donts": [
+      "Don't reintroduce the earlier dark cyberpunk/neon dashboard look as a default for new screens.",
+      "Don't use gradient text or background-clip: text for emphasis.",
+      "Don't use border-left/border-right as a colored accent stripe on cards or list rows.",
+      "Don't add drop shadows for elevation — this system is flat by design.",
+      "Don't round any corner — a single rounded button or card breaks the square-corner rule immediately."
+    ]
+  }
+}

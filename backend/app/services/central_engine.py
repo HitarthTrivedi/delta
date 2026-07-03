@@ -680,6 +680,41 @@ def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User, db
     return filtered_actions
 
 
+MAX_WEEKLY_ACTIONS = 6
+
+
+def _capacity_based_task_cap(user: "User", profile: dict) -> int:
+    """Size the week to what the user actually has time for, instead of a flat
+    count for everyone. Same bucketing style as _should_assign_break_week's
+    hours-per-week pacing guard elsewhere in this file.
+    """
+    hours = user.hours_per_week or (profile or {}).get("hours_per_week") or 10
+    try:
+        hours = int(hours)
+    except Exception:
+        hours = 10
+    if hours <= 6:
+        return 2
+    if hours <= 10:
+        return 3
+    if hours <= 15:
+        return 4
+    if hours <= 25:
+        return 5
+    return MAX_WEEKLY_ACTIONS
+
+
+def _merge_capped_actions(base: list[dict], extra: list[dict], cap: int = MAX_WEEKLY_ACTIONS) -> list[dict]:
+    """Add new actions on top of what's already selected instead of replacing
+    it outright. Dedupes by id and caps the total so a week never turns into a
+    wall of tasks, but never truncates the tasks already chosen for the base.
+    """
+    existing_ids = {str(action.get("id")) for action in base}
+    added = [action for action in extra if str(action.get("id")) not in existing_ids]
+    room = max(0, cap - len(base))
+    return base + added[:room]
+
+
 def _event_block_actions(events: list[dict]) -> list[dict]:
     event = events[0] if events else {}
     kind = str(event.get("kind") or "").lower()
@@ -1575,7 +1610,18 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                     recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
                     trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
                     long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
-                    weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
+                    # Only swap out the beginner-level ("Start ...") tasks for
+                    # role-appropriate proof work — keep every other task the user
+                    # already has this week so a page load never silently drops
+                    # tasks that were never beginner-level to begin with.
+                    non_beginner_actions = [
+                        action for action in actions
+                        if not str(action.get("title", "")).lower().startswith("start ")
+                    ]
+                    weekly_focus["primary_actions"] = _merge_capped_actions(
+                        non_beginner_actions, recurring_actions + proof_actions[:2] + trend_actions[:1],
+                        cap=_capacity_based_task_cap(user, profile)
+                    )
                     weekly_focus["long_horizon_lanes"] = long_plan["lanes"]
                     weekly_focus["phase_name"] = "Profile-based proof sprint"
                     weekly_focus["selection_reason"] = "Adjusted away from beginner tasks using resume/profile experience and market trends."
@@ -1590,15 +1636,11 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             elif not weekly_focus.get("long_horizon_lanes"):
                 recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
                 trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
-                existing_ids = {str(action.get("id")) for action in actions}
-                durable_actions = [
-                    action for action in [*recurring_actions, *trend_actions[:1]]
-                    if str(action.get("id")) not in existing_ids
-                ]
-                if durable_actions:
-                    # Prepend new durable lanes without ever truncating the tasks
-                    # the user already has this week.
-                    weekly_focus["primary_actions"] = durable_actions + actions
+                # Keep every task already chosen this week; only add durable lanes
+                # that aren't already present, up to the user's capacity-based cap.
+                weekly_focus["primary_actions"] = _merge_capped_actions(
+                    actions, [*recurring_actions, *trend_actions[:1]], cap=_capacity_based_task_cap(user, profile)
+                )
                 long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
                 weekly_focus["long_horizon_lanes"] = long_plan["lanes"]
                 weekly_focus["selection_reason"] = "Upgraded existing week with durable habit and trend lanes."
@@ -1671,14 +1713,15 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     }
     recurring_actions = _recurring_habit_actions(profile, skills, user, cycle_count)
     trend_actions = _trend_response_actions(profile, skills, user, market)
+    weekly_cap = _capacity_based_task_cap(user, profile)
     if recurring_actions:
-        weekly_focus["primary_actions"] = recurring_actions + weekly_focus["primary_actions"][:2]
+        weekly_focus["primary_actions"] = _merge_capped_actions(weekly_focus["primary_actions"], recurring_actions, cap=weekly_cap)
         weekly_focus["selection_reason"] = "Includes recurring long-term habit work plus the current roadmap slice."
     if _has_prior_profile_depth(profile, skills, user):
         proof_actions = _domain_proof_actions(profile, skills, user, db)
         if proof_actions:
             weekly_focus["phase_name"] = "Profile-based proof sprint"
-            weekly_focus["primary_actions"] = recurring_actions + proof_actions[:2] + trend_actions[:1]
+            weekly_focus["primary_actions"] = _merge_capped_actions(weekly_focus["primary_actions"], proof_actions[:2] + trend_actions[:1], cap=weekly_cap)
             weekly_focus["selection_reason"] = "Matched against resume/project evidence and current skill depth."
     if should_cycle_break:
         # Check we haven't had a break too recently (< 14 days)
