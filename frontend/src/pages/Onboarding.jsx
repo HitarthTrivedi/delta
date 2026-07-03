@@ -125,11 +125,12 @@ const Bubble = ({ msg }) => {
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          maxWidth: '70%',
+          maxWidth: '85%',
+          minWidth: 0,
         }}>
           <FileText size={14} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />
-          <div>
-            <p style={{ color: 'var(--ink)', fontSize: '0.85rem', fontWeight: 500, margin: 0 }}>{msg.filename}</p>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <p style={{ color: 'var(--ink)', fontSize: '0.85rem', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.filename}</p>
             <p style={{ color: 'var(--ink-soft)', fontSize: '0.75rem', margin: 0 }}>Resume uploaded</p>
           </div>
           <CheckCircle2 size={14} style={{ color: 'var(--ink)', flexShrink: 0 }} />
@@ -483,12 +484,16 @@ export default function Onboarding() {
         background: 'var(--bone)',
         color: 'var(--ink)',
         fontFamily: "'Manrope', sans-serif",
-        padding: '6rem 2rem 4rem',
+        paddingTop: '5rem',
+        paddingBottom: '3rem',
+        paddingLeft: 'clamp(1rem, 4vw, 2rem)',
+        paddingRight: 'clamp(1rem, 4vw, 2rem)',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
       }}>
-        <div style={{ maxWidth: 880, width: '100%' }}>
+        <div style={{ maxWidth: 880, width: '100%', minWidth: 0 }}>
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: 35 }}>
             <div style={{
@@ -498,7 +503,7 @@ export default function Onboarding() {
             }}>
               <CheckCircle2 size={26} style={{ color: 'var(--bone)' }} />
             </div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--oxblood)', fontSize: '2rem', fontWeight: 600, letterSpacing: 0, marginBottom: 8 }}>
+            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--oxblood)', fontSize: 'clamp(1.4rem, 5vw, 2rem)', fontWeight: 600, letterSpacing: 0, marginBottom: 8 }}>
               {reviewMode ? 'Review Your Delta Profile' : 'Onboarding Profile Sync'}
             </h1>
             <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: 500, margin: '0 auto' }}>
@@ -513,10 +518,10 @@ export default function Onboarding() {
             background: 'var(--accent-surface)',
             border: '1px solid var(--accent-surface)',
             borderRadius: 0,
-            padding: '24px 30px',
+            padding: 'clamp(14px, 3vw, 30px) clamp(14px, 4vw, 30px)',
             marginBottom: 30,
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--rule)', paddingBottom: 10 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--rule)', paddingBottom: 10 }}>
               <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
                 {isEditing ? 'Modify Intake Details' : 'Active Profile Snapshot'}
               </h2>
@@ -560,12 +565,10 @@ export default function Onboarding() {
               )}
             </div>
 
-            {/* Profile Fields Editor Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: 20,
-            }}>
+            {/* Profile Fields Editor Grid — Tailwind's compiled breakpoints,
+                not a hand-rolled media query, so the collapse to one column
+                on mobile is guaranteed rather than inferred. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 onboarding-field-grid" style={{ gap: 20 }}>
               {/* Field Block Helper */}
               {[{ key: 'name', label: 'Full Name', type: 'text' },
                 { key: 'email', label: 'Email Address', type: 'text' },
@@ -593,7 +596,7 @@ export default function Onboarding() {
                 { key: 'target_attempt', label: 'Target Attempt / Intake', type: 'text' },
                 { key: 'exam_goal_detail', label: 'Exam / Goal Detail', type: 'text' },
               ].map(f => (
-                <div key={f.key}>
+                <div key={f.key} style={{ minWidth: 0, overflow: 'hidden' }}>
                   <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                     {f.label}
                   </label>
@@ -617,12 +620,12 @@ export default function Onboarding() {
                         onChange={e => handleProfileFieldChange(f.key, e.target.value)}
                         style={{
                           width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)',
-                          borderRadius: 0, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none',
+                          borderRadius: 0, color: 'var(--ink)', padding: '6px 8px', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box',
                         }}
                       />
                     )
                   ) : (
-                    <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{profile[f.key] || 'Not specified'}</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word', display: 'block', minWidth: 0 }}>{profile[f.key] || 'Not specified'}</span>
                   )}
                 </div>
               ))}
@@ -634,7 +637,7 @@ export default function Onboarding() {
                 { key: 'preferred_content_types', label: 'Preferred content (comma-separated)' },
                 { key: 'extracurricular_interests', label: 'Extracurricular Interests (comma-separated)' },
               ].map(f => (
-                <div key={f.key} style={{ gridColumn: 'span 2' }}>
+                <div key={f.key} className="col-span-full" style={{ minWidth: 0, overflow: 'hidden' }}>
                   <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                     {f.label}
                   </label>
@@ -649,7 +652,7 @@ export default function Onboarding() {
                       }}
                     />
                   ) : (
-                    <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word', display: 'block', minWidth: 0 }}>
                       {Array.isArray(profile[f.key]) ? arrayToString(profile[f.key]) : profile[f.key] || 'None specified'}
                     </span>
                   )}
@@ -657,7 +660,7 @@ export default function Onboarding() {
               ))}
 
               {/* Past Experience Description */}
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="col-span-full" style={{ minWidth: 0, overflow: 'hidden' }}>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Personal Introduction / Backstory
                 </label>
@@ -672,13 +675,13 @@ export default function Onboarding() {
                     }}
                   />
                 ) : (
-                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0, overflowWrap: 'break-word' }}>
                     {profile.personal_introduction || profile.backstory || 'No backstory captured yet.'}
                   </p>
                 )}
               </div>
 
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="col-span-full" style={{ minWidth: 0, overflow: 'hidden' }}>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Inferred Timeline Reason
                 </label>
@@ -693,13 +696,13 @@ export default function Onboarding() {
                     }}
                   />
                 ) : (
-                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0, overflowWrap: 'break-word' }}>
                     {profile.inferred_planning_reason || 'Delta has not inferred a timeline reason yet.'}
                   </p>
                 )}
               </div>
 
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="col-span-full" style={{ minWidth: 0, overflow: 'hidden' }}>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Work Experience / Academic Projects Summary
                 </label>
@@ -714,7 +717,7 @@ export default function Onboarding() {
                     }}
                   />
                 ) : (
-                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 500, color: 'var(--ink)', lineHeight: 1.5, margin: 0, overflowWrap: 'break-word' }}>
                     {profile.past_experience || 'No experience summary compiled.'}
                   </p>
                 )}
@@ -723,7 +726,7 @@ export default function Onboarding() {
           </div>
 
           {/* Action Row */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+          <div className="onboarding-action-row" style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
             <button
               onClick={handleConfirmProfile}
               disabled={isEditing}
@@ -789,6 +792,55 @@ export default function Onboarding() {
             </button>
           </div>
         </div>
+
+        {/* Responsive styles injected in this return tree */}
+        <style>{`
+          .onboarding-review-root {
+            padding: 5rem 1rem 3rem;
+            box-sizing: border-box;
+            width: 100%;
+          }
+          .onboarding-form-card {
+            padding: 14px 14px;
+            box-sizing: border-box;
+          }
+          .onboarding-action-row {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .onboarding-action-row button {
+            width: 100%;
+            justify-content: center;
+          }
+          .onboarding-field-grid {
+            min-width: 0;
+          }
+
+          @media (min-width: 480px) {
+            .onboarding-review-root {
+              padding: 5.5rem 1.5rem 3rem;
+            }
+            .onboarding-form-card {
+              padding: 18px 20px;
+            }
+            .onboarding-action-row {
+              flex-direction: row;
+              align-items: center;
+            }
+            .onboarding-action-row button {
+              width: auto;
+            }
+          }
+
+          @media (min-width: 640px) {
+            .onboarding-review-root {
+              padding: 6rem 2rem 4rem;
+            }
+            .onboarding-form-card {
+              padding: 24px 30px;
+            }
+          }
+        `}</style>
       </div>
     );
   }
@@ -839,9 +891,12 @@ export default function Onboarding() {
               }}
             />
           </div>
-          {/* Required Fields Pills */}
+          {/* Required Fields Pills — horizontally scrollable so this row never
+              wraps to extra lines and grows the fixed header's height on
+              narrow screens (which would push it into the chat below). */}
           <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: 6,
+            display: 'flex', flexWrap: 'nowrap', gap: 6,
+            overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2,
           }}>
             {REQUIRED_FIELDS_METADATA.map(({ key, label }) => {
               const isFilled = filledFields.includes(key);
@@ -862,6 +917,8 @@ export default function Onboarding() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 4,
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                     transition: 'all 0.2s',
                   }}
                 >
@@ -984,9 +1041,9 @@ export default function Onboarding() {
                 border: '1px solid var(--rule)',
                 borderRadius: 0,
               }}>
-                <CheckCircle2 size={13} style={{ color: 'var(--ink)' }} />
-                <span style={{ color: 'var(--ink)', fontSize: '0.8rem', flex: 1 }}>{uploadFile.name} — uploaded</span>
-                <button onClick={() => setUploadFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)', padding: 0 }}>
+                <CheckCircle2 size={13} style={{ color: 'var(--ink)', flexShrink: 0 }} />
+                <span style={{ color: 'var(--ink)', fontSize: '0.8rem', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadFile.name} — uploaded</span>
+                <button onClick={() => setUploadFile(null)} aria-label="Remove attached file" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)', padding: 8, display: 'flex', flexShrink: 0 }}>
                   <X size={13} />
                 </button>
               </div>
@@ -1119,6 +1176,47 @@ export default function Onboarding() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 0; }
+
+        /* ── Responsive: Onboarding Review Section ── */
+        .onboarding-review-root {
+          padding: 6rem 1.25rem 4rem;
+        }
+        .onboarding-form-card {
+          padding: 16px 18px;
+        }
+        .onboarding-action-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .onboarding-action-row button {
+          width: 100%;
+          justify-content: center;
+        }
+        .onboarding-field-grid {
+          min-width: 0;
+        }
+
+        @media (min-width: 480px) {
+          .onboarding-form-card {
+            padding: 20px 24px;
+          }
+          .onboarding-action-row {
+            flex-direction: row;
+            align-items: center;
+          }
+          .onboarding-action-row button {
+            width: auto;
+          }
+        }
+
+        @media (min-width: 640px) {
+          .onboarding-review-root {
+            padding: 6rem 2rem 4rem;
+          }
+          .onboarding-form-card {
+            padding: 24px 30px;
+          }
+        }
       `}</style>
     </div>
   );

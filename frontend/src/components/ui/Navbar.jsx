@@ -84,7 +84,8 @@ export default function Navbar({ user }) {
             <button
               onClick={handleLogout}
               title="Sign Out"
-              className="hidden sm:flex p-2 bg-transparent border border-rule text-ink-soft hover:text-oxblood hover:border-oxblood transition-all"
+              aria-label="Sign Out"
+              className="hidden sm:flex items-center justify-center w-11 h-11 bg-transparent border border-rule text-ink-soft hover:text-oxblood hover:border-oxblood transition-all"
             >
               <LogOut size={14} />
             </button>
@@ -92,7 +93,7 @@ export default function Navbar({ user }) {
             {/* Hamburger — mobile only */}
             <button
               onClick={() => setMobileOpen((o) => !o)}
-              className="md:hidden p-2 bg-transparent border border-rule text-ink-soft"
+              className="md:hidden flex items-center justify-center w-11 h-11 bg-transparent border border-rule text-ink-soft"
               aria-label="Toggle menu"
             >
               {mobileOpen ? <X size={16} /> : <Menu size={16} />}
@@ -118,10 +119,10 @@ export default function Navbar({ user }) {
                   key={path}
                   to={path}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 font-mono text-xs uppercase tracking-[0.12em] transition-all no-underline border-l-2 ${
+                  className={`flex items-center gap-3 px-4 py-3.5 font-mono text-xs uppercase tracking-[0.12em] transition-all no-underline ${
                     isActive(path)
-                      ? 'text-oxblood border-oxblood bg-accent-surface'
-                      : 'text-ink-soft hover:text-ink hover:bg-accent-surface border-transparent'
+                      ? 'text-oxblood bg-accent-surface'
+                      : 'text-ink-soft hover:text-ink hover:bg-accent-surface'
                   }`}
                 >
                   <Icon size={16} />

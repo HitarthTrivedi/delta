@@ -149,12 +149,15 @@ export const useAuthStore = create((set) => ({
   },
 
   // Sign Out
+  // Note: delta_remember_me is intentionally kept. It's a preference, not a
+  // credential — the login form overwrites it on every sign-in anyway, and
+  // deleting it here meant a forced logout (e.g. a transient 401) silently
+  // downgraded the next OAuth session to sessionStorage-only.
   logout: async () => {
     set({ loading: true });
     await supabase.auth.signOut();
     set({ userId: null, token: null, user: null, loading: false });
     clearPersistedSession();
-    localStorage.removeItem('delta_remember_me');
   }
 }));
 export default useAuthStore;

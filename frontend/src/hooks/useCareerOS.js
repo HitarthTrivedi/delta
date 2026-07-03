@@ -5,12 +5,19 @@ import { careerOSAPI } from '../lib/api';
 // across Dashboard / CareerChat / ProgressReport / WeeklyPlan.
 export const careerContextKey = (userId) => ['careerContext', userId];
 
-// Read-through cache: returns the cached context if still fresh (global
-// staleTime), otherwise fetches and caches it. Use in imperative loaders.
+// The context endpoint aggregates the whole engine (memory, market, roadmap,
+// external opportunity feeds) — keep it fresh well beyond the 60s global
+// default so page navigation doesn't re-trigger the expensive compile.
+// Mutations (weekly cycle, task updates) seed the cache directly instead.
+const CONTEXT_STALE_TIME = 5 * 60 * 1000;
+
+// Read-through cache: returns the cached context if still fresh, otherwise
+// fetches and caches it. Use in imperative loaders.
 export function fetchCareerContext(queryClient, userId) {
   return queryClient.fetchQuery({
     queryKey: careerContextKey(userId),
     queryFn: () => careerOSAPI.getContext(userId),
+    staleTime: CONTEXT_STALE_TIME,
   });
 }
 
@@ -26,5 +33,6 @@ export function useCareerContext(userId) {
     queryKey: careerContextKey(userId),
     queryFn: () => careerOSAPI.getContext(userId),
     enabled: !!userId,
+    staleTime: CONTEXT_STALE_TIME,
   });
 }

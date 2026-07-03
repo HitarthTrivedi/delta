@@ -1321,15 +1321,16 @@ def run_memory_consolidation_cycle(db: Session, user_id: str) -> dict:
     return context
 
 
-def compile_career_context(db: Session, user_id: str) -> dict:
+def compile_career_context(db: Session, user_id: str, background_tasks=None) -> dict:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise ValueError("User not found")
 
     # ── Hydrate user from profile_store JSON (real intake data) ──────────────
+    profile = {}
     try:
         from app.services.profile_store import load_profile
-        profile = load_profile(user_id)
+        profile = load_profile(user_id, db=db)
         if profile:
             changed = False
             if profile.get("name") and not user.name:
@@ -1381,12 +1382,7 @@ def compile_career_context(db: Session, user_id: str) -> dict:
         next_questions = open_questions_data
 
     # ── Also attach raw profile so frontend can display intake completeness ──
-    profile_data = {}
-    try:
-        from app.services.profile_store import load_profile as _lp
-        profile_data = _lp(user_id)
-    except Exception:
-        pass
+    profile_data = profile
 
     # ── Calculate active week number and start time solely based on user start time ──
     if user.created_at:
@@ -1416,12 +1412,21 @@ def compile_career_context(db: Session, user_id: str) -> dict:
         "current_week_started_at": current_week_start,
         "progress_summary": progress_summary,
     }
-    try:
-        from app.services.agent2_memory import sync_current_week, sync_user_context
-        sync_user_context(user_id, profile_data, context)
-        sync_current_week(user_id, context, reason="Career context compiled.")
-    except Exception:
-        pass
+    # The agent2 memory syncs each read + rewrite the whole agent2_memory_data
+    # JSON blob (4 extra DB round trips). Callers on a read path (the context
+    # GET endpoint) pass BackgroundTasks so the response isn't blocked on them.
+    def _sync_agent2_memory():
+        try:
+            from app.services.agent2_memory import sync_current_week, sync_user_context
+            sync_user_context(user_id, profile_data, context)
+            sync_current_week(user_id, context, reason="Career context compiled.")
+        except Exception:
+            pass
+
+    if background_tasks is not None:
+        background_tasks.add_task(_sync_agent2_memory)
+    else:
+        _sync_agent2_memory()
     return context
 
 
@@ -1560,7 +1565,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     ).count()
     try:
         from app.services.profile_store import load_profile
-        profile = load_profile(user.id)
+        profile = load_profile(user.id, db=db)
     except Exception:
         profile = {}
     try:

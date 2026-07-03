@@ -50,6 +50,10 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
+      // Must be set before the OAuth redirect: when Supabase writes the session
+      // on return, customStorage reads this flag to pick localStorage vs
+      // sessionStorage. Without it Google users were never remembered.
+      localStorage.setItem('delta_remember_me', rememberMe ? 'true' : 'false');
       await loginWithGoogle();
     } catch (err) {
       toast.error(err.message || 'Google Sign-In failed');
@@ -60,7 +64,7 @@ export default function LoginPage() {
     <div className="min-h-screen w-full flex bg-bone font-sans">
 
       {/* ── Left Panel: Form ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-10 py-12 bg-bone relative z-[1]">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 sm:px-10 py-12 bg-bone relative z-[1]">
 
         <div className="w-full max-w-[400px] relative">
 
@@ -138,7 +142,8 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-ink-soft flex items-center p-0.5"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 bg-transparent border-none cursor-pointer text-ink-soft flex items-center justify-center"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -235,22 +240,16 @@ export default function LoginPage() {
           {/* Footer */}
           <p className="mt-8 text-center text-[11px] text-ink-soft leading-relaxed">
             By continuing, you agree to Delta's{' '}
-            <span
-              onClick={() => window.open('/terms', '_blank')}
-              className="text-oxblood cursor-pointer underline"
-            >Terms</span>
+            <a href="/terms" target="_blank" rel="noreferrer" className="text-oxblood underline">Terms</a>
             {' '}and{' '}
-            <span
-              onClick={() => window.open('/privacy', '_blank')}
-              className="text-oxblood cursor-pointer underline"
-            >Privacy Policy</span>
+            <a href="/privacy" target="_blank" rel="noreferrer" className="text-oxblood underline">Privacy Policy</a>
           </p>
 
         </div>
       </div>
 
       {/* ── Right Panel: Image ── */}
-      <div className="login-right-panel hidden md:block w-[48%] min-w-[420px] relative overflow-hidden border-l border-rule">
+      <div className="login-right-panel hidden lg:block w-[48%] min-w-[420px] relative overflow-hidden border-l border-rule">
         {/* Background image */}
         <img
           src="/login-bg.jpg"

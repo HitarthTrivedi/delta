@@ -400,7 +400,7 @@ export default function WeeklyPlan() {
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
 
         {/* Header */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 28 }}>
+        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 28 }}>
           <div>
             <p style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>
               Part 2 · Agent 2 roadmap · Week {context?.week_number || 1}
@@ -633,7 +633,7 @@ export default function WeeklyPlan() {
             </div>
             {docsLoading && <Loader2 size={15} style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="plan-preferences-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {/* Permanent */}
             <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
               <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Permanent Rules</p>
@@ -716,7 +716,7 @@ export default function WeeklyPlan() {
 
         {/* Task feedback + manual edit */}
         <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: editingTasks ? 16 : 0 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: editingTasks ? 16 : 0 }}>
             <div>
               <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Task Controls</h2>
               <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
@@ -807,7 +807,7 @@ export default function WeeklyPlan() {
 
         {/* Agent 2 compact box */}
         <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
               <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Agent 2</h2>
               <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
@@ -896,7 +896,7 @@ export default function WeeklyPlan() {
           <div onClick={() => setChatOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(26,25,24,0.45)', zIndex: 55 }} />
           <div style={{
             position: 'fixed', top: 0, right: 0, bottom: 0,
-            width: 'min(50vw, 600px)', minWidth: 340,
+            width: 'min(max(50vw, 340px), 600px, 96vw)',
             background: 'var(--paper)', borderLeft: '1px solid var(--rule)',
             zIndex: 60, display: 'flex', flexDirection: 'column',
           }}>
@@ -1002,6 +1002,9 @@ export default function WeeklyPlan() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @media (max-width: 640px) {
+          .plan-preferences-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
     </main>
   );

@@ -93,9 +93,9 @@ def get_domain_pack_by_id(domain_id: str):
 
 
 @router.get("/user/{user_id}/context")
-def get_career_context(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+def get_career_context(user_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
-        return compile_career_context(db, user_id)
+        return compile_career_context(db, user_id, background_tasks=background_tasks)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:

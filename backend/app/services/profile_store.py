@@ -69,10 +69,17 @@ def _open_db():
     return SessionLocal()
 
 
-def load_profile(user_id: str) -> Dict[str, Any]:
-    """Load a user profile from the database. Returns {} if not found."""
+def load_profile(user_id: str, db=None) -> Dict[str, Any]:
+    """Load a user profile from the database. Returns {} if not found.
+
+    Pass the request's existing session as `db` to avoid opening (and paying
+    the round-trip cost of) a fresh connection per call; it is left open for
+    the caller to manage.
+    """
     _safe_user_id(user_id)
-    db = _open_db()
+    owns_session = db is None
+    if owns_session:
+        db = _open_db()
     try:
         from app.models.user import User
         user = db.query(User).filter(User.id == user_id).first()
@@ -83,7 +90,8 @@ def load_profile(user_id: str) -> Dict[str, Any]:
         logger.error(f"Failed to load profile {user_id}: {e}")
         return {}
     finally:
-        db.close()
+        if owns_session:
+            db.close()
 
 
 def save_profile(user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:

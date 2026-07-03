@@ -37,7 +37,7 @@ def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(requi
             if not user:
                 raise HTTPException(status_code=500, detail="Failed to create user.")
 
-    profile = load_profile(user_id)
+    profile = load_profile(user_id, db=db)
     onboarding_complete = profile.get("onboarding_complete", False)
 
     filled = [f for f in REQUIRED_FIELDS if profile.get(f)]
@@ -75,9 +75,9 @@ def get_user_with_skills(user_id: str, db: Session = Depends(get_db), _: str = D
             if not user:
                 raise HTTPException(status_code=500, detail="Failed to create user.")
     
-    profile = load_profile(user_id)
+    profile = load_profile(user_id, db=db)
     onboarding_complete = profile.get("onboarding_complete", False)
-    
+
     filled = [f for f in REQUIRED_FIELDS if profile.get(f)]
     pct = round((len(filled) / len(REQUIRED_FIELDS)) * 100, 1) if REQUIRED_FIELDS else 100.0
     if onboarding_complete:

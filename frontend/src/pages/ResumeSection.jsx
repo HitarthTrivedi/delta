@@ -449,7 +449,7 @@ function SuggestionsDiff({ suggestions, onClose, onApply, applying }) {
       </div>
 
       {/* Action bar */}
-      <div className="flex items-center justify-between gap-4 border border-rule bg-paper p-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border border-rule bg-paper p-4">
         <p className="text-xs text-ink-soft">
           {acceptedAdds.size} addition{acceptedAdds.size !== 1 ? 's' : ''} · {acceptedRemoves.size} removal{acceptedRemoves.size !== 1 ? 's' : ''} selected
         </p>

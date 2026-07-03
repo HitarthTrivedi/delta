@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import supabase from './supabaseClient';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
@@ -23,12 +24,28 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Automatically handle expired or invalid JWT sessions
+// Automatically handle expired or invalid JWT sessions.
+// A 401 usually just means the access token expired before Supabase's auto
+// refresh fired (background tab, laptop wake). Refresh once and retry the
+// request; only log out if the refresh itself fails.
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      console.warn("Session expired or invalid, logging out...");
+  async (error) => {
+    const original = error.config;
+    if (error.response && error.response.status === 401 && original && !original._retried) {
+      original._retried = true;
+      try {
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && data?.session) {
+          // onAuthStateChange in authStore updates the store + storage mirror.
+          original.headers['Authorization'] = `Bearer ${data.session.access_token}`;
+          original.headers['X-User-Id'] = data.session.user.id;
+          return api(original);
+        }
+      } catch (_) {
+        // fall through to logout
+      }
+      console.warn("Session expired and refresh failed, logging out...");
       useAuthStore.getState().logout();
       // Only redirect if not already on the login page to avoid redirect loops
       if (window.location.pathname !== '/login') {

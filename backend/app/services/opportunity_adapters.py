@@ -1,10 +1,12 @@
 """Opportunity adapters normalize contests, hackathons, jobs, and domain events."""
 import datetime
+import json
 import os
 import re
 import time
 from html import unescape
 
+from app.services.cache import cached
 from app.services.domain_packs import infer_domain_pack
 from app.services.http_client import get_session
 
@@ -279,6 +281,21 @@ class JobPostSignalAdapter(OpportunityAdapter):
         return events
 
 
+def _opportunities_cache_key(user_skills, target_role=None, days_ahead=30, sources=None):
+    return json.dumps([
+        sorted({str(s).lower() for s in user_skills}),
+        (target_role or "").lower(),
+        days_ahead,
+        sorted(s.lower() for s in sources) if sources else None,
+    ])
+
+
+# The adapters hit six live external sites (LeetCode, Codeforces, Kaggle,
+# Unstop, hackathon feeds, Arbeitnow) with up to a 20s combined budget. This
+# runs on the career-context GET path, so cache the aggregated feed — contest
+# and job listings don't change minute-to-minute. Empty results aren't cached
+# (transient fetch failures retry on the next call).
+@cached("opportunity_feed", ttl=1800, key_fn=_opportunities_cache_key)
 def collect_opportunities(
     user_skills: list[str],
     target_role: str | None = None,

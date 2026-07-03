@@ -15,6 +15,15 @@ code {
     font-family: 'IBM Plex Mono', Menlo, Monaco, Consolas, monospace;
 }
 
+/* iOS Safari zooms the viewport on focus for any text input under 16px.
+   Many of this app's inline-styled form fields sit at 13-15px for density;
+   force 16px on small viewports only, where the zoom actually happens. */
+@media (max-width: 640px) {
+    input, textarea, select {
+        font-size: 16px !important;
+    }
+}
+
 @layer base {
     :root {
         /* Editorial palette — matches the Alpha.Kore pitch memorandum */

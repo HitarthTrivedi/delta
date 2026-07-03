@@ -122,7 +122,7 @@ export default function Opportunities() {
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>
 
         {/* Header */}
-        <header style={{ display: 'flex', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 24 }}>
+        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
             <p style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 650, margin: '0 0 10px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <Briefcase size={15} style={{ color: 'var(--oxblood)' }} /> Opportunities
