@@ -48,7 +48,8 @@ def trigger_daily_reminders(
     """
     if not settings.REMINDER_SECRET:
         raise HTTPException(status_code=503, detail="REMINDER_SECRET not configured.")
-    if x_reminder_secret != settings.REMINDER_SECRET:
+    import hmac
+    if not hmac.compare_digest(x_reminder_secret or "", settings.REMINDER_SECRET):
         raise HTTPException(status_code=401, detail="Invalid reminder secret.")
 
     users = db.query(User).all()

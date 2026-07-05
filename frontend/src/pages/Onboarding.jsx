@@ -113,6 +113,24 @@ const stringToArray = (str) => {
   return str.split(',').map(s => s.trim()).filter(Boolean);
 };
 
+/* Rebuild wizard steps from a saved intake conversation. Each assistant question
+   is paired with the user answer that follows it (round carried for editing);
+   the final unanswered question becomes the current step (round null). */
+const buildSteps = (conversation) => {
+  const msgs = (conversation || []).filter(m => m.role === 'assistant' || m.role === 'user');
+  const steps = [];
+  for (let i = 0; i < msgs.length; i++) {
+    if (msgs[i].role !== 'assistant') continue;
+    const ans = msgs[i + 1] && msgs[i + 1].role === 'user' ? msgs[i + 1] : null;
+    steps.push({
+      question: msgs[i].content,
+      answer: ans ? ans.content : '',
+      round: ans && ans.round != null ? ans.round : null,
+    });
+  }
+  return steps;
+};
+
 /* ─── Main Onboarding Page ─── */
 export default function Onboarding() {
   const navigate  = useNavigate();
@@ -173,12 +191,22 @@ export default function Onboarding() {
 
         const res = await ingestionAPI.start(userId, 'general');
         setSessionId(res.session_id);
-        const firstQ = res.initial_question || res.message ||
-          "Let's start with the basics: your name, what you're currently doing (school, college, or working), and the role or field you want to build toward.";
-        setSteps([{ question: firstQ, answer: '', round: null }]);
-        setCursor(0);
-        setDraft('');
-        // phase stays 'resume' — the user uploads or skips a resume before questions
+        const built = buildSteps(res.conversation);
+        const answered = built.filter(s => s.round != null).length;
+        if (answered > 0) {
+          // Returning to an in-progress intake — offer Continue / Start over
+          setSteps(built);
+          setCursor(built.length - 1);
+          setDraft('');
+          setPhase('choice');
+        } else {
+          const firstQ = res.initial_question || res.message || (built[0] && built[0].question) ||
+            "Let's start with the basics: your name, what you're currently doing (school, college, or working), and the role or field you want to build toward.";
+          setSteps(built.length ? built : [{ question: firstQ, answer: '', round: null }]);
+          setCursor(0);
+          setDraft('');
+          setPhase('resume');
+        }
       } catch (e) {
         console.error(e);
         setSteps([{ question: "Let's start with the basics: your name, what you're currently doing, and the role or field you want to build toward.", answer: '', round: null }]);
@@ -257,6 +285,23 @@ export default function Onboarding() {
 
   const skipResume = () => setPhase('questions');
 
+  const continueSession = () => {
+    setCursor(steps.length - 1);
+    setDraft('');
+    setPhase('questions');
+  };
+
+  const startOver = async () => {
+    try {
+      await ingestionAPI.resetProfile(userId);
+      queryClient.invalidateQueries({ queryKey: ['user', userId] });
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not restart. Please try again.');
+    }
+  };
+
   /* resume upload — pre-fills the profile via the dedicated extraction endpoint */
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
@@ -266,11 +311,11 @@ export default function Onboarding() {
     setParsing(true);
     try {
       const text = await parseFile(file);
-      setUploadFile({ name: file.name });
       const res = await ingestionAPI.ingestResume(userId, sessionId, text);
 
       if (res.success) {
         applyProgress(res);
+        setUploadFile({ name: file.name });
         toast.success('Resume analyzed — details pre-filled.');
         if (res.review_required || res.status === 'review_required') {
           setIsDone(true);
@@ -287,8 +332,9 @@ export default function Onboarding() {
         }
         setPhase('questions');
       } else {
-        toast.error(res.message || 'Could not read that resume. You can continue by answering the questions.');
+        toast.error("Couldn't read that resume right now — you can still answer the questions and everything will be captured.");
         setUploadFile(null);
+        setPhase('questions');
       }
     } catch (err) {
       toast.error(err.message || 'Failed to parse file.');
@@ -835,9 +881,38 @@ export default function Onboarding() {
             <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6 }}>
               {phase === 'resume'
                 ? 'Start by uploading your resume if you have one — Delta pre-fills what it recognizes. No resume? Just skip and answer a few quick questions.'
+                : phase === 'choice'
+                ? 'You already have an intake in progress.'
                 : 'Answer one question at a time. You can go back and change any earlier answer.'}
             </p>
           </motion.div>
+
+          {/* Returning user: continue or start over */}
+          {phase === 'choice' && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: 'clamp(20px, 5vw, 36px)', textAlign: 'center' }}
+            >
+              <p style={{ color: 'var(--ink)', fontSize: '0.95rem', lineHeight: 1.55, margin: '0 0 22px' }}>
+                Pick up where you left off, or start fresh? Starting over clears your current answers.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button
+                  onClick={continueSession}
+                  style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', padding: '12px 24px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Continue where I left off
+                </button>
+                <button
+                  onClick={startOver}
+                  style={{ background: 'none', color: 'var(--ink-soft)', border: '1px solid var(--rule)', padding: '12px 24px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Start over
+                </button>
+              </div>
+            </motion.div>
+          )}
 
           {/* Resume step */}
           {phase === 'resume' && (

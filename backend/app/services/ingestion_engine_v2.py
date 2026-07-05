@@ -460,6 +460,37 @@ class IngestionEngineV2:
 
         return {key: value for key, value in extracted.items() if value not in ("", [], None)}
 
+    def _regex_extract_contacts(self, text: str) -> dict:
+        """Model-free safety net: pull contact/link/GPA fields straight from the raw
+        resume text so they are captured even when the LLM parser is unavailable."""
+        out: dict[str, Any] = {}
+        if not text:
+            return out
+        m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
+        if m:
+            out["email"] = m.group(0)
+        m = re.search(r"(?:https?://)?(?:www\.)?linkedin\.com/[A-Za-z0-9_%/-]+", text, re.I)
+        if m:
+            out["linkedin_url"] = m.group(0)
+        m = re.search(r"(?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9_-]+", text, re.I)
+        if m:
+            out["github_url"] = m.group(0)
+        for url in re.findall(r"https?://[^\s)]+", text):
+            low = url.lower()
+            if "linkedin.com" not in low and "github.com" not in low:
+                out["portfolio_url"] = url.rstrip(".,);")
+                break
+        m = re.search(r"(?:CGPA|GPA)\s*[:\-]?\s*(\d(?:\.\d{1,2})?)", text, re.I)
+        if m:
+            out["gpa"] = m.group(1)
+        # Phone: a run of 10-13 digits (optionally +cc, spaces, hyphens).
+        for cand in re.findall(r"\+?\d[\d\s-]{8,15}\d", text):
+            digits = re.sub(r"\D", "", cand)
+            if 10 <= len(digits) <= 13:
+                out["phone_number"] = cand.strip()
+                break
+        return out
+
     def _strip_hallucinated_exam(self, extracted: dict, conversation: list[dict]) -> None:
         """Drop exam fields the LLM invented but the user never actually named.
         The model sometimes fabricates target_exam (e.g. "UPSC") from unrelated
@@ -895,7 +926,25 @@ Return ONLY the JSON object."""
             if isinstance(generated, dict):
                 extracted = generated
         except Exception as exc:
-            logger.warning(f"Resume AI extraction failed; using empty fallback: {exc}")
+            logger.warning(f"Resume parse via {INTAKE_RESUME_MODEL} failed: {exc}")
+
+        # gemini-2.5-flash is quota-limited and frequently returns 503; when it
+        # yields nothing, retry on the Groq quality tier so the resume still parses.
+        if not extracted:
+            try:
+                logger.info("Resume parse falling back to Groq quality tier")
+                generated = generate_json(prompt, temperature=0.1, model=quality_model())
+                if isinstance(generated, dict):
+                    extracted = generated
+            except Exception as exc:
+                logger.warning(f"Resume parse Groq fallback also failed: {exc}")
+
+        # Deterministic safety net: contact/link/GPA fields are trivially regex-able
+        # from the raw text, so capture them even if every model was unavailable.
+        for key, val in self._regex_extract_contacts(resume_text).items():
+            if not extracted.get(key):
+                extracted[key] = val
+
         if isinstance(extracted, dict) and extracted:
             # The user literally uploaded a resume — record that fact.
             extracted["has_resume"] = True

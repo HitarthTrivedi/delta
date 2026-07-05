@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.services.resume_parser import parse_resume, parse_resume_llm
 from app.services.resume_service import (
@@ -80,7 +81,10 @@ async def upload_resume(
     _: str = Depends(require_owner),
 ):
     """Upload an existing PDF or DOCX resume; parse, structure and store it."""
-    content = await file.read()
+    max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_MB} MB.")
     filename = file.filename or "resume.pdf"
     parsed = parse_resume(content, filename)
     raw_text = parsed.get("raw_text") or ""
@@ -252,7 +256,10 @@ async def upload_resume_legacy(
 ):
     if not x_user_id and not authorization:
         raise HTTPException(status_code=401, detail="Authentication required.")
-    content = await file.read()
+    max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_MB} MB.")
     filename = file.filename or "resume.pdf"
     parsed = parse_resume(content, filename)
     return {

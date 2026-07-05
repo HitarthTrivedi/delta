@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
+import hmac
 import json
 import uuid
 import datetime
 
+from app.config import settings
 from app.database import get_db
 from app.models.feedback import Feedback
 
@@ -39,7 +41,10 @@ def submit_feedback(payload: FeedbackRequest, db: Session = Depends(get_db)):
 
 
 @router.get("")
-def list_feedback(db: Session = Depends(get_db)):
+def list_feedback(db: Session = Depends(get_db), x_admin_secret: str = Header(default="")):
+    # Contains other users' PII (name/email/message) — admins only.
+    if not settings.ADMIN_SECRET or not hmac.compare_digest(x_admin_secret or "", settings.ADMIN_SECRET):
+        raise HTTPException(status_code=403, detail="Admin access required.")
     rows = db.query(Feedback).order_by(Feedback.created_at.desc()).limit(100).all()
     return [
         {

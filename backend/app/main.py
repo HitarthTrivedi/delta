@@ -1,8 +1,12 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+import logging
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from starlette.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.limiter import limiter
 from app.config import settings
 from app.database import engine, Base
@@ -15,11 +19,47 @@ app = FastAPI(
     title="delta 2.0 API",
     description="Career Intelligence Platform — AI-driven skill tracking & market alignment",
     version="2.0.0",
+    # Interactive docs and schema are disabled in production (avoid exposing the
+    # full API surface); set ENABLE_DOCS=true to re-enable in dev.
+    docs_url="/docs" if settings.ENABLE_DOCS else None,
+    redoc_url="/redoc" if settings.ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if settings.ENABLE_DOCS else None,
 )
 
-# Attach limiter to app state so decorators can find it
+# Attach limiter to app state so decorators + the global default_limits work
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)  # applies the global default rate limit to every route
+
+_MAX_BODY_BYTES = (settings.MAX_UPLOAD_MB + 2) * 1024 * 1024
+
+
+@app.middleware("http")
+async def security_and_size_guard(request: Request, call_next):
+    # Reject oversized bodies before reading them (memory-exhaustion DoS).
+    cl = request.headers.get("content-length")
+    if cl:
+        try:
+            if int(cl) > _MAX_BODY_BYTES:
+                return JSONResponse(status_code=413, content={"detail": "Request body too large."})
+        except ValueError:
+            pass
+    response = await call_next(request)
+    # Baseline security headers on every response.
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # Never leak internal exception text to clients on server errors; log it instead.
+    # 4xx details are intended, user-facing messages and pass through unchanged.
+    if exc.status_code >= 500:
+        logging.getLogger("delta").error("5xx at %s: %s", request.url.path, exc.detail)
+        return JSONResponse(status_code=exc.status_code, content={"detail": "Internal server error. Please try again."})
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=getattr(exc, "headers", None))
 
 # Compress large JSON payloads (career context, market snapshots) over the wire.
 app.add_middleware(GZipMiddleware, minimum_size=1024)

@@ -38,26 +38,26 @@ class StartSessionRequest(BaseModel):
 class AnswerRequest(BaseModel):
     user_id: str
     session_id: str
-    answer: str
+    answer: str = Field(max_length=10000)
 
 
 class BridgeRequest(BaseModel):
     user_id: str
-    raw_text: str
+    raw_text: str = Field(max_length=100000)
     source: str = "resume"
 
 
 class ResumeIngestionRequest(BaseModel):
     user_id: str
     session_id: str
-    resume_text: str
+    resume_text: str = Field(max_length=100000)
 
 
 class EditAnswerRequest(BaseModel):
     user_id: str
     session_id: str
     round: int
-    answer: str
+    answer: str = Field(max_length=10000)
 
 
 @router.post("/start")

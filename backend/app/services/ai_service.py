@@ -82,6 +82,20 @@ _quality_cycle = itertools.cycle(_QUALITY_POOL)
 # Fast tier: cheap/frequent calls (intent classification, extraction, routing).
 FAST_MODEL = "llama-3.1-8b-instant"
 
+# Free-tier per-request token budgets are small (TPM: 8b≈6K, 120b≈8K, 70b≈12K) and a
+# request reserves its max_tokens up front — so an oversized max_tokens alone triggers
+# HTTP 413 "request too large". Cap output per model to stay within budget.
+_GROQ_MAX_OUTPUT = {
+    "llama-3.1-8b-instant": 1024,
+    "openai/gpt-oss-120b": 4000,
+    "llama-3.3-70b-versatile": 6000,
+    "meta-llama/llama-4-scout-17b": 6000,
+}
+
+
+def _groq_max_tokens(model: str, requested: int) -> int:
+    return min(requested, _GROQ_MAX_OUTPUT.get(model, 2048))
+
 
 def quality_model() -> str:
     """Next Groq quality model, round-robined across gpt-oss-120b and
@@ -118,7 +132,7 @@ def _groq_generate(prompt: str, temperature: float, max_tokens: int, model: str)
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
-        max_tokens=max_tokens,
+        max_tokens=_groq_max_tokens(model, max_tokens),
     )
     return (resp.choices[0].message.content or "").strip()
 
@@ -133,7 +147,7 @@ def _groq_stream(prompt: str, temperature: float, max_tokens: int, model: str):
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
-        max_tokens=max_tokens,
+        max_tokens=_groq_max_tokens(model, max_tokens),
         stream=True,
     )
     for chunk in stream:

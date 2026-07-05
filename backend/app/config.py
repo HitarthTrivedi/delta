@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    # Security controls
+    # ALLOW_HEADER_AUTH: when true, trust the unverified X-User-Id header (dev only).
+    # MUST stay false in production — a verified Supabase JWT is then required.
+    ALLOW_HEADER_AUTH: bool = parse_bool_env("ALLOW_HEADER_AUTH", False)
+    ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
+    MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "5") or "5")
+    MAX_TEXT_CHARS: int = int(os.getenv("MAX_TEXT_CHARS", "60000") or "60000")
+    ENABLE_DOCS: bool = parse_bool_env("ENABLE_DOCS", False)
     SERPER_API_KEY: str = os.getenv("SERPER_API_KEY", "")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
