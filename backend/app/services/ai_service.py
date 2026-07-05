@@ -58,6 +58,90 @@ def _next_client():
     return next(_client_cycle)
 
 
+# ─── Groq client (fast LPU inference; OpenAI-style chat API) ───────────────────
+# Groq runs Llama / gpt-oss at very high tokens/sec, so it drives the
+# latency-sensitive, user-facing paths (chat, intake). Rate limits are per-model
+# and org-level (extra keys do NOT stack), so we round-robin the two "quality"
+# models to combine their independent daily buckets. On ANY Groq failure — rate
+# limit, drained bucket, missing key or package — the caller transparently falls
+# back to gemma via the Google path below, so chat never hard-fails.
+_groq_client = None
+_groq_initialised = False
+
+GROQ_MODELS = {
+    "openai/gpt-oss-120b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "meta-llama/llama-4-scout-17b",
+}
+
+# Quality tier: alternate two independent daily buckets to double the headroom.
+_QUALITY_POOL = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
+_quality_cycle = itertools.cycle(_QUALITY_POOL)
+
+# Fast tier: cheap/frequent calls (intent classification, extraction, routing).
+FAST_MODEL = "llama-3.1-8b-instant"
+
+
+def quality_model() -> str:
+    """Next Groq quality model, round-robined across gpt-oss-120b and
+    llama-3.3-70b-versatile so their separate rate-limit buckets combine."""
+    return next(_quality_cycle)
+
+
+def _get_groq():
+    global _groq_client, _groq_initialised
+    if _groq_initialised:
+        return _groq_client
+    _groq_initialised = True
+    try:
+        from groq import Groq
+        from app.config import settings
+        key = (settings.GROQ_API_KEY or "").strip().strip('"').strip("'")
+        if key and not key.startswith("your_"):
+            _groq_client = Groq(api_key=key, timeout=60.0)
+            logger.info("Groq client initialised")
+        else:
+            logger.warning("No GROQ_API_KEY set — Groq models fall back to gemma")
+    except Exception as e:
+        logger.warning(f"Failed to init Groq client (falling back to gemma): {e}")
+    return _groq_client
+
+
+def _groq_generate(prompt: str, temperature: float, max_tokens: int, model: str) -> str | None:
+    """One-shot Groq completion. Returns text, None if Groq is unconfigured, or
+    raises on an API error so the caller can fall back to gemma."""
+    client = _get_groq()
+    if client is None:
+        return None
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
+def _groq_stream(prompt: str, temperature: float, max_tokens: int, model: str):
+    """Stream a Groq completion as text chunks. Raises if Groq is unconfigured or
+    errors before output, so the caller can fall back to gemma streaming."""
+    client = _get_groq()
+    if client is None:
+        raise RuntimeError("Groq client unavailable")
+    stream = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=max_tokens,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None) -> str:
@@ -75,6 +159,20 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
             model = "gemma-4-31b-it"
 
     logger.info(f"[LLM] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
+
+    # Groq path — fast LPU inference. On any failure, fall back to gemma below.
+    # When Groq is simply unconfigured, fall through quietly (it warns once at init).
+    if model in GROQ_MODELS:
+        if _get_groq() is not None:
+            try:
+                text = _groq_generate(prompt, temperature, max_tokens, model)
+                if text:
+                    logger.info(f"[LLM] groq success | {model} | response_len={len(text)}")
+                    return text
+                logger.warning(f"[LLM] groq {model} returned empty — falling back to gemma")
+            except Exception as e:
+                logger.warning(f"[LLM] groq {model} failed ({type(e).__name__}: {str(e)[:120]}) — falling back to gemma")
+        model = "gemma-4-31b-it"
 
     if not _clients:
         logger.warning("No API clients available — using mock fallback")
@@ -132,6 +230,25 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
             model = "gemma-4-31b-it"
 
     logger.info(f"[LLM stream] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
+
+    # Groq streaming path. On failure before any output, fall back to gemma below.
+    # When Groq is simply unconfigured, fall through quietly (it warns once at init).
+    if model in GROQ_MODELS:
+        if _get_groq() is not None:
+            got = False
+            try:
+                for piece in _groq_stream(prompt, temperature, max_tokens, model):
+                    got = True
+                    yield piece
+                if got:
+                    return
+                logger.warning(f"[LLM stream] groq {model} empty — falling back to gemma")
+            except Exception as e:
+                if got:
+                    logger.error(f"[LLM stream] groq error after partial output: {e}")
+                    return
+                logger.warning(f"[LLM stream] groq {model} failed ({type(e).__name__}) — falling back to gemma")
+        model = "gemma-4-31b-it"
 
     if not _clients:
         yield _mock_structured_response(prompt)

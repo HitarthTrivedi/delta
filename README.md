@@ -14,7 +14,7 @@ Delta 2.0 is a career intelligence web app with a FastAPI backend and a React fr
 - Frontend: React 18, Create React App, CRACO, Tailwind CSS, Radix UI, React Router, Axios, Zustand, TanStack React Query, Framer Motion, Recharts
 - Backend: Python 3.11, FastAPI, Uvicorn, SQLAlchemy, Pydantic, python-dotenv
 - Database: SQLite by default through SQLAlchemy
-- AI/search integrations: OpenAI, Google Gemini, Tavily
+- AI/search integrations: Google Gemini, Groq (fast LPU inference), OpenAI, Tavily
 - Container support: Dockerfile for the backend and `docker-compose.yml`
 
 ## Project Structure
@@ -64,10 +64,18 @@ Optional API keys can be added to `backend/.env`:
 ```env
 OPENAI_API_KEY=your_openai_key_here
 GEMINI_API_KEY=your_gemini_key_here
+GROQ_API_KEY=your_groq_key_here
 TAVILY_API_KEY=your_tavily_key_here
 RESEND_API_KEY=your_resend_key_here
 EMAIL_FROM=onboarding@resend.dev
 ```
+
+### AI models
+
+Delta routes each task to the model that fits it best:
+
+- **Groq** (`gpt-oss-120b` / `llama-3.3-70b-versatile` round-robined, and `llama-3.1-8b-instant` for cheap high-frequency calls) — powers the latency-sensitive, user-facing paths: Agent 2 chat and the onboarding intake. Set `GROQ_API_KEY` to enable it; **without the key these paths transparently fall back to Gemini**, so the app runs identically either way.
+- **Google Gemini** — `gemma-4-31b-it` for roadmap generation and background work (unlimited quota), `gemini-2.5-flash` for résumé analysis.
 
 ### Caching (optional)
 

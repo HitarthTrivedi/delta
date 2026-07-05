@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { motion } from 'framer-motion';
 import {
-  Paperclip, Send, CheckCircle2, X,
-  FileText, Loader2, User, ClipboardList, Edit3, Save, Check
+  Paperclip, CheckCircle2, Loader2, ClipboardList,
+  Edit3, Save, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useUserWithSkills } from '../hooks/useUser';
@@ -91,115 +89,6 @@ const parseFile = async (file) => {
   throw new Error('Unsupported file type. Use .pdf, .docx, .txt, or .md');
 };
 
-/* ─── Typing indicator ─── */
-const TypingDots = () => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 0' }}>
-    {[0, 1, 2].map(i => (
-      <motion.span
-        key={i}
-        animate={{ opacity: [0.3, 1, 0.3] }}
-        transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
-        style={{ width: 6, height: 6, borderRadius: 0, background: 'var(--ink-soft)', display: 'block' }}
-      />
-    ))}
-  </div>
-);
-
-/* ─── Chat Bubble ─── */
-const Bubble = ({ msg }) => {
-  const isAssistant = msg.role === 'assistant';
-  const isFile = msg.role === 'file';
-
-  if (isFile) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}
-      >
-        <div style={{
-          background: 'var(--accent-surface)',
-          border: '1px solid var(--rule)',
-          borderRadius: 0,
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          maxWidth: '85%',
-          minWidth: 0,
-        }}>
-          <FileText size={14} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />
-          <div style={{ minWidth: 0, overflow: 'hidden' }}>
-            <p style={{ color: 'var(--ink)', fontSize: '0.85rem', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.filename}</p>
-            <p style={{ color: 'var(--ink-soft)', fontSize: '0.75rem', margin: 0 }}>Resume uploaded</p>
-          </div>
-          <CheckCircle2 size={14} style={{ color: 'var(--ink)', flexShrink: 0 }} />
-        </div>
-      </motion.div>
-    );
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      style={{
-        display: 'flex',
-        justifyContent: isAssistant ? 'flex-start' : 'flex-end',
-        marginBottom: 14,
-        gap: 10,
-      }}
-    >
-      {isAssistant && (
-        <div style={{
-          width: 30, height: 30, borderRadius: 0,
-          background: 'var(--ink)', flexShrink: 0, marginTop: 2,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <ClipboardList size={14} style={{ color: 'var(--bone)' }} />
-        </div>
-      )}
-
-      <div style={{
-        maxWidth: '72%',
-        background: isAssistant ? 'var(--accent-surface)' : 'var(--ink)',
-        border: isAssistant ? '1px solid var(--rule)' : 'none',
-        borderRadius: 0,
-        padding: '12px 16px',
-        color: isAssistant ? 'var(--ink)' : 'var(--bone)',
-        fontSize: '0.9rem',
-        lineHeight: 1.6,
-      }}>
-        {isAssistant ? (
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              p: ({ children }) => <p style={{ margin: '0 0 6px 0' }}>{children}</p>,
-              ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
-              ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
-              li: ({ children }) => <li style={{ marginBottom: 3 }}>{children}</li>,
-              strong: ({ children }) => <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{children}</strong>,
-              code: ({ children }) => <code style={{ background: 'var(--rule)', padding: '1px 5px', borderRadius: 0, fontSize: '0.8rem' }}>{children}</code>,
-            }}
-          >
-            {msg.content}
-          </ReactMarkdown>
-        ) : msg.content}
-      </div>
-
-      {!isAssistant && (
-        <div style={{
-          width: 30, height: 30, borderRadius: 0,
-          background: 'var(--rule)', flexShrink: 0, marginTop: 2,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <User size={14} style={{ color: 'var(--ink)' }} />
-        </div>
-      )}
-    </motion.div>
-  );
-};
-
 const REQUIRED_FIELDS_METADATA = [
   { key: 'name', label: 'Name' },
   { key: 'current_status', label: 'Status' },
@@ -231,8 +120,6 @@ export default function Onboarding() {
   const userId    = useAuthStore(state => state.userId);
   const { data: user, isLoading: isUserLoading } = useUserWithSkills(userId);
 
-  const [messages,   setMessages]   = useState([]);
-  const [input,      setInput]      = useState('');
   const [sessionId,  setSessionId]  = useState(null);
   const [isThinking, setIsThinking] = useState(false);
   const [isDone,     setIsDone]     = useState(false);
@@ -240,20 +127,19 @@ export default function Onboarding() {
   const [uploadFile, setUploadFile] = useState(null);
   const [parsing,    setParsing]    = useState(false);
 
+  // Wizard state: one question per screen, resume-first, with go-back editing
+  const [phase,  setPhase]  = useState('resume');   // 'resume' | 'questions'
+  const [steps,  setSteps]  = useState([]);          // [{ question, answer, round }]
+  const [cursor, setCursor] = useState(0);
+  const [draft,  setDraft]  = useState('');
+
   const [progress, setProgress] = useState(0);
   const [filledFields, setFilledFields] = useState([]);
   const [profile, setProfile] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const bottomRef   = useRef(null);
-  const fileRef     = useRef(null);
-  const inputRef    = useRef(null);
-
-  /* auto-scroll */
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isThinking]);
+  const fileRef = useRef(null);
 
   /* load profile data on complete */
   const loadProfileData = useCallback(async () => {
@@ -287,75 +173,91 @@ export default function Onboarding() {
 
         const res = await ingestionAPI.start(userId, 'general');
         setSessionId(res.session_id);
-        
-        if (res.conversation && res.conversation.length > 0) {
-          setMessages(res.conversation);
-        } else {
-          const firstMsg = res.initial_question || res.message || "Hi, I am Delta's intake advisor. You can do this fully by conversation, even if you do not have a resume. Tell me who you are, your current stage, what you want to improve toward, and how much time you realistically have each week.";
-          setMessages([{ role: 'assistant', content: firstMsg }]);
-        }
+        const firstQ = res.initial_question || res.message ||
+          "Let's start with the basics: your name, what you're currently doing (school, college, or working), and the role or field you want to build toward.";
+        setSteps([{ question: firstQ, answer: '', round: null }]);
+        setCursor(0);
+        setDraft('');
+        // phase stays 'resume' — the user uploads or skips a resume before questions
       } catch (e) {
         console.error(e);
-        setMessages([{
-          role: 'assistant',
-          content: "Hi, I am Delta's intake advisor. You can do this fully by conversation, even if you do not have a resume. Tell me who you are, your current stage, what you want to improve toward, and how much time you realistically have each week.",
-        }]);
+        setSteps([{ question: "Let's start with the basics: your name, what you're currently doing, and the role or field you want to build toward.", answer: '', round: null }]);
       } finally {
         setIsThinking(false);
       }
     })();
   }, [userId, loadProfileData]);
 
-  /* send message */
-  const handleSend = useCallback(async (overrideText = null) => {
-    const text = (overrideText ?? input).trim();
+  const applyProgress = useCallback((res) => {
+    if (res.confidence_score !== undefined) setProgress(Math.round(res.confidence_score * 100));
+    if (res.filled_fields) setFilledFields(res.filled_fields);
+    if (res.profile) setProfile(res.profile);
+  }, []);
+
+  /* submit the current answer, or save an edited earlier answer, then advance */
+  const handleNext = useCallback(async () => {
+    const text = draft.trim();
     if (!text || isThinking) return;
+    const step = steps[cursor];
+    const isCurrent = cursor === steps.length - 1 && !step.round;
 
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
     setIsThinking(true);
-
     try {
-      const res = await ingestionAPI.submitAnswer(userId, sessionId, text);
-
-      const aiReply = res.next_question || res.message || res.response || '';
-      if (aiReply) {
-        setMessages(prev => [...prev, { role: 'assistant', content: aiReply }]);
-      }
-
-      if (res.confidence_score !== undefined) {
-        setProgress(Math.round(res.confidence_score * 100));
-      }
-      if (res.filled_fields) {
-        setFilledFields(res.filled_fields);
-      }
-
-      if (res.review_required || res.status === 'review_required') {
-        setIsDone(true);
-        setReviewMode(true);
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: "Your profile draft is ready. Please review and edit anything before Delta creates your roadmap.",
-        }]);
-        await loadProfileData();
-        queryClient.invalidateQueries({ queryKey: ['user', userId] });
-      } else if (res.completed || res.status === 'complete' || res.status === 'completed') {
-        setIsDone(true);
-        setReviewMode(false);
-        await loadProfileData();
+      if (isCurrent) {
+        const res = await ingestionAPI.submitAnswer(userId, sessionId, text);
+        applyProgress(res);
+        const goReview = res.review_required || res.status === 'review_required';
+        setSteps(prev => {
+          const next = [...prev];
+          next[cursor] = { ...next[cursor], answer: text, round: res.round ?? (cursor + 1) };
+          if (!goReview) {
+            const q = res.next_question || res.message;
+            if (q) next.push({ question: q, answer: '', round: null });
+          }
+          return next;
+        });
+        if (goReview) {
+          setIsDone(true);
+          setReviewMode(true);
+          await loadProfileData();
+          queryClient.invalidateQueries({ queryKey: ['user', userId] });
+        } else {
+          setCursor(c => c + 1);
+          setDraft('');
+        }
+      } else {
+        // Revisiting an already-answered question
+        if (text !== step.answer && step.round != null) {
+          const res = await ingestionAPI.editAnswer(userId, sessionId, step.round, text);
+          applyProgress(res);
+          setSteps(prev => {
+            const next = [...prev];
+            next[cursor] = { ...next[cursor], answer: text };
+            return next;
+          });
+        }
+        const nextCursor = cursor + 1;
+        setCursor(nextCursor);
+        setDraft(steps[nextCursor]?.answer || '');
       }
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Sorry, something went wrong on my end. Could you try sending that again?",
-      }]);
+      toast.error('Something went wrong. Please try again.');
     } finally {
       setIsThinking(false);
     }
-  }, [input, sessionId, userId, isThinking, queryClient, loadProfileData]);
+  }, [draft, isThinking, steps, cursor, userId, sessionId, applyProgress, queryClient, loadProfileData]);
 
-  /* file upload — uses dedicated resume extraction endpoint */
+  const handleBack = () => {
+    if (cursor === 0 || isThinking) return;
+    const prev = cursor - 1;
+    setCursor(prev);
+    setDraft(steps[prev]?.answer || '');
+  };
+
+  const skipResume = () => setPhase('questions');
+
+  /* resume upload — pre-fills the profile via the dedicated extraction endpoint */
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -364,59 +266,35 @@ export default function Onboarding() {
     setParsing(true);
     try {
       const text = await parseFile(file);
-      setUploadFile({ name: file.name, text });
-      toast.success('Resume parsed — extracting your profile...');
-
-      // Show file bubble
-      setMessages(prev => [...prev, { role: 'file', filename: file.name }]);
-      setIsThinking(true);
-
-      // Use the dedicated /ingestion/resume endpoint for proper AI extraction
+      setUploadFile({ name: file.name });
       const res = await ingestionAPI.ingestResume(userId, sessionId, text);
 
       if (res.success) {
-        const extracted = res.extracted_fields || [];
-        const confirmMsg = extracted.length > 0
-          ? `Resume analyzed. I extracted: ${extracted.slice(0, 5).join(', ')}${extracted.length > 5 ? ' and more' : ''}.`
-          : 'Resume received.';
-        setMessages(prev => [...prev, { role: 'assistant', content: confirmMsg }]);
-
-        const followUp = res.follow_up || res.message;
-        if (followUp && followUp !== confirmMsg) {
-          setMessages(prev => [...prev, { role: 'assistant', content: followUp }]);
-        }
-
-        if (res.confidence_score !== undefined) {
-          setProgress(Math.round(res.confidence_score * 100));
-        }
-        if (res.filled_fields) {
-          setFilledFields(res.filled_fields);
-        }
+        applyProgress(res);
+        toast.success('Resume analyzed — details pre-filled.');
         if (res.review_required || res.status === 'review_required') {
           setIsDone(true);
           setReviewMode(true);
           await loadProfileData();
           queryClient.invalidateQueries({ queryKey: ['user', userId] });
+          return;
         }
+        const q = res.follow_up || res.message;
+        if (q) {
+          setSteps([{ question: q, answer: '', round: null }]);
+          setCursor(0);
+          setDraft('');
+        }
+        setPhase('questions');
       } else {
-        toast.error(res.message || 'Could not extract resume data.');
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: "I had trouble reading that resume. Could you paste your key details as text instead?",
-        }]);
+        toast.error(res.message || 'Could not read that resume. You can continue by answering the questions.');
+        setUploadFile(null);
       }
     } catch (err) {
       toast.error(err.message || 'Failed to parse file.');
+      setUploadFile(null);
     } finally {
       setParsing(false);
-      setIsThinking(false);
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
     }
   };
 
@@ -934,231 +812,142 @@ export default function Onboarding() {
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 2rem' }}>
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 1.5rem' }}>
+      {/* Wizard body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 0 3rem' }}>
+        <div style={{ maxWidth: 620, margin: '0 auto', padding: '0 1.5rem' }}>
 
           {/* Intro header */}
-          {messages.length <= 1 && !isThinking && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ textAlign: 'center', marginBottom: 32 }}
+          >
+            <div style={{
+              width: 52, height: 52, borderRadius: 0, background: 'var(--ink)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <ClipboardList size={22} style={{ color: 'var(--bone)' }} />
+            </div>
+            <h1 style={{ color: 'var(--oxblood)', fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: '1.6rem', fontWeight: 600, marginBottom: 8 }}>
+              Part 1: Tell us about yourself
+            </h1>
+            <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6 }}>
+              {phase === 'resume'
+                ? 'Start by uploading your resume if you have one — Delta pre-fills what it recognizes. No resume? Just skip and answer a few quick questions.'
+                : 'Answer one question at a time. You can go back and change any earlier answer.'}
+            </p>
+          </motion.div>
+
+          {/* Resume step */}
+          {phase === 'resume' && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              style={{ textAlign: 'center', marginBottom: 40 }}
+              style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: 'clamp(20px, 5vw, 36px)', textAlign: 'center' }}
             >
-              <div style={{
-                width: 52, height: 52, borderRadius: 0, background: 'var(--ink)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 16px',
-              }}>
-                <ClipboardList size={22} style={{ color: 'var(--bone)' }} />
-              </div>
-              <h1 style={{ color: 'var(--oxblood)', fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: '1.6rem', fontWeight: 600, marginBottom: 8 }}>
-                Part 1: Tell us about yourself
-              </h1>
-              <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-                Upload your resume first if you have one. I will extract what I can,
-                then ask only the missing questions Agent 2 needs for the roadmap.
-              </p>
+              {!uploadFile ? (
+                <>
+                  <div
+                    onClick={() => !parsing && fileRef.current?.click()}
+                    style={{
+                      border: '1px dashed var(--rule)', padding: '28px 20px',
+                      cursor: parsing ? 'wait' : 'pointer', marginBottom: 20,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                    }}
+                  >
+                    {parsing
+                      ? <Loader2 size={26} style={{ color: 'var(--ink-soft)', animation: 'spin 1s linear infinite' }} />
+                      : <Paperclip size={26} style={{ color: 'var(--ink-soft)' }} />}
+                    <span style={{ color: 'var(--ink)', fontSize: '0.92rem', fontWeight: 600 }}>
+                      {parsing ? 'Analyzing your resume…' : 'Upload your resume'}
+                    </span>
+                    <span style={{ color: 'var(--ink-soft)', fontSize: '0.78rem' }}>PDF, DOCX, TXT or MD</span>
+                  </div>
+                  <button
+                    onClick={skipResume}
+                    disabled={parsing}
+                    style={{
+                      background: 'none', border: 'none', color: 'var(--ink-soft)',
+                      fontSize: '0.85rem', cursor: parsing ? 'not-allowed' : 'pointer',
+                      textDecoration: 'underline', fontWeight: 600,
+                    }}
+                  >
+                    I don&apos;t have a resume — skip
+                  </button>
+                </>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <CheckCircle2 size={16} style={{ color: 'var(--ink)' }} />
+                  <span style={{ color: 'var(--ink)', fontSize: '0.9rem' }}>{uploadFile.name} — analyzed</span>
+                </div>
+              )}
             </motion.div>
           )}
 
-          {/* Messages */}
-          <AnimatePresence>
-            {messages.map((msg, i) => (
-              <Bubble key={i} msg={msg} />
-            ))}
-          </AnimatePresence>
-
-          {/* Thinking indicator */}
-          {isThinking && (
+          {/* Question step */}
+          {phase === 'questions' && steps[cursor] && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{ display: 'flex', gap: 10, marginBottom: 14 }}
+              key={cursor}
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: 'clamp(20px, 5vw, 36px)' }}
             >
-              <div style={{
-                width: 30, height: 30, borderRadius: 0, background: 'var(--ink)',
-                flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <ClipboardList size={14} style={{ color: 'var(--bone)' }} />
-              </div>
-              <div style={{
-                background: 'var(--accent-surface)',
-                border: '1px solid var(--rule)',
-                borderRadius: 0,
-                padding: '12px 18px',
-              }}>
-                <TypingDots />
-              </div>
-            </motion.div>
-          )}
-
-          <div ref={bottomRef} />
-        </div>
-      </div>
-
-      {/* Input Area */}
-      {!isDone && (
-        <div style={{
-          borderTop: '1px solid var(--accent-surface)',
-          padding: '1rem 1.5rem',
-          background: 'var(--bone)',
-        }}>
-          <div style={{ maxWidth: 680, margin: '0 auto' }}>
-
-            {/* Resume upload hint */}
-            {!uploadFile && messages.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 10,
-                  padding: '8px 14px',
-                  background: 'var(--accent-surface)',
-                  border: '1px solid var(--accent-surface)',
-                  borderRadius: 0,
-                  cursor: 'pointer',
-                }}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Paperclip size={13} style={{ color: 'var(--ink-soft)' }} />
-                <span style={{ color: 'var(--ink-soft)', fontSize: '0.8rem' }}>
-                  {parsing ? 'Parsing resume...' : 'Attach your resume (PDF or TXT) — skip if you don\'t have one'}
-                </span>
-                {parsing && <Loader2 size={13} style={{ color: 'var(--ink-soft)', animation: 'spin 1s linear infinite' }} />}
-              </motion.div>
-            )}
-
-            {/* Uploaded file badge */}
-            {uploadFile && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                marginBottom: 10, padding: '6px 12px',
-                background: 'var(--accent-surface)',
-                border: '1px solid var(--rule)',
-                borderRadius: 0,
-              }}>
-                <CheckCircle2 size={13} style={{ color: 'var(--ink)', flexShrink: 0 }} />
-                <span style={{ color: 'var(--ink)', fontSize: '0.8rem', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploadFile.name} — uploaded</span>
-                <button onClick={() => setUploadFile(null)} aria-label="Remove attached file" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)', padding: 8, display: 'flex', flexShrink: 0 }}>
-                  <X size={13} />
-                </button>
-              </div>
-            )}
-
-            {/* Text input row */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: 10,
-              background: 'var(--accent-surface)',
-              border: '1px solid var(--rule)',
-              borderRadius: 0,
-              padding: '10px 12px',
-            }}>
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={parsing}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--ink-soft)', padding: '10px', flexShrink: 0,
-                  transition: 'color 0.2s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.color = 'var(--ink)'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-soft)'}
-                title="Attach resume"
-                aria-label="Attach resume"
-              >
-                <Paperclip size={18} />
-              </button>
-
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.66rem', color: 'var(--oxblood)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 500 }}>
+                Question {cursor + 1}
+              </span>
+              <p style={{ color: 'var(--ink)', fontSize: '1.05rem', lineHeight: 1.55, fontWeight: 500, margin: '12px 0 20px' }}>
+                {steps[cursor].question}
+              </p>
               <textarea
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type your answer..."
-                rows={1}
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNext(); } }}
+                placeholder="Type your answer…"
+                autoFocus
+                rows={3}
                 disabled={isThinking}
                 style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  color: 'var(--ink)',
-                  fontSize: '0.92rem',
-                  lineHeight: 1.5,
-                  resize: 'none',
-                  fontFamily: 'inherit',
-                  maxHeight: 140,
-                  overflowY: 'auto',
-                  padding: '2px 0',
-                  placeholderColor: 'var(--ink-soft)',
-                }}
-                onInput={e => {
-                  e.target.style.height = 'auto';
-                  e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+                  width: '100%', boxSizing: 'border-box', background: 'var(--bone)',
+                  border: '1px solid var(--rule)', outline: 'none', color: 'var(--ink)',
+                  fontSize: '0.95rem', lineHeight: 1.5, resize: 'vertical',
+                  fontFamily: 'inherit', padding: '12px 14px', minHeight: 84,
                 }}
               />
-
-              <button
-                onClick={() => handleSend()}
-                disabled={!input.trim() || isThinking}
-                style={{
-                  width: 36, height: 36, borderRadius: 0,
-                  background: input.trim() && !isThinking ? 'var(--ink)' : 'var(--rule)',
-                  border: 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: input.trim() && !isThinking ? 'pointer' : 'not-allowed',
-                  flexShrink: 0,
-                  transition: 'background 0.2s',
-                }}
-              >
-                {isThinking
-                  ? <Loader2 size={16} style={{ color: 'var(--ink-soft)', animation: 'spin 1s linear infinite' }} />
-                  : <Send size={14} style={{ color: input.trim() ? 'var(--bone)' : 'var(--ink-soft)' }} />
-                }
-              </button>
-            </div>
-
-            <p style={{
-              textAlign: 'center',
-              color: 'var(--rule)',
-              fontSize: '0.72rem',
-              marginTop: 10,
-            }}>
-              Press Enter to send · Shift+Enter for new line · Your data is stored securely
-            </p>
-          </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, gap: 12 }}>
+                <button
+                  onClick={handleBack}
+                  disabled={cursor === 0 || isThinking}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    background: 'none', border: 'none',
+                    color: cursor === 0 ? 'var(--rule)' : 'var(--ink-soft)',
+                    fontSize: '0.85rem', fontWeight: 600,
+                    cursor: cursor === 0 || isThinking ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <ChevronLeft size={15} /> Back
+                </button>
+                <button
+                  onClick={handleNext}
+                  disabled={!draft.trim() || isThinking}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    background: draft.trim() && !isThinking ? 'var(--ink)' : 'var(--rule)',
+                    color: draft.trim() && !isThinking ? 'var(--bone)' : 'var(--ink-soft)',
+                    border: 'none', padding: '11px 24px', fontSize: '0.9rem', fontWeight: 700,
+                    cursor: draft.trim() && !isThinking ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {isThinking
+                    ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
+                    : <>Next <ChevronRight size={15} /></>}
+                </button>
+              </div>
+            </motion.div>
+          )}
         </div>
-      )}
-
-      {/* Complete state */}
-      {isDone && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{
-            padding: '1.5rem',
-            textAlign: 'center',
-            borderTop: '1px solid var(--accent-surface)',
-            background: 'var(--bone)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: 0, background: 'var(--ink)',
-              animation: 'ping 1s cubic-bezier(0,0,0.2,1) infinite',
-            }} />
-            <span style={{ color: 'var(--ink)', fontSize: '0.88rem', fontWeight: 600 }}>
-              Opening Agent 2 weekly plan...
-            </span>
-          </div>
-        </motion.div>
-      )}
+      </div>
 
       {/* Hidden file input */}
       <input

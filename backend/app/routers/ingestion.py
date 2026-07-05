@@ -53,6 +53,13 @@ class ResumeIngestionRequest(BaseModel):
     resume_text: str
 
 
+class EditAnswerRequest(BaseModel):
+    user_id: str
+    session_id: str
+    round: int
+    answer: str
+
+
 @router.post("/start")
 def start_ingestion_session(
     payload: StartSessionRequest,
@@ -99,6 +106,23 @@ def submit_ingestion_answer(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process answer: {str(e)}")
+
+
+@router.post("/edit-answer")
+def edit_ingestion_answer(
+    payload: EditAnswerRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
+    """Replace a previously-given answer (by round) and re-derive the profile."""
+    verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
+    try:
+        return engine.edit_answer(db, payload.user_id, payload.session_id, payload.round, payload.answer)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to edit answer: {str(e)}")
 
 
 @router.post("/resume")

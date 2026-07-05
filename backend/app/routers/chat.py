@@ -660,8 +660,8 @@ Meaning of each action:
 
 Return only the JSON object."""
     try:
-        from app.services.ai_service import generate_json
-        result = generate_json(prompt, temperature=0.1)
+        from app.services.ai_service import generate_json, FAST_MODEL
+        result = generate_json(prompt, temperature=0.1, model=FAST_MODEL)
         if isinstance(result, dict) and result.get("action") in _ACTION_TO_INTENT:
             return result
     except Exception as exc:
@@ -977,7 +977,7 @@ def chat_message(
     user_profile_doc = read_profile_doc(data.user_id) if is_weekly_agent else ""
 
     try:
-        from app.services.ai_service import generate_response
+        from app.services.ai_service import generate_response, quality_model
 
         lowered_update = user_update.lower()
         if is_weekly_agent:
@@ -1333,6 +1333,7 @@ Skills: {skills_context}
             prompt,
             temperature=0.5 if is_weekly_agent else 0.7,
             max_tokens=10000,
+            model=quality_model(),
         )
         cleaned_response = response.strip()
         updated_actions = None
@@ -1470,10 +1471,10 @@ User message: {data.message}
 Respond with a practical next step, mention relevant roadmap/project/market context when useful, and ask at most one follow-up question."""
 
     def _event_stream():
-        from app.services.ai_service import generate_response_stream
+        from app.services.ai_service import generate_response_stream, quality_model
         chunks: list[str] = []
         try:
-            for piece in generate_response_stream(prompt, temperature=0.7, max_tokens=10000):
+            for piece in generate_response_stream(prompt, temperature=0.7, max_tokens=10000, model=quality_model()):
                 if piece:
                     chunks.append(piece)
                     yield f"data: {json.dumps({'delta': piece})}\n\n"

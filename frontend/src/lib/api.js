@@ -225,6 +225,7 @@ export const achievementsAPI = {
 export const ingestionAPI = {
   start: (userId, journeyType) => api.post('/ingestion/start', { user_id: userId, journey_type: journeyType }).then(r => r.data),
   submitAnswer: (userId, sessionId, answer) => api.post('/ingestion/answer', { user_id: userId, session_id: sessionId, answer }).then(r => r.data),
+  editAnswer: (userId, sessionId, round, answer) => api.post('/ingestion/edit-answer', { user_id: userId, session_id: sessionId, round, answer }).then(r => r.data),
   ingestResume: (userId, sessionId, resumeText) => api.post('/ingestion/resume', { user_id: userId, session_id: sessionId, resume_text: resumeText }).then(r => r.data),
   getState: (userId) => api.get(`/ingestion/state/${userId}`).then(r => r.data),
   getProfile: (userId) => api.get(`/ingestion/profile/${userId}`).then(r => r.data),

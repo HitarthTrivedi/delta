@@ -2,8 +2,9 @@
 Ingestion Engine v2 — Clean, reliable intake agent for delta Career OS.
 
 Architecture:
-  - Uses google-genai via ai_service.generate_response / generate_json: the resume
-    parse runs on gemini-2.5-flash (accuracy) and the Q&A round on gemma-4-31b-it (quota)
+  - Resume parse runs on gemini-2.5-flash (accuracy); the Q&A round (extraction +
+    next-question) runs on the Groq quality tier via quality_model() for fast,
+    intent-aware questions.
   - Writes extracted profile to profile_store (data/profiles/<user_id>.json)
   - Downstream agents (roadmap, brief) read from the same profile store
   - Keeps conversation log in IngestionSession DB row for audit
@@ -24,7 +25,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from app.services.ai_service import generate_response, generate_json
+from app.services.ai_service import generate_response, generate_json, quality_model
 from app.services.profile_store import load_profile, save_profile, profile_as_context_string
 from app.services.web_search import WebSearchService
 
@@ -33,12 +34,10 @@ logger = logging.getLogger("delta.ingestion_v2")
 # Model assignment for the intake agent:
 #  - Resume parsing is a single, accuracy-critical, infrequent call → use the
 #    stronger gemini-2.5-flash so skills/facts are extracted correctly without guessing.
-#  - The conversational Q&A round is many back-and-forth calls → use gemma-4-31b-it
-#    to stay within the free Gemini quota (gemini-2.5-flash free tier is call-limited).
-# Everything else in the app (roadmap/progress/resume feature) keeps the globally
-# configured GEMINI_MODEL.
+#  - The conversational Q&A round (field extraction + next-question) is where intent
+#    understanding matters most, so it runs on the Groq quality tier via quality_model()
+#    — fast, and far better at reading the user's goal than gemma-4-31b-it was.
 INTAKE_RESUME_MODEL = "gemini-2.5-flash"
-INTAKE_CHAT_MODEL = "gemma-4-31b-it"
 
 # Minimum number of genuine user answers required before the intake can finish —
 # guarantees a real goals/ambitions conversation even when a resume already fills
@@ -133,18 +132,19 @@ Conversation so far:
 Write ONE short, precise follow-up question to collect the single most important missing field.
 
 Hard rules:
-- Keep it to ONE sentence. Be simple, warm, and direct. No long preambles.
+- Keep it short and warm (one to two sentences). You MAY ask for a few closely-related basic facts in a single question (e.g. course, college, and year together). No long preambles.
 - Do NOT ask anything already answered.
 - This student could be anyone: a school student, a dropout, an undergrad, a master's student, a fresher, or a career switcher. Adapt the wording to their stage; never assume a level of background they have not shown.
 - Only ask about a competitive exam (UPSC, GATE, CAT, GRE, etc.) if the student has EXPLICITLY mentioned one. Never bring up an exam on your own.
 - If they have no resume or no projects yet, that is fine — ask about their interests, current level, or how much time they have, not resume details.
 - Do NOT use emojis.
 
-What to ask about, in priority order:
-1. The STORY behind joining delta and the time pressure — if you do not yet know WHY they came (just improving skills? chasing a job? a deadline?) or HOW urgent it is, ask that first. It decides their pace.
-2. If a real field is still missing, ask for that field.
-3. Otherwise (e.g. a resume already covers the facts), ask about the things a resume CANNOT tell you — the student's actual goals, ambitions, motivation ("why this path"), what success looks like for them, or the kind of role/work they truly want.
+What to ask about, in priority order — collect the CONCRETE BASICS first, then go deeper:
+1. Core identity and education FIRST. While any of these basics is still missing, ask for them before anything else: their current stage (school / undergrad / graduate / working), degree major or stream, college or university, year of study, and the target role or field they want. You may combine a few closely-related basics into one natural question.
+2. Then their current skills, and whether they have any projects or experience yet (it is completely fine if they have none).
+3. ONLY AFTER the basics above are captured, ask the deeper things a form cannot tell you — the story behind why they came to delta, how urgent their goal is, their motivation, and what success looks like for them.
 
+Do NOT open with motivation, backstory, or "why did you come here" questions while basic identity/education facts are still missing.
 Never ask "how many hours per week can you give" unless their story gives no clue about their time pressure — delta suggests the hours itself.
 
 Reply with just the question text, nothing else."""
@@ -443,20 +443,11 @@ class IngestionEngineV2:
             extracted["current_status"] = "school"
             extracted["education_stage"] = "School student"
 
-        if "video edit" in lowered or "video editing" in lowered or "davinci" in lowered or "resolve" in lowered:
-            extracted["target_role"] = "Video Editor"
-            extracted["goal_direction"] = "Build a future in video editing"
-            extracted["target_industries"] = ["Content creation", "Social media", "Video production"]
-            extracted["skills"] = ["Instagram content editing", "DaVinci Resolve"]
-            extracted["career_goals"] = ["Build a future in video editing"]
-            extracted["learning_style"] = "practical"
-            extracted["preferred_content_types"] = ["projects", "videos"]
-
-        if "instagram" in lowered or "posts" in lowered:
-            extracted["past_experience"] = "Created Instagram posts for personal or random Instagram pages."
-            extracted["projects"] = ["Instagram post edits"]
-            extracted["no_experience_yet"] = False
-        elif extracted.get("has_resume") is False:
+        # If the user explicitly has no resume, assume no formal experience yet
+        # unless a later answer says otherwise. Field-specific facts (role, skills,
+        # projects) are left entirely to the LLM extractor — no hardcoded guessing
+        # of a career from stray keywords.
+        if extracted.get("has_resume") is False:
             extracted["no_experience_yet"] = True
 
         hours_match = re.search(r"\b(\d{1,2})\s*(?:hours|hrs|h)\b", lowered)
@@ -469,10 +460,24 @@ class IngestionEngineV2:
 
         return {key: value for key, value in extracted.items() if value not in ("", [], None)}
 
+    def _strip_hallucinated_exam(self, extracted: dict, conversation: list[dict]) -> None:
+        """Drop exam fields the LLM invented but the user never actually named.
+        The model sometimes fabricates target_exam (e.g. "UPSC") from unrelated
+        goals, which then corrupts the planning horizon."""
+        if not extracted.get("target_exam"):
+            return
+        user_said = " ".join(
+            m.get("content", "") for m in conversation if m.get("role") == "user"
+        ).lower()
+        exam_keywords = ("upsc", "gpsc", "gate", "cat", "gre", "ielts", "toefl", "civil services", "ias", "ips")
+        if str(extracted["target_exam"]).lower() not in user_said and not any(k in user_said for k in exam_keywords):
+            for fld in ("target_exam", "target_attempt", "exam_goal_detail", "known_exam_dates"):
+                extracted.pop(fld, None)
+
     def _safe_generate_json(self, prompt: str, conversation: list[dict]) -> dict:
         heuristic = self._heuristic_extract_from_conversation(conversation)
         try:
-            extracted = generate_json(prompt, model=INTAKE_CHAT_MODEL)
+            extracted = generate_json(prompt, model=quality_model())
             if isinstance(extracted, dict) and extracted:
                 # Heuristic fills in fields the AI missed (e.g. hours_per_week from regex)
                 for key, val in heuristic.items():
@@ -485,7 +490,7 @@ class IngestionEngineV2:
 
     def _safe_generate_text(self, prompt: str, fallback: str, temperature: float = 0.6, max_tokens: int = 2000) -> str:
         try:
-            text = generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=INTAKE_CHAT_MODEL)
+            text = generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=quality_model())
             return text.strip() or fallback
         except Exception as exc:
             logger.warning(f"AI text generation failed; using fallback text: {exc}")
@@ -493,24 +498,26 @@ class IngestionEngineV2:
 
     def _fallback_next_question(self, missing_fields: list[str], profile: dict) -> str:
         missing = set(missing_fields or [])
+        # Facts first — nail identity, education, and goal basics before going deep.
         if "name" in missing:
             return "What should I call you?"
-        if "personal_introduction" in missing:
-            return "Tell me a bit about yourself — who you are, what you have studied or worked on, and why you are here."
         if "education_stage" in missing:
-            return "What is your current stage: school, college, dropped out, graduated, working, or something else?"
+            return "What are you currently doing — school, college, graduated, or working — and if studying, which course and year?"
         if "target_role" in missing or "goal_direction" in missing:
             return "What role or field do you want to work toward — even a rough direction is fine?"
-        if "joining_reason" in missing:
-            return "What specifically brought you to delta, and is there any deadline or urgency driving you?"
         if "skills" in missing:
             return "What tools, languages, or skills have you picked up so far, even if self-taught or just started?"
-        if "career_goals" in missing:
-            return "What is the main goal you want delta to help you reach in the next 1-2 years?"
         if "past_experience" in missing:
             return "Have you built any projects, done internships, or worked anywhere — even informally or at a small scale?"
+        if "career_goals" in missing:
+            return "What is the main goal you want delta to help you reach in the next 1-2 years?"
         if "learning_style" in missing:
             return "Do you learn best by building projects, watching videos, reading, or a mix of all?"
+        # Deeper, in-depth questions come only after the basics above.
+        if "joining_reason" in missing:
+            return "What specifically brought you to delta, and is there any deadline or urgency driving you?"
+        if "personal_introduction" in missing:
+            return "Tell me a bit more about yourself — your background and what led you here."
         if "hours_per_week" in missing:
             return "How many hours per week can you realistically dedicate to this learning path?"
         return "Is there anything else about your background, constraints, or goals that delta should know to build the right roadmap for you?"
@@ -633,9 +640,10 @@ class IngestionEngineV2:
                 "what changed, what you are aiming for now, and whether any exam, intake, or deadline is coming up."
             )
         return (
-            "Hi, I am delta's intake advisor. Before the resume, give me a small introduction in your own words: "
-            "who you are, what you have studied or worked on, why you are here, what goal or exam you are aiming for, "
-            "and any deadline, intake, family constraint, or weekly time limit I should know. After that, attach your resume if you have one."
+            "Hi, I am delta's intake advisor. Let's start with the basics: your name, what you are "
+            "currently doing (school, college, or working — and if studying, your course and year), "
+            "and the role or field you want to build toward. We will get into your background and goals "
+            "right after. If you have a resume, you can attach it anytime."
         )
 
     def process_answer(self, db: Session, user_id: str, session_id: str, answer: str) -> Dict[str, Any]:
@@ -663,6 +671,8 @@ class IngestionEngineV2:
         )
         extracted = self._safe_generate_json(EXTRACT_PROMPT.format(conversation=conv_text), conversation)
         if isinstance(extracted, dict) and extracted:
+            # Drop any exam the LLM invented but the user never named (corrupts the plan).
+            self._strip_hallucinated_exam(extracted, conversation)
             if not extracted.get("personal_introduction"):
                 first_user = next((m["content"] for m in conversation if m.get("role") == "user"), "")
                 if first_user:
@@ -711,6 +721,7 @@ class IngestionEngineV2:
                 "status": "review_required",
                 "completed": False,
                 "review_required": True,
+                "round": session.current_round,
                 "confidence_score": confidence,
                 "message": completion_msg,
                 "next_question": None,
@@ -745,10 +756,58 @@ class IngestionEngineV2:
         return {
             "status": "active",
             "completed": False,
+            "round": session.current_round,
             "confidence_score": confidence,
             "next_question": next_q,
             "message": next_q,
             "missing_fields": missing_required,
+            "profile": profile,
+        }
+
+    def edit_answer(self, db: Session, user_id: str, session_id: str, round_no: int, new_answer: str) -> Dict[str, Any]:
+        """Replace a previously-given answer (identified by its round) and re-derive
+        the profile from the corrected conversation. This corrects the transcript and
+        re-extracts fields; it does NOT re-branch the later questions that were already
+        asked. The final review screen lets the user fix anything else."""
+        session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        conversation = json.loads(session.conversation_log or "[]")
+        replaced = False
+        for m in conversation:
+            if m.get("role") == "user" and m.get("round") == round_no:
+                m["content"] = new_answer
+                replaced = True
+                break
+        if not replaced:
+            raise ValueError(f"No answer found for round {round_no}")
+
+        conv_text = "\n".join(
+            f"{'Advisor' if m['role'] == 'assistant' else 'User'}: {m['content']}"
+            for m in conversation if m.get("role") in ("assistant", "user")
+        )
+        extracted = self._safe_generate_json(EXTRACT_PROMPT.format(conversation=conv_text), conversation)
+        if isinstance(extracted, dict) and extracted:
+            self._strip_hallucinated_exam(extracted, conversation)
+            profile_after_save = save_profile(user_id, extracted)
+            self._enrich_profile_context(user_id, profile_after_save)
+
+        session.conversation_log = json.dumps(conversation)
+        profile = load_profile(user_id)
+        profile = self._fill_flexible_defaults(user_id, profile)
+        filled_required = [f for f in PROFILE_REVIEW_FIELDS if profile.get(f)]
+        _, confidence, missing = self._review_readiness(profile, session.current_round)
+        session.confidence_score = confidence
+        session.gaps_filled = len(filled_required)
+        db.commit()
+
+        return {
+            "status": "edited",
+            "round": round_no,
+            "confidence_score": confidence,
+            "filled_fields": filled_required,
+            "missing_fields": missing,
             "profile": profile,
         }
 
@@ -916,8 +975,9 @@ Return ONLY the JSON object."""
                             profile_context=profile_ctx,
                             missing_fields=", ".join(missing) or "none",
                             conversation="\n".join(
-                                f"{'Advisor' if m['role'] == 'assistant' else 'User'}: {m['content']}"
-                                for m in conv if m["role"] in ("assistant", "user")
+                                (m['content'] if m['role'] == 'system_note'
+                                 else f"{'Advisor' if m['role'] == 'assistant' else 'User'}: {m['content']}")
+                                for m in conv if m["role"] in ("assistant", "user", "system_note")
                             )[-2000:]
                         ),
                         self._fallback_next_question(missing, profile),

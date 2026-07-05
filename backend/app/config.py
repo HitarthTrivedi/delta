@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY_4: str = os.getenv("GEMINI_API_KEY_4", "")
     GEMINI_API_KEY_5: str = os.getenv("GEMINI_API_KEY_5", "")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     SERPER_API_KEY: str = os.getenv("SERPER_API_KEY", "")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
