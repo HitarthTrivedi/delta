@@ -330,11 +330,13 @@ def sanitize_llm_json_text(text: str) -> str:
     return re.sub(r"\\(?=[A-Za-z]{2,})", r"\\\\", text)
 
 
-def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None) -> dict | list:
+def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None, max_tokens: int = 10000) -> dict | list:
     """
     Generate a JSON response. Strips markdown fences and parses automatically.
+    Small JSON payloads (e.g. intent routing) should pass a low max_tokens so the
+    request reserves fewer tokens against tight free-tier per-minute budgets.
     """
-    raw = generate_response(prompt, temperature=temperature, model=model)
+    raw = generate_response(prompt, temperature=temperature, model=model, max_tokens=max_tokens)
 
     clean = raw
     if "```json" in clean:

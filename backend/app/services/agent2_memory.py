@@ -209,10 +209,12 @@ def memory_context_text(user_id: str) -> str:
         f"- {task.get('title') or task.get('skill')}: {task.get('description') or task.get('detail') or ''}"
         for task in tasks
     ]
+    # Keep only the last few turns, each trimmed — enough for continuity without
+    # ballooning the prompt (the full history bloats the request past free-tier limits).
     turn_lines = []
-    for turn in recent_turns[-12:]:
-        turn_lines.append(f"User: {turn.get('user_message', '')[:300]}")
-        turn_lines.append(f"Agent: {turn.get('assistant_response', '')[:400]}")
+    for turn in recent_turns[-5:]:
+        turn_lines.append(f"User: {turn.get('user_message', '')[:240]}")
+        turn_lines.append(f"Agent: {turn.get('assistant_response', '')[:320]}")
 
     parts = [
         "Agent 2 persistent memory:",

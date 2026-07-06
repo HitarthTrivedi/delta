@@ -220,3 +220,44 @@ def profile_as_context_string(user_id: str) -> str:
     if p.get("resume_text"):
         lines.append(f"\n--- Resume Extract ---\n{p['resume_text'][:2000]}\n--- End Resume ---")
     return "\n".join(lines)
+
+
+def profile_as_compact_context(user_id: str, max_chars: int = 1200) -> str:
+    """A tight, point-wise profile for prompts on tight token budgets (Agent 2 chat).
+
+    Unlike profile_as_context_string, this emits ONLY fields that actually have a
+    value — dropping the "Not specified" noise and the multi-KB resume dump — so the
+    request stays small without losing the facts the coach needs to answer well.
+    """
+    p = load_profile(user_id)
+    if not p:
+        return ""
+
+    def val(x):
+        if x is None:
+            return ""
+        if isinstance(x, list):
+            return ", ".join(str(i).strip() for i in x if str(i).strip())
+        s = str(x).strip()
+        return "" if s.lower() in {"", "not specified", "none", "unknown", "n/a"} else s
+
+    fields = [
+        ("Name", p.get("name")),
+        ("Target role", p.get("target_role") or p.get("goal_direction")),
+        ("Goal/exam track", p.get("detected_goal_track") or p.get("target_exam")),
+        ("Exam detail", p.get("exam_goal_detail")),
+        ("Education stage", p.get("education_stage")),
+        ("Major", p.get("major")),
+        ("Year of study", p.get("study_year")),
+        ("Experience level", p.get("experience_level")),
+        ("Past experience", p.get("past_experience")),
+        ("Projects", p.get("projects")),
+        ("Skills", p.get("skills")),
+        ("Hours/week", p.get("hours_per_week")),
+        ("Learning style", p.get("learning_style")),
+        ("Target industries", p.get("target_industries")),
+        ("Career goals", p.get("career_goals")),
+        ("Planning horizon (months)", p.get("planning_horizon_months")),
+    ]
+    lines = [f"- {label}: {val(v)}" for label, v in fields if val(v)]
+    return "\n".join(lines)[:max_chars]

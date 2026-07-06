@@ -28,7 +28,7 @@ from app.services.central_engine import (
     serialize_journey_event,
 )
 from app.services.onboarding_pipeline import finalize_onboarding, start_onboarding
-from app.services.profile_store import profile_as_context_string, load_profile
+from app.services.profile_store import profile_as_context_string, profile_as_compact_context, load_profile
 from app.services.agent2_memory import (
     append_chat_turn,
     append_progress_event,
@@ -661,7 +661,9 @@ Meaning of each action:
 Return only the JSON object."""
     try:
         from app.services.ai_service import generate_json, FAST_MODEL
-        result = generate_json(prompt, temperature=0.1, model=FAST_MODEL)
+        # The intent decision is a tiny JSON object — cap output low so the request
+        # stays well under the fast model's small per-minute token budget (avoids 413).
+        result = generate_json(prompt, temperature=0.1, model=FAST_MODEL, max_tokens=300)
         if isinstance(result, dict) and result.get("action") in _ACTION_TO_INTENT:
             return result
     except Exception as exc:
@@ -969,12 +971,16 @@ def chat_message(
         sync_current_week(data.user_id, career_context, current_actions, reason="Agent 2 chat loaded current week.")
 
     skills_context = ", ".join([f"{s.name} ({s.proficiency}/10)" for s in skills]) if skills else "No skills yet"
-    profile_context = profile_as_context_string(data.user_id)
-    persistent_context = memory_context_text(data.user_id)
-    context_json = json.dumps(career_context, default=str)[:8000]
+    # Compact, point-wise context blocks with hard budgets — the full profile dump +
+    # 12-turn history + raw career JSON blow the request past free-tier token limits
+    # (the 413 the user hit). Summarised context keeps requests small and fast without
+    # losing the facts the coach needs, so answers stay detailed and grounded.
+    profile_context = profile_as_compact_context(data.user_id)
+    persistent_context = memory_context_text(data.user_id)[:1800]
+    context_json = json.dumps(career_context, default=str)[:2500]
     from app.services.user_context_store import read_current_week_context, read_profile_doc
-    user_instructions_ctx = read_current_week_context(data.user_id) if is_weekly_agent else ""
-    user_profile_doc = read_profile_doc(data.user_id) if is_weekly_agent else ""
+    user_instructions_ctx = (read_current_week_context(data.user_id)[:800] if is_weekly_agent else "")
+    user_profile_doc = (read_profile_doc(data.user_id)[:800] if is_weekly_agent else "")
 
     try:
         from app.services.ai_service import generate_response, quality_model
@@ -1440,10 +1446,10 @@ def chat_stream(
         career_context = {}
 
     skills_context = ", ".join([f"{s.name} ({s.proficiency}/10)" for s in skills]) if skills else "No skills yet"
-    profile_context = profile_as_context_string(data.user_id)
-    persistent_context = memory_context_text(data.user_id)
+    profile_context = profile_as_compact_context(data.user_id)
+    persistent_context = memory_context_text(data.user_id)[:1800]
     date_context = _date_context_text(_parse_date_reference(data.message))
-    context_json = json.dumps(career_context, default=str)[:8000]
+    context_json = json.dumps(career_context, default=str)[:2500]
 
     # Same persona/prompt as the non-weekly branch of /message.
     role_prompt = """You are delta, the central AI assistant inside a personalized Career OS.
