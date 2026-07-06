@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.services.central_engine import (
     compile_career_context,
+    evaluate_week_status,
     initialize_career_os_for_user,
     log_journey_event,
     refresh_roadmap_with_ai,
@@ -30,6 +31,7 @@ from app.services.central_engine import (
 )
 from app.services.domain_packs import get_domain_pack, list_domain_packs
 from app.services.agent2_memory import append_progress_event
+from app.services.day_planner import build_day_plan
 
 router = APIRouter(prefix="/api/career-os", tags=["career-os"])
 
@@ -260,4 +262,112 @@ def update_weekly_tasks(user_id: str, payload: WeeklyTasksUpdate, db: Session = 
     except Exception as exc:
         db.rollback()
         _log.error("update_weekly_tasks failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── Day-wise planning ─────────────────────────────────────────────────────────
+
+def _current_actions(roadmap: RoadmapState) -> list[dict]:
+    weekly_focus = json.loads(roadmap.weekly_focus) if roadmap.weekly_focus else {}
+    return weekly_focus.get("primary_actions") or []
+
+
+def _week_signature(actions: list[dict]) -> str:
+    """Stable fingerprint of the week's tasks — used to detect a stale day-plan cache."""
+    ids = sorted(str(a.get("id") or a.get("title") or "") for a in actions)
+    return "|".join(ids)
+
+
+def _generate_day_plan(db: Session, roadmap: RoadmapState, user_id: str) -> dict:
+    user = db.query(User).filter(User.id == user_id).first()
+    status = evaluate_week_status(db, user, roadmap)
+    actions = _current_actions(roadmap)
+    day_schedule = json.loads(roadmap.day_schedule) if roadmap.day_schedule else {}
+    plan = build_day_plan(actions, day_schedule, status["week_start"])
+    plan["week_signature"] = _week_signature(actions)
+    return plan
+
+
+class PlanStyleUpdate(BaseModel):
+    plan_style: str = Field(..., examples=["week", "day"])
+    day_schedule: dict | None = None
+
+
+@router.put("/user/{user_id}/plan-style")
+def set_plan_style(user_id: str, payload: PlanStyleUpdate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    """Set week/day plan style. When switching to 'day', persist the schedule and
+    generate the 7-day distribution."""
+    roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="No roadmap found for user.")
+    try:
+        style = "day" if payload.plan_style == "day" else "week"
+        roadmap.plan_style = style
+        if payload.day_schedule is not None:
+            roadmap.day_schedule = json.dumps(payload.day_schedule)
+        day_plan = None
+        if style == "day":
+            day_plan = _generate_day_plan(db, roadmap, user_id)
+            roadmap.day_plan = json.dumps(day_plan)
+        db.commit()
+        return {"status": "saved", "plan_style": style, "day_plan": day_plan}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        _log.error("set_plan_style failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/user/{user_id}/day-plan")
+def get_day_plan(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    """Return the current week's day plan, regenerating it if the week's tasks changed."""
+    roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="No roadmap found for user.")
+    try:
+        cached = json.loads(roadmap.day_plan) if roadmap.day_plan else None
+        signature = _week_signature(_current_actions(roadmap))
+        if not cached or cached.get("week_signature") != signature:
+            cached = _generate_day_plan(db, roadmap, user_id)
+            roadmap.day_plan = json.dumps(cached)
+            db.commit()
+        return {
+            "plan_style": roadmap.plan_style or "week",
+            "day_schedule": json.loads(roadmap.day_schedule) if roadmap.day_schedule else None,
+            "day_plan": cached,
+        }
+    except Exception as exc:
+        db.rollback()
+        _log.error("get_day_plan failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class AdvanceExpiredRequest(BaseModel):
+    carried_task_ids: list[str] = Field(default_factory=list)
+
+
+@router.post("/user/{user_id}/advance-expired-week")
+def advance_expired_week(user_id: str, payload: AdvanceExpiredRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    """Auto-replan a week whose 7-day window lapsed with tasks unfinished, carrying
+    over the unfinished tasks the user chose to keep."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+    status = evaluate_week_status(db, user, roadmap)
+    if not status["expired"]:
+        raise HTTPException(status_code=400, detail="This week has not expired yet.")
+    keep = {str(t).strip().lower() for t in payload.carried_task_ids}
+    carried = [
+        a for a in status["incomplete_actions"]
+        if str(a.get("id") or "").strip().lower() in keep
+        or str(a.get("title") or "").strip().lower() in keep
+    ]
+    try:
+        return run_weekly_career_cycle(db, user_id, bypass_gate=True, carried_actions=carried)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        _log.error("advance_expired_week failed for %s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

@@ -1106,36 +1106,40 @@ def initialize_career_os_for_user(
     }
 
 
-def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise ValueError("User not found")
+def evaluate_week_status(db: Session, user: User, roadmap: "RoadmapState | None") -> dict:
+    """Single source of truth for 'where is this week': its number, start time,
+    which tasks are done/skipped, which remain, and whether the 7-day window has
+    lapsed with work still unfinished (an expired week that should auto-replan).
 
-    roadmap_before = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
-    valid_cycles = _valid_weekly_cycle_events(db, user_id)
-    if user.created_at:
-        now = datetime.datetime.utcnow()
-        elapsed_days = (now - user.created_at).days
-        week_number = max(1, (elapsed_days // 7) + 1)
-        current_week_start = user.created_at + datetime.timedelta(days=(week_number - 1) * 7)
-    else:
-        # Treat account as started yesterday so the time gate doesn't permanently block
-        current_week_start = datetime.datetime.utcnow() - datetime.timedelta(days=1)
-    current_actions = []
-    if roadmap_before:
-        current_actions = (_as_json(roadmap_before.weekly_focus, {}) or {}).get("primary_actions") or []
-    def _normalize(s: str) -> str:
+    Reused by run_weekly_career_cycle (completion gate) and compile_career_context
+    (to flag an expired week to the frontend so it can prompt for carry-over)."""
+    def _normalize(s) -> str:
         return str(s).strip().lower()
 
+    now = datetime.datetime.utcnow()
+    if user.created_at:
+        elapsed_days = (now - user.created_at).days
+        weeks_elapsed = elapsed_days // 7
+        week_number = max(1, weeks_elapsed + 1)
+        week_start = user.created_at + datetime.timedelta(days=(week_number - 1) * 7)
+    else:
+        # Treat account as started yesterday so the time gate doesn't permanently block.
+        weeks_elapsed = 0
+        week_number = 1
+        week_start = now - datetime.timedelta(days=1)
+
+    current_actions = []
+    if roadmap:
+        current_actions = (_as_json(roadmap.weekly_focus, {}) or {}).get("primary_actions") or []
     expected_ids = {
         _normalize(action.get("id") or action.get("title"))
         for action in current_actions
         if action.get("id") or action.get("title")
     }
     task_events = db.query(JourneyEvent).filter(
-        JourneyEvent.user_id == user_id,
+        JourneyEvent.user_id == user.id,
         JourneyEvent.event_type.in_(["weekly_task_completed", "weekly_task_reopened", "weekly_task_skipped"]),
-        JourneyEvent.created_at >= current_week_start
+        JourneyEvent.created_at >= week_start,
     ).order_by(JourneyEvent.created_at.asc()).all()
     latest_task_state = {}
     for event in task_events:
@@ -1147,21 +1151,70 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         for task_id, event_type in latest_task_state.items()
         if event_type in {"weekly_task_completed", "weekly_task_skipped"}
     }
+    incomplete_actions = [
+        action for action in current_actions
+        if _normalize(action.get("id") or action.get("title")) not in accepted_ids
+        and (action.get("id") or action.get("title"))
+    ]
+    # A week is "expired" when more 7-day windows have elapsed than the user has
+    # advanced through (weekly_cycle_completed events) AND tasks are still unfinished.
+    # The time-derived week_start always tracks the current window, so we compare
+    # weeks-elapsed against cycles-completed rather than a raw age of the week.
+    cycles_completed = db.query(JourneyEvent).filter(
+        JourneyEvent.user_id == user.id,
+        JourneyEvent.event_type == "weekly_cycle_completed",
+    ).count()
+    expired = bool(incomplete_actions) and weeks_elapsed > cycles_completed
+    return {
+        "week_number": week_number,
+        "week_start": week_start,
+        "current_actions": current_actions,
+        "expected_ids": expected_ids,
+        "accepted_ids": accepted_ids,
+        "latest_task_state": latest_task_state,
+        "incomplete_actions": incomplete_actions,
+        "expired": expired,
+    }
+
+
+def run_weekly_career_cycle(
+    db: Session, user_id: str,
+    bypass_gate: bool = False,
+    carried_actions: list | None = None,
+) -> dict:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise ValueError("User not found")
+
+    roadmap_before = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+    valid_cycles = _valid_weekly_cycle_events(db, user_id)
+    status = evaluate_week_status(db, user, roadmap_before)
+    week_number = status["week_number"]
+    current_week_start = status["week_start"]
+    current_actions = status["current_actions"]
+    expected_ids = status["expected_ids"]
+    accepted_ids = status["accepted_ids"]
+    latest_task_state = status["latest_task_state"]
+    def _normalize(s) -> str:
+        return str(s).strip().lower()
 
     import os as _os
     dev_mode = _os.getenv("DEV_MODE", "false").lower() in {"true", "1", "yes"}
 
-    # Completion gate: require the current tasks to be finished/skipped before advancing.
-    # Skipped in DEV_MODE so the plan can be iterated freely during testing.
-    if not dev_mode and expected_ids and not expected_ids.issubset(accepted_ids):
-        remaining = len(expected_ids - accepted_ids)
-        raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
+    # Completion + min-time gates are skipped when bypass_gate is set — used when
+    # the 7-day window has already lapsed with tasks unfinished (an expired week
+    # the user has chosen to move on from after answering the carry-over prompt).
+    if not dev_mode and not bypass_gate:
+        # Completion gate: require the current tasks to be finished/skipped before advancing.
+        if expected_ids and not expected_ids.issubset(accepted_ids):
+            remaining = len(expected_ids - accepted_ids)
+            raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
 
-    elapsed_seconds = (datetime.datetime.utcnow() - current_week_start).total_seconds()
-    minimum_seconds = max(30, len(expected_ids or accepted_ids or [1]) * 60)
-    if not dev_mode and elapsed_seconds < minimum_seconds:
-        minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
-        raise ValueError(f"Please wait about {minutes} more minute(s) before requesting the next week.")
+        elapsed_seconds = (datetime.datetime.utcnow() - current_week_start).total_seconds()
+        minimum_seconds = max(30, len(expected_ids or accepted_ids or [1]) * 60)
+        if elapsed_seconds < minimum_seconds:
+            minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
+            raise ValueError(f"Please wait about {minutes} more minute(s) before requesting the next week.")
 
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
 
@@ -1241,6 +1294,24 @@ def run_weekly_career_cycle(db: Session, user_id: str) -> dict:
         onboarding_profile=onboarding_profile,
         recent_events=recent_events_summary,
     )
+
+    # Carry-over: pin unfinished tasks the user chose to keep into the fresh week,
+    # ahead of the newly generated ones (deduped + capped to the week's capacity).
+    if carried_actions:
+        weekly_focus = _as_json(roadmap.weekly_focus, {}) or {}
+        weekly_focus["primary_actions"] = _merge_capped_actions(
+            carried_actions,
+            weekly_focus.get("primary_actions") or [],
+            cap=_capacity_based_task_cap(user, onboarding_profile or {}),
+        )
+        weekly_focus["carried_over"] = [a.get("title") for a in carried_actions if a.get("title")]
+        roadmap.weekly_focus = _dump(weekly_focus)
+        roadmap.last_replanned_reason = (
+            f"Auto-replanned an expired week; carried over {len(carried_actions)} unfinished task(s)."
+        )
+        db.commit()
+        db.refresh(roadmap)
+
     event = log_journey_event(
         db=db,
         user_id=user_id,
@@ -1384,15 +1455,10 @@ def compile_career_context(db: Session, user_id: str, background_tasks=None) -> 
     # ── Also attach raw profile so frontend can display intake completeness ──
     profile_data = profile
 
-    # ── Calculate active week number and start time solely based on user start time ──
-    if user.created_at:
-        now = datetime.datetime.utcnow()
-        elapsed_days = (now - user.created_at).days
-        week_number = max(1, (elapsed_days // 7) + 1)
-        current_week_start = user.created_at + datetime.timedelta(days=(week_number - 1) * 7)
-    else:
-        week_number = 1
-        current_week_start = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+    # ── Active week number, start time, and expiry status (shared helper) ──
+    week_status = evaluate_week_status(db, user, roadmap)
+    week_number = week_status["week_number"]
+    current_week_start = week_status["week_start"]
 
     progress_summary = build_progress_summary(db, user_id, valid_cycles, current_week_start)
     context = {
@@ -1411,6 +1477,11 @@ def compile_career_context(db: Session, user_id: str, background_tasks=None) -> 
         "week_number": week_number,
         "current_week_started_at": current_week_start,
         "progress_summary": progress_summary,
+        # Day-wise planning + expired-week carry-over signals for the frontend.
+        "plan_style": (roadmap.plan_style if roadmap else None) or "week",
+        "day_schedule": _as_json(roadmap.day_schedule, None) if roadmap else None,
+        "week_expired": week_status["expired"],
+        "expired_incomplete_tasks": week_status["incomplete_actions"] if week_status["expired"] else [],
     }
     # The agent2 memory syncs each read + rewrite the whole agent2_memory_data
     # JSON blob (4 extra DB round trips). Callers on a read path (the context

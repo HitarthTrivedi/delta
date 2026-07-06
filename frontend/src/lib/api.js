@@ -204,6 +204,9 @@ export const careerOSAPI = {
   getContextDocs: (userId) => api.get(`/career-os/user/${userId}/context-docs`).then(r => r.data),
   updateContextDocs: (userId, data) => api.put(`/career-os/user/${userId}/context-docs`, data).then(r => r.data),
   updateWeeklyTasks: (userId, tasks) => api.put(`/career-os/user/${userId}/weekly-tasks`, { tasks }).then(r => r.data),
+  setPlanStyle: (userId, planStyle, daySchedule) => api.put(`/career-os/user/${userId}/plan-style`, { plan_style: planStyle, day_schedule: daySchedule }, { timeout: 120000 }).then(r => r.data),
+  getDayPlan: (userId) => api.get(`/career-os/user/${userId}/day-plan`, { timeout: 120000 }).then(r => r.data),
+  advanceExpiredWeek: (userId, carriedTaskIds) => api.post(`/career-os/user/${userId}/advance-expired-week`, { carried_task_ids: carriedTaskIds }, { timeout: 300000 }).then(r => r.data),
 };
 
 // ── Opportunities API (AI-matched jobs & internships) ──

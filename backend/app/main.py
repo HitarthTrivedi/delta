@@ -101,10 +101,18 @@ def startup():
                 conn.execute(text("SET LOCAL statement_timeout = '30s'"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_data TEXT"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS agent2_memory_data TEXT"))
+                conn.execute(text("ALTER TABLE roadmap_states ADD COLUMN IF NOT EXISTS plan_style TEXT"))
+                conn.execute(text("ALTER TABLE roadmap_states ADD COLUMN IF NOT EXISTS day_schedule TEXT"))
+                conn.execute(text("ALTER TABLE roadmap_states ADD COLUMN IF NOT EXISTS day_plan TEXT"))
             else:
                 for col in ("profile_data", "agent2_memory_data"):
                     try:
                         conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} TEXT"))
+                    except Exception:
+                        pass
+                for col in ("plan_style", "day_schedule", "day_plan"):
+                    try:
+                        conn.execute(text(f"ALTER TABLE roadmap_states ADD COLUMN {col} TEXT"))
                     except Exception:
                         pass
             conn.commit()

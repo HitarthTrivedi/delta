@@ -34,6 +34,149 @@ const SUGGESTIONS = [
   'What should I focus on first this week?',
 ];
 
+const DAYS = [
+  { key: 'mon', label: 'Mon' }, { key: 'tue', label: 'Tue' }, { key: 'wed', label: 'Wed' },
+  { key: 'thu', label: 'Thu' }, { key: 'fri', label: 'Fri' }, { key: 'sat', label: 'Sat' }, { key: 'sun', label: 'Sun' },
+];
+
+// One-question-at-a-time wizard that collects a user's weekly availability, fixed
+// commitments, and personal recurring tasks — then hands the schedule to the parent.
+function ScheduleWizard({ initial, onSubmit, onCancel }) {
+  const [step, setStep] = useState(0);
+  const [hours, setHours] = useState(() => {
+    const h = {}; DAYS.forEach(d => { h[d.key] = (initial?.per_day_hours?.[d.key] ?? '') === '' ? '' : String(initial.per_day_hours[d.key]); });
+    return h;
+  });
+  const [fixed, setFixed] = useState(initial?.fixed || []);
+  const [recurring, setRecurring] = useState(initial?.recurring || []);
+  const [fixedLabel, setFixedLabel] = useState('');
+  const [fixedDays, setFixedDays] = useState([]);
+  const [recLabel, setRecLabel] = useState('');
+  const [recCadence, setRecCadence] = useState('');
+
+  const inputStyle = { width: '100%', background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: '10px 12px', fontSize: 14, color: 'var(--ink)' };
+  const chip = (active) => ({ padding: '6px 10px', border: '1px solid var(--rule)', borderRadius: 0, cursor: 'pointer', fontSize: 12, fontWeight: 650, background: active ? 'var(--ink)' : 'var(--paper)', color: active ? 'var(--bone)' : 'var(--ink)' });
+
+  const submit = () => {
+    const per_day_hours = {};
+    DAYS.forEach(d => { const v = parseFloat(hours[d.key]); if (!Number.isNaN(v)) per_day_hours[d.key] = v; });
+    onSubmit({ per_day_hours, fixed, recurring });
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+      <div style={{ ...panelStyle, background: 'var(--bone)', padding: 24, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-soft)', fontWeight: 650 }}>Day-wise setup · Question {step + 1} of 3</p>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)' }}><X size={18} /></button>
+        </div>
+
+        {step === 0 && (
+          <div>
+            <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>How many focused hours can you give each day?</h2>
+            <p style={{ margin: '0 0 16px', color: 'var(--ink-soft)', fontSize: 13 }}>Leave a day blank or 0 if it's fully taken by college/work — Delta will keep it light or free.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 8 }}>
+              {DAYS.map(d => (
+                <label key={d.key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-soft)' }}>
+                  {d.label}
+                  <input type="number" min="0" max="16" step="0.5" value={hours[d.key]}
+                    onChange={e => setHours(prev => ({ ...prev, [d.key]: e.target.value }))} style={inputStyle} placeholder="h" />
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div>
+            <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>Any fixed commitments?</h2>
+            <p style={{ margin: '0 0 16px', color: 'var(--ink-soft)', fontSize: 13 }}>College, a job, anything you must do on certain days. Add each and pick its days.</p>
+            {fixed.map((f, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '8px 10px', border: '1px solid var(--rule)', marginBottom: 6 }}>
+                <span style={{ fontSize: 13 }}>{f.label} <span style={{ color: 'var(--ink-soft)' }}>· {(f.days || []).join(', ') || 'all days'}</span></span>
+                <button onClick={() => setFixed(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)' }}><Trash2 size={14} /></button>
+              </div>
+            ))}
+            <input value={fixedLabel} onChange={e => setFixedLabel(e.target.value)} placeholder="e.g. College 9-5" style={{ ...inputStyle, marginBottom: 8 }} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {DAYS.map(d => (
+                <span key={d.key} onClick={() => setFixedDays(prev => prev.includes(d.key) ? prev.filter(x => x !== d.key) : [...prev, d.key])} style={chip(fixedDays.includes(d.key))}>{d.label}</span>
+              ))}
+            </div>
+            <button onClick={() => { if (fixedLabel.trim()) { setFixed(prev => [...prev, { label: fixedLabel.trim(), days: fixedDays }]); setFixedLabel(''); setFixedDays([]); } }}
+              style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '8px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={14} /> Add commitment
+            </button>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div>
+            <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>Personal tasks Delta should remind you of?</h2>
+            <p style={{ margin: '0 0 16px', color: 'var(--ink-soft)', fontSize: 13 }}>Things outside Delta's tasks — German classes, a side project. Add a name and when (e.g. "Mon/Wed" or "daily").</p>
+            {recurring.map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '8px 10px', border: '1px solid var(--rule)', marginBottom: 6 }}>
+                <span style={{ fontSize: 13 }}>{r.label} <span style={{ color: 'var(--ink-soft)' }}>· {r.cadence || 'as scheduled'}</span></span>
+                <button onClick={() => setRecurring(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)' }}><Trash2 size={14} /></button>
+              </div>
+            ))}
+            <input value={recLabel} onChange={e => setRecLabel(e.target.value)} placeholder="e.g. German class" style={{ ...inputStyle, marginBottom: 8 }} />
+            <input value={recCadence} onChange={e => setRecCadence(e.target.value)} placeholder="e.g. Mon/Wed  or  daily" style={{ ...inputStyle, marginBottom: 8 }} />
+            <button onClick={() => { if (recLabel.trim()) { setRecurring(prev => [...prev, { label: recLabel.trim(), cadence: recCadence.trim() }]); setRecLabel(''); setRecCadence(''); } }}
+              style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '8px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Plus size={14} /> Add reminder
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 24 }}>
+          <button onClick={() => (step === 0 ? onCancel() : setStep(step - 1))}
+            style={{ background: 'var(--paper)', border: '1px solid var(--rule)', padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 650 }}>
+            {step === 0 ? 'Cancel' : 'Back'}
+          </button>
+          <button onClick={() => (step === 2 ? submit() : setStep(step + 1))}
+            style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+            {step === 2 ? 'Build my day plan' : 'Next'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Read-only 7-day board showing when each Delta task slice + personal reminder falls.
+function DayBoard({ dayPlan, loading }) {
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 16, color: 'var(--ink-soft)' }}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Building your day-by-day plan…</div>;
+  }
+  const days = dayPlan?.days || [];
+  if (!days.length) return <p style={{ color: 'var(--ink-soft)', fontSize: 14 }}>No day plan yet.</p>;
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {days.map(day => (
+        <div key={day.date} style={{ border: '1px solid var(--rule)', borderRadius: 0, padding: 14, background: day.is_free ? 'var(--accent-surface)' : 'var(--paper)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <strong style={{ fontSize: 14 }}>{day.label}</strong>
+            <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{day.date}{day.is_free ? ' · Free day' : ''}</span>
+          </div>
+          {day.focus && <p style={{ margin: '0 0 8px', fontSize: 12, fontStyle: 'italic', color: 'var(--ink-soft)' }}>{day.focus}</p>}
+          {(day.delta_tasks || []).map((t, i) => (
+            <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+              <span style={{ fontWeight: 650 }}>{t.title}</span>
+              {t.note && t.note !== t.title && <span style={{ color: 'var(--ink-soft)' }}> — {t.note}</span>}
+            </div>
+          ))}
+          {(day.personal || []).map((p, i) => (
+            <div key={`p${i}`} style={{ fontSize: 12, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <Bell size={12} /> {p}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function WeeklyPlan() {
   const userId = useAuthStore((state) => state.userId);
   const queryClient = useQueryClient();
@@ -79,6 +222,15 @@ export default function WeeklyPlan() {
   // Skip dialog
   const [skipDialog, setSkipDialog] = useState(null); // {action, index}
 
+  // Day-wise planning
+  const [planStyle, setPlanStyle] = useState('week');
+  const [dayPlan, setDayPlan] = useState(null);
+  const [dayLoading, setDayLoading] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  // Expired-week carry-over
+  const [expiredOpen, setExpiredOpen] = useState(false);
+  const [carrySel, setCarrySel] = useState({}); // task id/title -> keep?
+
   const bottomRef = useRef(null);
 
   const loadContext = useCallback(async (regenerate = false) => {
@@ -90,6 +242,13 @@ export default function WeeklyPlan() {
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
+      setPlanStyle(data?.plan_style || 'week');
+      if (data?.week_expired && (data?.expired_incomplete_tasks || []).length) {
+        const sel = {};
+        (data.expired_incomplete_tasks || []).forEach(t => { sel[t.id || t.title] = true; });
+        setCarrySel(sel);
+        setExpiredOpen(true);
+      }
       if (regenerate) toast.success('Agent 2 loaded your first weekly plan.');
     } catch (err) {
       console.error(err);
@@ -144,6 +303,75 @@ export default function WeeklyPlan() {
   const actions = useMemo(() => getTaskProgress(context, fallbackActions).actions, [context]);
 
   useReminder(actions, checked);
+
+  // Signature of this week's tasks — refetch the day plan when the tasks change.
+  const weekSig = useMemo(() => actions.map(a => a.id || a.title).join('|'), [actions]);
+
+  useEffect(() => {
+    if (!userId || planStyle !== 'day') return;
+    let cancelled = false;
+    setDayLoading(true);
+    careerOSAPI.getDayPlan(userId)
+      .then(d => { if (!cancelled) setDayPlan(d?.day_plan || null); })
+      .catch(() => { if (!cancelled) toast.error('Could not load your day plan.'); })
+      .finally(() => { if (!cancelled) setDayLoading(false); });
+    return () => { cancelled = true; };
+  }, [userId, planStyle, weekSig]);
+
+  const handleSelectPlanStyle = async (style) => {
+    if (style === planStyle) return;
+    if (style === 'day' && !context?.day_schedule) {
+      setScheduleOpen(true);
+      return;
+    }
+    setPlanStyle(style);
+    try {
+      const r = await careerOSAPI.setPlanStyle(userId, style, style === 'day' ? context?.day_schedule : undefined);
+      if (style === 'day') setDayPlan(r?.day_plan || null);
+      setContext(prev => ({ ...prev, plan_style: style }));
+    } catch {
+      toast.error('Could not switch plan style.');
+      setPlanStyle(planStyle);
+    }
+  };
+
+  const submitSchedule = async (schedule) => {
+    setScheduleOpen(false);
+    setDayLoading(true);
+    setPlanStyle('day');
+    try {
+      const r = await careerOSAPI.setPlanStyle(userId, 'day', schedule);
+      setDayPlan(r?.day_plan || null);
+      setContext(prev => ({ ...prev, plan_style: 'day', day_schedule: schedule }));
+      toast.success('Day-wise plan created.');
+    } catch {
+      toast.error('Could not build the day plan.');
+      setPlanStyle('week');
+    } finally {
+      setDayLoading(false);
+    }
+  };
+
+  const submitCarryOver = async (idsOverride) => {
+    const ids = idsOverride || Object.keys(carrySel).filter(k => carrySel[k]);
+    setExpiredOpen(false);
+    setAdvancing(true);
+    try {
+      const data = await careerOSAPI.advanceExpiredWeek(userId, ids);
+      setContext(data);
+      seedCareerContext(queryClient, userId, data);
+      const progress = getTaskProgress(data, fallbackActions);
+      setChecked(progress.checkedByIndex);
+      setSkipped(progress.skippedByIndex);
+      setPlanStyle(data?.plan_style || 'week');
+      resetAgent2Chat('New week loaded — the previous week expired. Tell me if anything has changed.');
+      toast.success('Week changed. Carried over the tasks you kept.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not change the week.');
+    } finally {
+      setAdvancing(false);
+    }
+  };
 
   const refreshWeek = async () => {
     setRefreshing(true);
@@ -484,6 +712,39 @@ export default function WeeklyPlan() {
                 </div>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* Plan style toggle */}
+        <section style={{ ...panelStyle, padding: 16, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>How do you want this week laid out?</p>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-soft)' }}>Week view lists all tasks together. Day view spreads them across your 7 days around your commitments.</p>
+          </div>
+          <div style={{ display: 'inline-flex', border: '1px solid var(--rule)' }}>
+            {[{ k: 'week', label: 'Week' }, { k: 'day', label: 'Day' }].map(opt => (
+              <button key={opt.k} onClick={() => handleSelectPlanStyle(opt.k)}
+                style={{ padding: '9px 20px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                  background: planStyle === opt.k ? 'var(--ink)' : 'var(--paper)', color: planStyle === opt.k ? 'var(--bone)' : 'var(--ink)' }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Day-by-day board */}
+        {planStyle === 'day' && (
+          <section style={{ ...panelStyle, padding: 22, marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
+              <div>
+                <h2 style={{ margin: '0 0 6px', fontSize: 22 }}>Your week, day by day</h2>
+                <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.5 }}>Delta split this week's tasks across your days. Mark them complete in the task list below.</p>
+              </div>
+              <button onClick={() => setScheduleOpen(true)} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>
+                <Pencil size={14} /> Edit schedule
+              </button>
+            </div>
+            <DayBoard dayPlan={dayPlan} loading={dayLoading} />
           </section>
         )}
 
@@ -998,6 +1259,48 @@ export default function WeeklyPlan() {
             </form>
           </div>
         </>
+      )}
+
+      {/* Day-wise schedule wizard */}
+      {scheduleOpen && (
+        <ScheduleWizard
+          initial={context?.day_schedule}
+          onSubmit={submitSchedule}
+          onCancel={() => setScheduleOpen(false)}
+        />
+      )}
+
+      {/* Expired-week carry-over prompt */}
+      {expiredOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div style={{ ...panelStyle, background: 'var(--bone)', padding: 24, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>This week's time is up</h2>
+            <p style={{ margin: '0 0 16px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.5 }}>
+              These tasks weren't marked done. Delta is moving you to a fresh week — pick any you want carried over.
+            </p>
+            <div style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
+              {(context?.expired_incomplete_tasks || []).map((t) => {
+                const key = t.id || t.title;
+                return (
+                  <label key={key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', border: '1px solid var(--rule)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!carrySel[key]} onChange={() => setCarrySel(prev => ({ ...prev, [key]: !prev[key] }))} style={{ marginTop: 3 }} />
+                    <span style={{ fontSize: 14, color: 'var(--ink)' }}>{t.title}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <button onClick={() => submitCarryOver([])}
+                style={{ background: 'var(--paper)', border: '1px solid var(--rule)', padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 650 }}>
+                Carry nothing
+              </button>
+              <button onClick={() => submitCarryOver()}
+                style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                Change my week
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`

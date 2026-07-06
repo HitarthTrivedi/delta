@@ -53,6 +53,10 @@ class RoadmapState(Base):
     resource_graph = Column(Text, nullable=True)  # JSON
     proof_requirements = Column(Text, nullable=True)  # JSON
     last_replanned_reason = Column(Text, nullable=True)
+    # Planning-style preference + day-wise scheduling (durable across weekly regen).
+    plan_style = Column(Text, nullable=True)  # "week" (default) | "day"
+    day_schedule = Column(Text, nullable=True)  # JSON: fixed commitments + personal recurring tasks
+    day_plan = Column(Text, nullable=True)  # JSON: cached 7-day distribution for the current week
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
