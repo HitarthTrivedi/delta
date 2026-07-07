@@ -162,44 +162,72 @@ const resolveTodayIndex = (days) => {
 
 const sliceKey = (t) => t.id || t.title;
 
-// Move any unfinished Delta task from a day that has already passed onto an upcoming
-// day within the same week — spreading to the least-loaded day (so free days fill
-// first). Returns a new days array if anything moved, else null (so callers can skip
-// a redundant save and avoid a re-render loop).
-const rollOverOverdue = (days, todayIndex) => {
-  const t = todayIso();
-  const copy = days.map(d => ({ ...d, delta_tasks: (d.delta_tasks || []).map(x => ({ ...x })), personal: [...(d.personal || [])] }));
-  let changed = false;
+// Coerce a personal reminder into a checkable object, dropping the legacy
+// "Free from Delta…" placeholder that older plans stored as a personal item.
+const normalizePersonal = (list) => (list || [])
+  .map(p => (typeof p === 'string' ? { label: p, done: false, kind: 'recurring' } : { done: false, kind: 'recurring', ...p }))
+  .filter(p => p.label && !/^free from delta/i.test(p.label));
 
-  const pickTarget = () => {
+// Normalize a day plan for display: (1) roll any unfinished Delta task from a day
+// that has already passed onto an upcoming day this week — least-loaded first, but
+// merging onto a day that already holds the same task; (2) de-duplicate Delta tasks
+// so the same task never appears twice on one day (e.g. after a split collapses);
+// (3) coerce personal reminders to checkable objects. Personal tasks are NEVER rolled
+// over. Returns a new days array when anything changed, else null (so callers can skip
+// a redundant save and avoid a re-render loop).
+const normalizeDayPlan = (days, todayIndex) => {
+  const t = todayIso();
+  const before = JSON.stringify(days);
+  const copy = days.map(d => ({
+    ...d,
+    delta_tasks: (d.delta_tasks || []).map(x => ({ ...x })),
+    personal: normalizePersonal(d.personal),
+  }));
+
+  const hasTask = (day, pid) => day.delta_tasks.some(y => (y.id || y.title) === pid);
+  const pickTarget = (pid) => {
     let best = todayIndex, count = Infinity;
     for (let j = todayIndex; j < copy.length; j++) {
+      if (hasTask(copy[j], pid)) return j; // merge onto a day already holding this task
       const c = copy[j].delta_tasks.length;
       if (c < count) { count = c; best = j; }
     }
     return best;
   };
 
+  // Roll unfinished tasks off past days.
   for (let i = 0; i < copy.length; i++) {
-    if (copy[i].date >= t) continue; // only days that have already passed
+    if (copy[i].date >= t) continue;
     const undone = copy[i].delta_tasks.filter(x => !x.done);
     if (!undone.length) continue;
     copy[i].delta_tasks = copy[i].delta_tasks.filter(x => x.done);
     undone.forEach(x => {
-      const target = pickTarget();
+      const pid = x.id || x.title;
+      const target = pickTarget(pid);
+      if (hasTask(copy[target], pid)) return; // already there — don't duplicate
       copy[target].delta_tasks.push({ ...x, note: `Rolled over from ${copy[i].label}`, rolled: true });
     });
-    changed = true;
   }
-  if (!changed) return null;
-  copy.forEach(d => { d.is_free = d.delta_tasks.length === 0; });
-  return copy;
+
+  // De-duplicate within every day (defensive — also cleans already-saved plans).
+  copy.forEach(d => {
+    const seen = new Set();
+    d.delta_tasks = d.delta_tasks.filter(x => {
+      const pid = x.id || x.title;
+      if (seen.has(pid)) return false;
+      seen.add(pid);
+      return true;
+    });
+    d.is_free = d.delta_tasks.length === 0;
+  });
+
+  return JSON.stringify(copy) === before ? null : copy;
 };
 
 // Single-day interactive view: shows exactly one day at a time with checkboxes,
 // defaulting to today. Unfinished tasks from past days have already been rolled
 // forward by the parent, so this only ever renders the current/selected day.
-function DayView({ dayPlan, loading, dayIndex, setDayIndex, todayIndex, actionById, onToggleSlice, askAgent2AboutTask }) {
+function DayView({ dayPlan, loading, dayIndex, setDayIndex, todayIndex, actionById, onToggleSlice, onTogglePersonal, askAgent2AboutTask }) {
   if (loading) {
     return <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 16, color: 'var(--ink-soft)' }}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Building your day-by-day plan…</div>;
   }
@@ -268,7 +296,8 @@ function DayView({ dayPlan, loading, dayIndex, setDayIndex, todayIndex, actionBy
                     {t.done && <Check size={15} />}
                   </button>
                   <div>
-                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, marginBottom: t.note && t.note !== t.title ? 4 : 0, textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
+                    <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: 0.6, padding: '2px 5px', marginBottom: 5, background: 'var(--oxblood)', color: 'var(--bone)' }}>DELTA</span>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--oxblood)', marginBottom: t.note && t.note !== t.title ? 4 : 0, textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
                     {t.note && t.note !== t.title && (
                       <span style={{ display: 'block', fontSize: 12, color: t.rolled ? 'var(--oxblood)' : 'var(--ink-soft)', marginBottom: 4 }}>{t.note}</span>
                     )}
@@ -294,12 +323,21 @@ function DayView({ dayPlan, loading, dayIndex, setDayIndex, todayIndex, actionBy
         )}
 
         {(day.personal || []).length > 0 && (
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--rule)' }}>
-            {(day.personal || []).map((p, i) => (
-              <div key={`p${i}`} style={{ fontSize: 12, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                <Bell size={12} /> {p}
-              </div>
-            ))}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--rule)' }}>
+            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Bell size={12} /> Your own tasks today
+            </p>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {(day.personal || []).map((p, i) => (
+                <button key={`p${i}`} onClick={() => onTogglePersonal(idx, i)} aria-label={p.done ? 'Mark not done' : 'Mark done'}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%', padding: '8px 10px', border: '1px solid var(--rule)', background: p.done ? 'var(--rule)' : 'var(--accent-surface)', cursor: 'pointer' }}>
+                  <span style={{ width: 20, height: 20, border: '1px solid var(--rule)', background: p.done ? 'var(--ink)' : 'transparent', color: 'var(--bone)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {p.done && <Check size={13} />}
+                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--ink)', textDecoration: p.done ? 'line-through' : 'none' }}>{p.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -456,18 +494,22 @@ export default function WeeklyPlan() {
   // Which day is "today" within this week's plan; the view defaults here.
   const todayIndex = useMemo(() => resolveTodayIndex(dayPlan?.days), [dayPlan]);
 
-  // Roll unfinished tasks from days that have already passed onto an upcoming day,
-  // then land the view on today. Runs whenever a fresh plan loads.
+  // Roll unfinished tasks off past days, de-dup, and normalize personal reminders.
   useEffect(() => {
     if (planStyle !== 'day' || !dayPlan?.days?.length) return;
-    const rolled = rollOverOverdue(dayPlan.days, todayIndex);
-    if (rolled) {
-      const next = { ...dayPlan, days: rolled };
+    const normalized = normalizeDayPlan(dayPlan.days, todayIndex);
+    if (normalized) {
+      const next = { ...dayPlan, days: normalized };
       setDayPlan(next);
       careerOSAPI.saveDayPlan(userId, next).catch(() => { /* non-fatal */ });
     }
-    setDayIndex(todayIndex);
   }, [dayPlan, planStyle, todayIndex, userId]);
+
+  // Land the view on today — only when entering day view or when the calendar day
+  // actually rolls over, NOT on every task toggle (which would snap the user back).
+  useEffect(() => {
+    if (planStyle === 'day') setDayIndex(todayIndex);
+  }, [planStyle, todayIndex]);
 
   const actionById = useCallback((key) => actions.find(a => (a.id || a.title) === key || a.title === key), [actions]);
 
@@ -507,6 +549,19 @@ export default function WeeklyPlan() {
     careerOSAPI.saveDayPlan(userId, next).catch(() => { /* non-fatal */ });
     await syncParentCompletion(days, slice);
   }, [advancing, dayPlan, userId, syncParentCompletion]);
+
+  // The user's own recurring tasks (German class, AlphaKore, …) get checkboxes purely
+  // for their own regularity. They are saved on the day plan only — never logged to the
+  // progress journal and never rolled to another day.
+  const togglePersonal = useCallback((dIdx, pIdx) => {
+    if (advancing || !dayPlan?.days) return;
+    const days = dayPlan.days.map((d, i) => i !== dIdx ? d : ({
+      ...d, personal: d.personal.map((p, j) => j !== pIdx ? p : ({ ...p, done: !p.done })),
+    }));
+    const next = { ...dayPlan, days };
+    setDayPlan(next);
+    careerOSAPI.saveDayPlan(userId, next).catch(() => { /* non-fatal */ });
+  }, [advancing, dayPlan, userId]);
 
   const handleSelectPlanStyle = async (style) => {
     if (style === planStyle) return;
@@ -971,6 +1026,7 @@ export default function WeeklyPlan() {
                 todayIndex={todayIndex}
                 actionById={actionById}
                 onToggleSlice={toggleDaySlice}
+                onTogglePersonal={togglePersonal}
                 askAgent2AboutTask={askAgent2AboutTask}
               />
             )}

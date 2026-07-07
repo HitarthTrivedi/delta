@@ -26,7 +26,6 @@ _WEEKDAY_LABEL = {
     "mon": "Monday", "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday",
     "fri": "Friday", "sat": "Saturday", "sun": "Sunday",
 }
-_FREE_NOTE = "Free from Delta tasks — use today for your own commitments."
 
 
 def _action_id(a: dict) -> str:
@@ -77,7 +76,14 @@ def _init_days(week_start: datetime.datetime, day_schedule: dict) -> list[dict]:
             "is_free": False,
         })
 
-    # Fixed commitments (college/work) and recurring personal tasks -> reminders.
+    # Fixed commitments (college/work) and recurring personal tasks become the user's
+    # OWN checkable reminders. They are never rolled over or written to the progress
+    # journal — they only ride alongside the Delta tasks so the day is a complete picture.
+    def _add_personal(day: dict, label: str, kind: str) -> None:
+        if any(p.get("label") == label for p in day["personal"]):
+            return  # de-dupe within a day
+        day["personal"].append({"label": label, "done": False, "kind": kind})
+
     for item in day_schedule.get("fixed") or []:
         label = (item.get("label") or "").strip()
         if not label:
@@ -85,18 +91,16 @@ def _init_days(week_start: datetime.datetime, day_schedule: dict) -> list[dict]:
         for key in (item.get("days") or []):
             for day in days:
                 if day["weekday"] == str(key).strip().lower():
-                    day["personal"].append(label)
+                    _add_personal(day, label, "fixed")
     for item in day_schedule.get("recurring") or []:
         label = (item.get("label") or "").strip()
         if not label:
             continue
         matched = _cadence_days(item.get("cadence") or "")
-        target = matched or [days[0]["weekday"]]  # unclear cadence -> first day
-        cadence_txt = (item.get("cadence") or "").strip()
-        note = f"{label}" + (f" ({cadence_txt})" if cadence_txt and not matched else "")
+        target = matched or list(_WEEKDAYS)  # unclear cadence -> remind every day
         for day in days:
             if day["weekday"] in target:
-                day["personal"].append(note)
+                _add_personal(day, label, "recurring")
     return days
 
 
@@ -150,7 +154,7 @@ def _llm_day_focus(days: list[dict], day_schedule: dict) -> dict:
 
     day_lines = "\n".join(
         f"{i} ({d['label']}): tasks=[{', '.join(t['title'] for t in d['delta_tasks'])}]"
-        + (f" personal=[{', '.join(d['personal'])}]" if d["personal"] else "")
+        + (f" personal=[{', '.join(p['label'] for p in d['personal'])}]" if d["personal"] else "")
         for i, d in enumerate(days) if d["delta_tasks"]
     )
     prompt = (
@@ -179,11 +183,11 @@ def _llm_day_focus(days: list[dict], day_schedule: dict) -> dict:
 
 
 def _finalize(days: list[dict]) -> None:
+    # A day with no Delta tasks is "free" — the UI renders the free-day message from
+    # this flag, so we don't inject a fake personal reminder (which used to linger even
+    # after a task rolled onto the day).
     for day in days:
-        if not day["delta_tasks"]:
-            day["is_free"] = True
-            if not day["personal"]:
-                day["personal"] = [_FREE_NOTE]
+        day["is_free"] = not day["delta_tasks"]
 
 
 def build_day_plan(week_actions: list[dict], day_schedule: dict, week_start: datetime.datetime) -> dict:
