@@ -118,6 +118,7 @@ def _assign(days: list[dict], actions: list[dict]) -> None:
             "id": action.get("id") or _action_id(action),
             "title": action.get("title") or "Task",
             "note": note,
+            "done": False,
         })
 
     for action in actions:

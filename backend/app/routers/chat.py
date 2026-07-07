@@ -694,6 +694,7 @@ def _agent2_intent(text: str) -> str:
         return "trim"
     if any(phrase in lowered for phrase in [
         "skip this task", "skip the task", "skip it", "remove this task", "remove the task",
+        "drop this task", "drop the task", "get rid of", "take it out", "take this out",
     ]):
         return "skip"
     if any(phrase in lowered for phrase in [
@@ -1089,18 +1090,37 @@ def chat_message(
                         if action.get("title", "").lower() in lowered_update or action.get("skill", "").lower() in lowered_update:
                             target = action
                             break
+                # Literally remove the task from this week's plan — not just mark it
+                # skipped. The user asked to drop it, so it should disappear from the
+                # weekly list AND the day plan (updated_actions tells the UI to re-render
+                # without it; the day plan regenerates off the new task signature).
+                target_id = str(target.get("id") or target.get("title") or "").strip().lower()
+                updated_actions = [
+                    a for a in current_actions
+                    if str(a.get("id") or a.get("title") or "").strip().lower() != target_id
+                ]
+                current_phase = _as_json(roadmap.weekly_focus, {}).get("phase_name")
+                _save_weekly_actions(db, roadmap, updated_actions, current_phase)
+                sync_current_week(data.user_id, career_context, updated_actions, reason=f"User removed task from this week: {target.get('title')}")
                 event = log_journey_event(
                     db=db,
                     user_id=data.user_id,
                     event_type="weekly_task_skipped",
-                    summary=f"Skipped Agent 2 task: {target.get('title')}",
+                    summary=f"Removed Agent 2 task from this week: {target.get('title')}",
                     evidence=target,
-                    impact={"user_chose_to_skip": True, "source": "agent_2_chat"},
+                    impact={"user_chose_to_skip": True, "removed_from_week": True, "source": "agent_2_chat"},
                 )
                 append_progress_event(data.user_id, serialize_journey_event(event))
-                response_text = f"Skipped: {target.get('title')}. It will no longer block this week. If you want, I can replace it with a normal task, a tougher task, or one course."
+                response_text = (
+                    f"Done — I removed \"{target.get('title')}\" from this week's plan. "
+                    "It's no longer on your weekly or day view. If you want, I can put a normal task, a tougher task, or one course in its place."
+                )
                 append_chat_turn(data.user_id, user_update, response_text, intent)
-                return ChatResponse(response=response_text, context=user_context)
+                return ChatResponse(
+                    response=response_text, context=user_context,
+                    updated_actions=updated_actions,
+                    week_phase=current_phase,
+                )
 
             if intent == "course" and roadmap:
                 profile = load_profile(data.user_id)

@@ -144,35 +144,169 @@ function ScheduleWizard({ initial, onSubmit, onCancel }) {
   );
 }
 
-// Read-only 7-day board showing when each Delta task slice + personal reminder falls.
-function DayBoard({ dayPlan, loading }) {
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// The day the user is "on" right now: the slot whose date is today, else the first
+// upcoming day (before the week starts) or the last day (week already elapsed).
+const resolveTodayIndex = (days) => {
+  if (!days?.length) return 0;
+  const t = todayIso();
+  const exact = days.findIndex(d => d.date === t);
+  if (exact >= 0) return exact;
+  if (t < days[0].date) return 0;
+  return days.length - 1;
+};
+
+const sliceKey = (t) => t.id || t.title;
+
+// Move any unfinished Delta task from a day that has already passed onto an upcoming
+// day within the same week — spreading to the least-loaded day (so free days fill
+// first). Returns a new days array if anything moved, else null (so callers can skip
+// a redundant save and avoid a re-render loop).
+const rollOverOverdue = (days, todayIndex) => {
+  const t = todayIso();
+  const copy = days.map(d => ({ ...d, delta_tasks: (d.delta_tasks || []).map(x => ({ ...x })), personal: [...(d.personal || [])] }));
+  let changed = false;
+
+  const pickTarget = () => {
+    let best = todayIndex, count = Infinity;
+    for (let j = todayIndex; j < copy.length; j++) {
+      const c = copy[j].delta_tasks.length;
+      if (c < count) { count = c; best = j; }
+    }
+    return best;
+  };
+
+  for (let i = 0; i < copy.length; i++) {
+    if (copy[i].date >= t) continue; // only days that have already passed
+    const undone = copy[i].delta_tasks.filter(x => !x.done);
+    if (!undone.length) continue;
+    copy[i].delta_tasks = copy[i].delta_tasks.filter(x => x.done);
+    undone.forEach(x => {
+      const target = pickTarget();
+      copy[target].delta_tasks.push({ ...x, note: `Rolled over from ${copy[i].label}`, rolled: true });
+    });
+    changed = true;
+  }
+  if (!changed) return null;
+  copy.forEach(d => { d.is_free = d.delta_tasks.length === 0; });
+  return copy;
+};
+
+// Single-day interactive view: shows exactly one day at a time with checkboxes,
+// defaulting to today. Unfinished tasks from past days have already been rolled
+// forward by the parent, so this only ever renders the current/selected day.
+function DayView({ dayPlan, loading, dayIndex, setDayIndex, todayIndex, actionById, onToggleSlice, askAgent2AboutTask }) {
   if (loading) {
     return <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 16, color: 'var(--ink-soft)' }}><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Building your day-by-day plan…</div>;
   }
   const days = dayPlan?.days || [];
   if (!days.length) return <p style={{ color: 'var(--ink-soft)', fontSize: 14 }}>No day plan yet.</p>;
+  const idx = Math.min(Math.max(dayIndex, 0), days.length - 1);
+  const day = days[idx];
+  const tasks = day.delta_tasks || [];
+  const allDone = tasks.length > 0 && tasks.every(t => t.done);
+
   return (
-    <div style={{ display: 'grid', gap: 10 }}>
-      {days.map(day => (
-        <div key={day.date} style={{ border: '1px solid var(--rule)', borderRadius: 0, padding: 14, background: day.is_free ? 'var(--accent-surface)' : 'var(--paper)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <strong style={{ fontSize: 14 }}>{day.label}</strong>
-            <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{day.date}{day.is_free ? ' · Free day' : ''}</span>
+    <div>
+      {/* Day selector strip — navigation only, not the full week's work */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+        {days.map((d, i) => {
+          const total = (d.delta_tasks || []).length;
+          const done = (d.delta_tasks || []).filter(x => x.done).length;
+          const complete = total > 0 && done === total;
+          const isSel = i === idx;
+          return (
+            <button key={d.date} onClick={() => setDayIndex(i)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                minWidth: 46, padding: '6px 8px', cursor: 'pointer', borderRadius: 0,
+                border: i === todayIndex ? '1px solid var(--oxblood)' : '1px solid var(--rule)',
+                background: isSel ? 'var(--ink)' : 'var(--paper)', color: isSel ? 'var(--bone)' : 'var(--ink)',
+              }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{d.label.slice(0, 3)}</span>
+              <span style={{ fontSize: 10, color: isSel ? 'var(--bone)' : 'var(--ink-soft)' }}>
+                {total === 0 ? 'free' : complete ? '✓' : `${done}/${total}`}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* The selected day */}
+      <div style={{ border: '1px solid var(--rule)', borderRadius: 0, padding: 16, background: day.is_free ? 'var(--accent-surface)' : 'var(--paper)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong style={{ fontSize: 16 }}>{day.label}</strong>
+            {idx === todayIndex && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', background: 'var(--oxblood)', color: 'var(--bone)' }}>TODAY</span>}
           </div>
-          {day.focus && <p style={{ margin: '0 0 8px', fontSize: 12, fontStyle: 'italic', color: 'var(--ink-soft)' }}>{day.focus}</p>}
-          {(day.delta_tasks || []).map((t, i) => (
-            <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
-              <span style={{ fontWeight: 650 }}>{t.title}</span>
-              {t.note && t.note !== t.title && <span style={{ color: 'var(--ink-soft)' }}> — {t.note}</span>}
-            </div>
-          ))}
-          {(day.personal || []).map((p, i) => (
-            <div key={`p${i}`} style={{ fontSize: 12, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <Bell size={12} /> {p}
-            </div>
-          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{day.date}</span>
+            <button onClick={() => setDayIndex(Math.max(0, idx - 1))} disabled={idx === 0}
+              style={{ border: '1px solid var(--rule)', background: 'var(--paper)', padding: '2px 8px', cursor: idx === 0 ? 'not-allowed' : 'pointer', fontSize: 13 }}>‹</button>
+            <button onClick={() => setDayIndex(Math.min(days.length - 1, idx + 1))} disabled={idx === days.length - 1}
+              style={{ border: '1px solid var(--rule)', background: 'var(--paper)', padding: '2px 8px', cursor: idx === days.length - 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>›</button>
+          </div>
         </div>
-      ))}
+
+        {day.focus && <p style={{ margin: '0 0 10px', fontSize: 12, fontStyle: 'italic', color: 'var(--ink-soft)' }}>{day.focus}</p>}
+
+        {tasks.length === 0 ? (
+          <p style={{ margin: '4px 0', fontSize: 14, color: 'var(--ink-soft)' }}>Free from Delta tasks today — spend it on your own commitments.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {tasks.map((t, i) => {
+              const parent = actionById(sliceKey(t)) || {};
+              return (
+                <div key={`${sliceKey(t)}-${i}`}
+                  style={{ display: 'grid', gridTemplateColumns: '30px minmax(0,1fr)', gap: 12, padding: 12, border: '1px solid var(--rule)', background: t.done ? 'var(--rule)' : 'var(--paper)' }}>
+                  <button onClick={() => onToggleSlice(idx, i)} aria-label={t.done ? 'Mark not done' : 'Mark done'}
+                    style={{ width: 26, height: 26, border: '1px solid var(--rule)', background: t.done ? 'var(--ink)' : 'transparent', color: 'var(--bone)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                    {t.done && <Check size={15} />}
+                  </button>
+                  <div>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, marginBottom: t.note && t.note !== t.title ? 4 : 0, textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
+                    {t.note && t.note !== t.title && (
+                      <span style={{ display: 'block', fontSize: 12, color: t.rolled ? 'var(--oxblood)' : 'var(--ink-soft)', marginBottom: 4 }}>{t.note}</span>
+                    )}
+                    {parent.detail && <span style={{ display: 'block', fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.5 }}>{parent.detail}</span>}
+                    {parent.problems?.length > 0 && (
+                      <span style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                        {parent.problems.map(p => (
+                          <a key={p.id} href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: 'var(--ink)', textDecoration: 'underline' }}>#{p.id} {p.title}</a>
+                        ))}
+                      </span>
+                    )}
+                    <span role="button" tabIndex={0}
+                      onClick={(e) => askAgent2AboutTask(e, parent.title ? parent : { title: t.title })}
+                      onKeyDown={(e) => { if (e.key === 'Enter') askAgent2AboutTask(e, parent.title ? parent : { title: t.title }); }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer', marginTop: 10 }}>
+                      <MessageSquare size={12} /> How to do this
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {(day.personal || []).length > 0 && (
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--rule)' }}>
+            {(day.personal || []).map((p, i) => (
+              <div key={`p${i}`} style={{ fontSize: 12, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <Bell size={12} /> {p}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {allDone && (
+          <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--ink)', fontWeight: 650 }}>All of today's tasks are done. Nice.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -230,6 +364,7 @@ export default function WeeklyPlan() {
   // Expired-week carry-over
   const [expiredOpen, setExpiredOpen] = useState(false);
   const [carrySel, setCarrySel] = useState({}); // task id/title -> keep?
+  const [dayIndex, setDayIndex] = useState(0); // which single day the day-view shows
 
   const bottomRef = useRef(null);
 
@@ -317,6 +452,61 @@ export default function WeeklyPlan() {
       .finally(() => { if (!cancelled) setDayLoading(false); });
     return () => { cancelled = true; };
   }, [userId, planStyle, weekSig]);
+
+  // Which day is "today" within this week's plan; the view defaults here.
+  const todayIndex = useMemo(() => resolveTodayIndex(dayPlan?.days), [dayPlan]);
+
+  // Roll unfinished tasks from days that have already passed onto an upcoming day,
+  // then land the view on today. Runs whenever a fresh plan loads.
+  useEffect(() => {
+    if (planStyle !== 'day' || !dayPlan?.days?.length) return;
+    const rolled = rollOverOverdue(dayPlan.days, todayIndex);
+    if (rolled) {
+      const next = { ...dayPlan, days: rolled };
+      setDayPlan(next);
+      careerOSAPI.saveDayPlan(userId, next).catch(() => { /* non-fatal */ });
+    }
+    setDayIndex(todayIndex);
+  }, [dayPlan, planStyle, todayIndex, userId]);
+
+  const actionById = useCallback((key) => actions.find(a => (a.id || a.title) === key || a.title === key), [actions]);
+
+  // Checking a day's task drives the same week-level completion the weekly view uses:
+  // a parent task counts as done only once every day-slice of it is checked, so the
+  // "Request Next Week" gate and DB journal stay accurate for day-wise users too.
+  const syncParentCompletion = useCallback(async (days, slice) => {
+    const pid = slice.id || slice.title;
+    const idx = actions.findIndex(a => (a.id || a.title) === pid || a.title === slice.title);
+    if (idx < 0) return;
+    let found = false, all = true;
+    days.forEach(d => (d.delta_tasks || []).forEach(t => {
+      if ((t.id || t.title) === pid || t.title === slice.title) { found = true; if (!t.done) all = false; }
+    }));
+    const shouldCheck = found && all;
+    if (shouldCheck === !!checked[idx]) return;
+    setChecked(prev => ({ ...prev, [idx]: shouldCheck }));
+    setSkipped(prev => ({ ...prev, [idx]: false }));
+    try {
+      await careerOSAPI.logJourneyEvent(userId, {
+        event_type: shouldCheck ? 'weekly_task_completed' : 'weekly_task_reopened',
+        summary: `${shouldCheck ? 'Completed' : 'Reopened'} Agent 2 task: ${actions[idx].title}`,
+        evidence: actions[idx],
+        impact: { weekly_plan_adjustment_needed: true },
+      });
+    } catch { /* saved locally; sync will retry on reload */ }
+  }, [actions, checked, userId]);
+
+  const toggleDaySlice = useCallback(async (dIdx, sIdx) => {
+    if (advancing || !dayPlan?.days) return;
+    const slice = dayPlan.days[dIdx].delta_tasks[sIdx];
+    const days = dayPlan.days.map((d, i) => i !== dIdx ? d : ({
+      ...d, delta_tasks: d.delta_tasks.map((t, j) => j !== sIdx ? t : ({ ...t, done: !t.done })),
+    }));
+    const next = { ...dayPlan, days };
+    setDayPlan(next);
+    careerOSAPI.saveDayPlan(userId, next).catch(() => { /* non-fatal */ });
+    await syncParentCompletion(days, slice);
+  }, [advancing, dayPlan, userId, syncParentCompletion]);
 
   const handleSelectPlanStyle = async (style) => {
     if (style === planStyle) return;
@@ -623,6 +813,29 @@ export default function WeeklyPlan() {
     ),
   };
 
+  // Shared "advance the week" CTA — appears once all tasks are checked/skipped, in
+  // whichever view (week or day) the user is looking at.
+  const allTasksResolved = !advancing && actions.length > 0 && actions.every((_, i) => checked[i] || skipped[i]);
+  const nextWeekCTA = allTasksResolved ? (
+    <div style={{ marginTop: 20, padding: 16, borderRadius: 0, background: 'var(--accent-surface)', border: '1px solid var(--accent-surface)' }}>
+      <p style={{ margin: '0 0 12px', color: 'var(--ink)', fontSize: 14, lineHeight: 1.5 }}>
+        <strong>All current tasks are checked.</strong> Request the next week only after you have genuinely finished the work and proof.
+      </p>
+      <button
+        onClick={requestNextWeek}
+        disabled={advancing}
+        style={{
+          width: '100%', background: 'var(--ink)', color: 'var(--bone)', border: 'none',
+          borderRadius: 0, padding: 14, fontWeight: 700, fontSize: 15,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          cursor: 'pointer',
+        }}
+      >
+        <Check size={18} /> Request Next Week's Activities
+      </button>
+    </div>
+  ) : null;
+
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -732,23 +945,41 @@ export default function WeeklyPlan() {
           </div>
         </section>
 
-        {/* Day-by-day board */}
+        {/* Day-by-day view — one day at a time, not the whole week at once */}
         {planStyle === 'day' && (
           <section style={{ ...panelStyle, padding: 22, marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
               <div>
-                <h2 style={{ margin: '0 0 6px', fontSize: 22 }}>Your week, day by day</h2>
-                <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.5 }}>Delta split this week's tasks across your days. Mark them complete in the task list below.</p>
+                <h2 style={{ margin: '0 0 6px', fontSize: 22 }}>Today's plan</h2>
+                <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.5 }}>Check off what you finish today. Anything you miss rolls forward to another day this week.</p>
               </div>
               <button onClick={() => setScheduleOpen(true)} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>
                 <Pencil size={14} /> Edit schedule
               </button>
             </div>
-            <DayBoard dayPlan={dayPlan} loading={dayLoading} />
+            {advancing ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 0' }}>
+                <Loader2 size={16} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
+                <span style={{ fontSize: 14, color: 'var(--ink)' }}>Agent 2 is preparing your next week…</span>
+              </div>
+            ) : (
+              <DayView
+                dayPlan={dayPlan}
+                loading={dayLoading}
+                dayIndex={dayIndex}
+                setDayIndex={setDayIndex}
+                todayIndex={todayIndex}
+                actionById={actionById}
+                onToggleSlice={toggleDaySlice}
+                askAgent2AboutTask={askAgent2AboutTask}
+              />
+            )}
+            {nextWeekCTA}
           </section>
         )}
 
-        {/* Tasks */}
+        {/* Tasks — full weekly list (day view shows the single-day board above instead) */}
+        {planStyle !== 'day' && (
         <section style={{ ...panelStyle, padding: 22, marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
             <div>
@@ -862,26 +1093,9 @@ export default function WeeklyPlan() {
           </div>
 
           {/* Request next week */}
-          {!advancing && actions.length > 0 && actions.every((_, i) => checked[i] || skipped[i]) && (
-            <div style={{ marginTop: 20, padding: 16, borderRadius: 0, background: 'var(--accent-surface)', border: '1px solid var(--accent-surface)' }}>
-              <p style={{ margin: '0 0 12px', color: 'var(--ink)', fontSize: 14, lineHeight: 1.5 }}>
-                <strong>All current tasks are checked.</strong> Request the next week only after you have genuinely finished the work and proof.
-              </p>
-              <button
-                onClick={requestNextWeek}
-                disabled={advancing}
-                style={{
-                  width: '100%', background: 'var(--ink)', color: 'var(--bone)', border: 'none',
-                  borderRadius: 0, padding: 14, fontWeight: 700, fontSize: 15,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                  cursor: 'pointer',
-                }}
-              >
-                <Check size={18} /> Request Next Week's Activities
-              </button>
-            </div>
-          )}
+          {nextWeekCTA}
         </section>
+        )}
 
         {/* Plan Preferences — permanent rules + next-week requests */}
         <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>

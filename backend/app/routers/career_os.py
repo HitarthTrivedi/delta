@@ -343,6 +343,33 @@ def get_day_plan(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+class DayPlanUpdate(BaseModel):
+    day_plan: dict
+
+
+@router.put("/user/{user_id}/day-plan")
+def save_day_plan(user_id: str, payload: DayPlanUpdate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    """Persist the day plan after the user checks off a day's task or Delta rolls an
+    unfinished task to another day. Only stored when it still matches the current week's
+    tasks — a stale plan is ignored so it can't overwrite a freshly regenerated week."""
+    roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="No roadmap found for user.")
+    try:
+        incoming = payload.day_plan or {}
+        signature = _week_signature(_current_actions(roadmap))
+        if incoming.get("week_signature") not in (None, signature):
+            return {"status": "stale", "day_plan": json.loads(roadmap.day_plan) if roadmap.day_plan else None}
+        incoming["week_signature"] = signature
+        roadmap.day_plan = json.dumps(incoming)
+        db.commit()
+        return {"status": "saved", "day_plan": incoming}
+    except Exception as exc:
+        db.rollback()
+        _log.error("save_day_plan failed for %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 class AdvanceExpiredRequest(BaseModel):
     carried_task_ids: list[str] = Field(default_factory=list)
 
