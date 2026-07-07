@@ -1272,21 +1272,30 @@ def run_weekly_career_cycle(
         for e in recent_events
     ]
 
-    # Archive the closing week and promote next-week requests before generating new tasks
+    # Archive the closing week and promote next-week requests before generating new tasks.
+    # Each step is isolated so a failure in one (e.g. the profile update) can't skip the
+    # others — in particular, promotion must always run so fulfilled one-week requests are
+    # consumed and don't linger on the user's plan.
+    from app.services.user_context_store import (
+        end_week, promote_next_week_requests, update_profile_with_completed_tasks
+    )
+    week_label = f"Week {week_number}" if 'week_number' in dir() else "Previous Week"
     try:
-        from app.services.user_context_store import (
-            end_week, promote_next_week_requests, update_profile_with_completed_tasks
-        )
-        week_label = f"Week {week_number}" if 'week_number' in dir() else "Previous Week"
         completed_tasks_for_profile = [
             a for a in current_actions
             if _normalize(a.get("id") or a.get("title")) in accepted_ids
         ]
         update_profile_with_completed_tasks(user_id, completed_tasks_for_profile, week_label)
+    except Exception as _e:
+        logger.warning(f"[ctx_store] profile update failed (non-fatal): {_e}")
+    try:
         promote_next_week_requests(user_id)
+    except Exception as _e:
+        logger.warning(f"[ctx_store] promote next-week requests failed (non-fatal): {_e}")
+    try:
         end_week(user_id, week_label)
-    except Exception as _ctx_err:
-        logger.warning(f"[ctx_store] week transition failed (non-fatal): {_ctx_err}")
+    except Exception as _e:
+        logger.warning(f"[ctx_store] end_week failed (non-fatal): {_e}")
 
     roadmap = get_or_create_roadmap_state(
         db, user, market, regenerate=True,

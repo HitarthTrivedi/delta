@@ -443,13 +443,23 @@ export default function WeeklyPlan() {
     loadContext(params.get('from') === 'intake');
   }, [loadContext, location.search]);
 
-  useEffect(() => {
+  // Fetches saved preferences. Called on load AND after every week transition —
+  // the backend expires fulfilled one-week requests when the week advances, so the
+  // panel must re-read them (otherwise the stale list lingers and could even be
+  // re-saved verbatim, resurrecting an already-consumed request).
+  const loadContextDocs = useCallback(async () => {
     setDocsLoading(true);
-    careerOSAPI.getContextDocs(userId)
-      .then(data => setContextDocs(data || { permanent: [], next_week: [] }))
-      .catch(() => toast.error('Could not load your saved preferences.'))
-      .finally(() => setDocsLoading(false));
+    try {
+      const data = await careerOSAPI.getContextDocs(userId);
+      setContextDocs(data || { permanent: [], next_week: [] });
+    } catch {
+      toast.error('Could not load your saved preferences.');
+    } finally {
+      setDocsLoading(false);
+    }
   }, [userId]);
+
+  useEffect(() => { loadContextDocs(); }, [loadContextDocs]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -609,6 +619,7 @@ export default function WeeklyPlan() {
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
       setPlanStyle(data?.plan_style || 'week');
+      loadContextDocs(); // fulfilled one-week requests are consumed on advance
       resetAgent2Chat('New week loaded — the previous week expired. Tell me if anything has changed.');
       toast.success('Week changed. Carried over the tasks you kept.');
     } catch (err) {
@@ -726,6 +737,9 @@ export default function WeeklyPlan() {
       // error line, and task changes are persisted server-side regardless.
       await loadContext();
     }
+    // A chat turn may have added/advanced a next-week request or set a permanent
+    // rule — re-read the saved preferences so the panel reflects the server truth.
+    loadContextDocs();
   };
 
   const sendMessage = async (e) => {
@@ -833,6 +847,7 @@ export default function WeeklyPlan() {
       const progress = getTaskProgress(data, fallbackActions);
       setChecked(progress.checkedByIndex);
       setSkipped(progress.skippedByIndex);
+      loadContextDocs(); // fulfilled one-week requests are consumed on advance
       resetAgent2Chat('New week loaded. Tell me if anything has changed — exams, pace, priorities.');
       toast.success('Next week loaded — Agent 2 has updated your tasks.');
     } catch (err) {
