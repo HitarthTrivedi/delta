@@ -727,6 +727,26 @@ def _agent2_intent(text: str) -> str:
     return "tutor_chat"
 
 
+def _is_explanation_request(text: str) -> bool:
+    """True when the user is asking HOW to do something / for resources / an explanation —
+    never a command to change the plan. The "How to do this" button sends exactly such a
+    message, and it often mentions "course"/"project"/"modules"; without this guard the
+    intent classifier can misread it as add_course/skip/etc. and silently rewrite the week.
+    """
+    t = (text or "").lower().strip()
+    if t.startswith((
+        "how do i", "how to ", "how should i", "how can i", "how would i", "how much",
+        "explain", "walk me through", "what should i do", "where should i start",
+        "where do i start", "break down", "give me step", "steps to", "steps for",
+        "tell me how", "can you explain", "what is", "what are",
+    )):
+        return True
+    return any(p in t for p in (
+        "step-by-step", "step by step", "best resources", "which modules", "which weeks",
+        "how long will", "how long each", "resources with", "specific links",
+    ))
+
+
 def _event_from_user_message(text: str, date_info: dict) -> dict | None:
     lowered = text.lower()
     event_keywords = ["exam", "test", "quiz", "paper", "mid sem", "midsem", "viva", "deadline", "submission", "interview", "presentation", "function", "wedding", "travel"]
@@ -917,6 +937,11 @@ def chat_message(
         intent = _ACTION_TO_INTENT.get(intent_obj.get("action"), "tutor_chat")
     else:
         intent = "tutor_chat" if is_weekly_agent else "chat"
+    # Safety net: a "how do I do this / what resources" question must never mutate the
+    # plan, even if the classifier flagged it as course/skip/trim/etc. (the "How to do
+    # this" button mentions "course"/"modules" and used to trigger a full week rewrite).
+    if is_weekly_agent and intent != "tutor_chat" and _is_explanation_request(user_update):
+        intent = "tutor_chat"
     llm_reply = intent_obj.get("reply") if intent_obj else None
     llm_count = intent_obj.get("count") if intent_obj else None
     llm_target = intent_obj.get("target") if intent_obj else None
