@@ -1156,15 +1156,19 @@ def evaluate_week_status(db: Session, user: User, roadmap: "RoadmapState | None"
         if _normalize(action.get("id") or action.get("title")) not in accepted_ids
         and (action.get("id") or action.get("title"))
     ]
-    # A week is "expired" when more 7-day windows have elapsed than the user has
-    # advanced through (weekly_cycle_completed events) AND tasks are still unfinished.
-    # The time-derived week_start always tracks the current window, so we compare
-    # weeks-elapsed against cycles-completed rather than a raw age of the week.
-    cycles_completed = db.query(JourneyEvent).filter(
-        JourneyEvent.user_id == user.id,
-        JourneyEvent.event_type == "weekly_cycle_completed",
-    ).count()
-    expired = bool(incomplete_actions) and weeks_elapsed > cycles_completed
+    # A week is "expired" when 7 calendar days have passed since the current week's
+    # tasks were assigned AND tasks are still unfinished. We anchor to a FIXED past
+    # moment — the user's last real week-advance, or signup for the first week — not
+    # to the derived week_start (which is recomputed to always contain "now", so it
+    # can never itself look expired). Using calendar-day difference makes it fire on
+    # the 8th day regardless of the signup time-of-day.
+    valid_cycles = _valid_weekly_cycle_events(db, user.id)
+    week_assigned_at = (
+        (valid_cycles[-1].created_at if valid_cycles else user.created_at)
+        or (now - datetime.timedelta(days=1))
+    )
+    days_since_assigned = (now.date() - week_assigned_at.date()).days
+    expired = bool(incomplete_actions) and days_since_assigned >= 7
     return {
         "week_number": week_number,
         "week_start": week_start,
