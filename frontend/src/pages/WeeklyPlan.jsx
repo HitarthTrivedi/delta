@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { CalendarDays, Check, Loader2, RefreshCw, Send, MessageSquare, Clock, BookOpen, Bell, X, Pencil, Plus, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Check, Loader2, RefreshCw, Send, MessageSquare, Bell, X, Pencil, Plus, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { careerOSAPI } from '../lib/api';
@@ -19,6 +19,18 @@ const panelStyle = {
   background: 'var(--paper)',
   border: '1px solid var(--rule)',
   borderRadius: 0,
+};
+
+const serif = "'Cormorant Garamond', Georgia, serif";
+const mono = "'IBM Plex Mono', ui-monospace, monospace";
+
+const monoLabel = {
+  fontFamily: mono,
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'var(--ink-soft)',
 };
 
 const fallbackActions = [
@@ -64,7 +76,7 @@ function ScheduleWizard({ initial, onSubmit, onCancel }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,25,24,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
       <div style={{ ...panelStyle, background: 'var(--bone)', padding: 24, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-soft)', fontWeight: 650 }}>Day-wise setup · Question {step + 1} of 3</p>
@@ -296,8 +308,7 @@ function DayView({ dayPlan, loading, dayIndex, setDayIndex, todayIndex, actionBy
                     {t.done && <Check size={15} />}
                   </button>
                   <div>
-                    <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 800, letterSpacing: 0.6, padding: '2px 5px', marginBottom: 5, background: 'var(--oxblood)', color: 'var(--bone)' }}>DELTA</span>
-                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--oxblood)', marginBottom: t.note && t.note !== t.title ? 4 : 0, textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: t.done ? 'var(--ink-soft)' : 'var(--ink)', marginBottom: t.note && t.note !== t.title ? 4 : 0, textDecoration: t.done ? 'line-through' : 'none' }}>{t.title}</span>
                     {t.note && t.note !== t.title && (
                       <span style={{ display: 'block', fontSize: 12, color: t.rolled ? 'var(--oxblood)' : 'var(--ink-soft)', marginBottom: 4 }}>{t.note}</span>
                     )}
@@ -892,59 +903,40 @@ export default function WeeklyPlan() {
         <strong>All current tasks are checked.</strong> Request the next week only after you have genuinely finished the work and proof.
       </p>
       <button
+        className="wp-btn wp-btn-primary"
         onClick={requestNextWeek}
         disabled={advancing}
-        style={{
-          width: '100%', background: 'var(--ink)', color: 'var(--bone)', border: 'none',
-          borderRadius: 0, padding: 14, fontWeight: 700, fontSize: 15,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          cursor: 'pointer',
-        }}
+        style={{ width: '100%', justifyContent: 'center', padding: 14 }}
       >
-        <Check size={18} /> Request Next Week's Activities
+        <Check size={15} /> Request Next Week's Activities
       </button>
     </div>
   ) : null;
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3.5rem' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
         {/* Header */}
-        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 28 }}>
+        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-end', marginBottom: 26 }}>
           <div>
-            <p style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>
-              Part 2 · Agent 2 roadmap · Week {context?.week_number || 1}
-            </p>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(2rem, 5vw, 3.4rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0, maxWidth: 760 }}>
-              {studentName}'s week. Adjusted to your pace.
+            <h1 style={{ fontFamily: serif, fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', lineHeight: 1.1, letterSpacing: 0, margin: 0, maxWidth: 640 }}>
+              {studentName}'s week, adjusted to your pace.
             </h1>
+            <p style={{ margin: '8px 0 0', color: 'var(--ink-soft)', fontSize: 14.5, lineHeight: 1.5 }}>
+              Week {context?.week_number || 1} — Agent 2 plans one week at a time around your real availability.
+            </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
             {notifPermission !== 'granted' && notifPermission !== 'unsupported' && (
-              <button
-                onClick={handleEnableReminders}
-                style={{
-                  background: 'var(--accent-surface)', color: 'var(--ink)',
-                  border: '1px solid var(--rule)', borderRadius: 0,
-                  padding: '11px 16px', fontWeight: 600, fontSize: 13,
-                  display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-                }}
-              >
-                <Bell size={14} /> Reminders
+              <button className="wp-btn wp-btn-ghost" onClick={handleEnableReminders}>
+                <Bell size={13} /> Reminders
               </button>
             )}
-            <button
-              onClick={refreshWeek}
-              disabled={refreshing || advancing}
-              style={{
-                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0,
-                padding: '11px 18px', fontWeight: 700,
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                cursor: refreshing ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {refreshing || advancing ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={15} />}
+            <button className="wp-btn wp-btn-primary" onClick={refreshWeek} disabled={refreshing || advancing}>
+              {refreshing || advancing
+                ? <Loader2 size={13} className="wp-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                : <RefreshCw size={13} />}
               Refresh plan
             </button>
           </div>
@@ -953,53 +945,26 @@ export default function WeeklyPlan() {
         {/* Stats bar */}
         <section style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 1, background: 'var(--rule)', border: '1px solid var(--rule)', marginBottom: 24,
+          gap: 1, background: 'var(--rule)', border: '1px solid var(--rule)', marginBottom: 20,
         }}>
           {[
-            { icon: BookOpen, label: 'Student', value: `${studentName} · ${educationStage}` },
-            { icon: BookOpen, label: 'Goal', value: targetRole },
-            { icon: Clock, label: 'Available pace', value: `${hoursPerWeek}h / week` },
-            { icon: CalendarDays, label: 'Focus', value: weeklyFocus.phase_name || 'First useful week' },
-          ].map(item => {
-            const Icon = item.icon;
-            return (
-              <div key={item.label} style={{ background: 'var(--paper)', padding: 18, minHeight: 110 }}>
-                <Icon size={17} style={{ color: 'var(--ink)', marginBottom: 14 }} />
-                <p style={{ color: 'var(--ink-soft)', margin: '0 0 6px', fontSize: 12 }}>{item.label}</p>
-                <p style={{ color: 'var(--ink)', margin: 0, fontSize: 15, lineHeight: 1.4, fontWeight: 650 }}>{item.value}</p>
-              </div>
-            );
-          })}
+            { label: 'Student', value: `${studentName} · ${educationStage}` },
+            { label: 'Goal', value: targetRole },
+            { label: 'Available pace', value: `${hoursPerWeek}h / week` },
+            { label: 'Focus', value: weeklyFocus.phase_name || 'First useful week' },
+          ].map(item => (
+            <div key={item.label} style={{ background: 'var(--paper)', padding: '16px 18px' }}>
+              <p style={{ ...monoLabel, margin: '0 0 8px' }}>{item.label}</p>
+              <p style={{ color: 'var(--ink)', margin: 0, fontSize: 14.5, lineHeight: 1.4, fontWeight: 650 }}>{item.value}</p>
+            </div>
+          ))}
         </section>
 
-        {/* Long-horizon plan */}
-        {longHorizonLanes.length > 0 && (
-          <section style={{ ...panelStyle, padding: 20, marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>Long-scale plan</h2>
-                <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.5 }}>
-                  Delta keeps these lanes alive across the selected timeline, then chooses the right weekly slice.
-                </p>
-              </div>
-              <span style={{ color: 'var(--ink-soft)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                {longHorizonPlan.horizon_months || roadmap.destination?.planning_horizon_months || 12} months
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
-              {longHorizonLanes.map((lane) => (
-                <div key={lane.name} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
-                  <p style={{ margin: '0 0 6px', color: 'var(--ink)', fontSize: 14, fontWeight: 700 }}>{lane.name}</p>
-                  <p style={{ margin: '0 0 8px', color: 'var(--ink-soft)', fontSize: 12 }}>{lane.cadence}</p>
-                  <p style={{ margin: 0, color: 'var(--ink)', fontSize: 13, lineHeight: 1.45 }}>{lane.rule}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        <div className="wp-main">
+        <div className="wp-center">
 
         {/* Plan style toggle */}
-        <section style={{ ...panelStyle, padding: 16, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+        <section style={{ ...panelStyle, padding: '14px 18px', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>How do you want this week laid out?</p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-soft)' }}>Week view lists all tasks together. Day view spreads them across your 7 days around your commitments.</p>
@@ -1007,7 +972,7 @@ export default function WeeklyPlan() {
           <div style={{ display: 'inline-flex', border: '1px solid var(--rule)' }}>
             {[{ k: 'week', label: 'Week' }, { k: 'day', label: 'Day' }].map(opt => (
               <button key={opt.k} onClick={() => handleSelectPlanStyle(opt.k)}
-                style={{ padding: '9px 20px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                style={{ fontFamily: mono, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '9px 18px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
                   background: planStyle === opt.k ? 'var(--ink)' : 'var(--paper)', color: planStyle === opt.k ? 'var(--bone)' : 'var(--ink)' }}>
                 {opt.label}
               </button>
@@ -1017,10 +982,10 @@ export default function WeeklyPlan() {
 
         {/* Day-by-day view — one day at a time, not the whole week at once */}
         {planStyle === 'day' && (
-          <section style={{ ...panelStyle, padding: 22, marginBottom: 20 }}>
+          <section style={{ ...panelStyle, padding: '20px 22px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
               <div>
-                <h2 style={{ margin: '0 0 6px', fontSize: 22 }}>Today's plan</h2>
+                <h2 style={{ margin: '0 0 6px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Today's plan</h2>
                 <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.5 }}>Check off what you finish today. Anything you miss rolls forward to another day this week.</p>
               </div>
               <button onClick={() => setScheduleOpen(true)} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>
@@ -1051,15 +1016,15 @@ export default function WeeklyPlan() {
 
         {/* Tasks — full weekly list (day view shows the single-day board above instead) */}
         {planStyle !== 'day' && (
-        <section style={{ ...panelStyle, padding: 22, marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+        <section style={{ ...panelStyle, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 10 }}>
             <div>
-              <h2 style={{ margin: '0 0 8px', fontSize: 24, letterSpacing: 0 }}>Tasks for this week</h2>
-              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55 }}>
+              <h2 style={{ margin: '0 0 6px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Tasks for this week</h2>
+              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.55 }}>
                 Agent 2 should only assign new work after these are completed or after you say the plan needs to change.
               </p>
             </div>
-            {loading && <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
+            {loading && <Loader2 size={18} className="wp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
           </div>
 
           {/* Advance progress — one honest status line, not a simulated multi-step sequence */}
@@ -1072,37 +1037,38 @@ export default function WeeklyPlan() {
             </div>
           )}
 
-          {/* Task list */}
-          <div style={{ display: advancing ? 'none' : 'grid', gap: 12 }}>
+          {/* Task list — one ruled ledger, not a stack of boxed cards */}
+          <div style={{ display: advancing ? 'none' : 'block' }}>
             {actions.map((action, index) => {
               const isDone = !!checked[index];
               const isSkipped = !!skipped[index];
               return (
                 <button
                   key={action.id}
+                  className="wp-task"
                   onClick={() => toggleTask(action, index)}
                   style={{
-                    display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: 14,
-                    textAlign: 'left', width: '100%',
-                    background: isDone ? 'var(--rule)' : isSkipped ? 'var(--accent-surface)' : 'var(--paper)',
-                    border: '1px solid var(--rule)', borderRadius: 0, padding: 16,
+                    display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) auto', gap: 14,
+                    alignItems: 'start', textAlign: 'left', width: '100%',
+                    background: 'transparent', border: 'none',
+                    borderTop: index ? '1px solid var(--rule)' : 'none',
+                    borderRadius: 0, padding: '16px 2px',
                     color: 'var(--ink)', cursor: advancing ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <span style={{
-                    width: 28, height: 28, borderRadius: 0,
-                    border: '1px solid var(--rule)',
+                    width: 22, height: 22, borderRadius: 0, marginTop: 1,
+                    border: isDone ? 'none' : '1px solid var(--ink-soft)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: isDone ? 'var(--ink)' : 'transparent', color: 'var(--bone)', flexShrink: 0,
                   }}>
-                    {isDone && <Check size={16} />}
+                    {isDone && <Check size={13} />}
                   </span>
-                  <span>
-                    <span style={{ display: 'block', fontSize: 16, fontWeight: 700, marginBottom: 6, textDecoration: isDone ? 'line-through' : 'none' }}>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, marginBottom: 5, lineHeight: 1.4, color: isDone ? 'var(--ink-soft)' : 'var(--ink)', textDecoration: isDone ? 'line-through' : 'none' }}>
                       {action.title}
-                      {isSkipped ? <span style={{ marginLeft: 8, color: 'var(--ink-soft)', fontSize: 12 }}>Skipped</span> : null}
                     </span>
-                    <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55 }}>{action.detail}</span>
+                    <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.55, maxWidth: '68ch' }}>{action.detail}</span>
                     {action.problems?.length > 0 ? (
                       <span style={{ display: 'block', marginTop: 10 }}>
                         <span style={{ color: 'var(--ink-soft)', fontSize: 12, display: 'block', marginBottom: 6 }}>Problems this week:</span>
@@ -1158,6 +1124,9 @@ export default function WeeklyPlan() {
                       </span>
                     </span>
                   </span>
+                  <span style={{ ...monoLabel, marginTop: 4 }}>
+                    {isDone ? 'Done' : isSkipped ? 'Skipped' : 'To do'}
+                  </span>
                 </button>
               );
             })}
@@ -1168,103 +1137,16 @@ export default function WeeklyPlan() {
         </section>
         )}
 
-        {/* Plan Preferences — permanent rules + next-week requests */}
-        <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Plan Preferences</h2>
-              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
-                Permanent rules apply every week · Next week requests carry forward once
-              </p>
-            </div>
-            {docsLoading && <Loader2 size={15} style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
-          </div>
-          <div className="plan-preferences-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            {/* Permanent */}
-            <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
-              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Permanent Rules</p>
-              {contextDocs.permanent.length === 0 && (
-                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No permanent rules yet. Add one below.</p>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                {contextDocs.permanent.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 0, padding: '7px 10px' }}>
-                    <span style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.4 }}>{item}</span>
-                    <button onClick={() => removePermanent(i)} aria-label="Remove rule" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 8, flexShrink: 0 }}>
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  value={newPermanent}
-                  onChange={e => setNewPermanent(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addPermanent()}
-                  placeholder="e.g. Never more than 2 tasks"
-                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
-                />
-                <button onClick={addPermanent} style={{ background: 'var(--rule)', border: 'none', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
-                  <Plus size={14} />
-                </button>
-              </div>
-            </div>
-            {/* Next week requests */}
-            <div style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
-              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Next Week Requests</p>
-              {contextDocs.next_week.length === 0 && (
-                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No requests yet. Add one below or tell Agent 2.</p>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                {contextDocs.next_week.map((item, i) => {
-                  const text = typeof item === 'string' ? item : item.text;
-                  const weeksLeft = typeof item === 'object' ? item.weeks_remaining : 1;
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 0, padding: '7px 10px' }}>
-                      <span style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.4 }}>{text}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 0, background: 'var(--accent-surface)', color: weeksLeft <= 1 ? 'var(--oxblood)' : 'var(--ink-soft)', flexShrink: 0 }}>
-                        {weeksLeft}w
-                      </span>
-                      <button onClick={() => removeNextWeek(i)} aria-label="Remove request" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 8, flexShrink: 0 }}>
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  value={newNextWeek}
-                  onChange={e => setNewNextWeek(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addNextWeek()}
-                  placeholder="e.g. Include a REST API project"
-                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    type="number"
-                    min={1}
-                    max={12}
-                    value={newNextWeekWeeks}
-                    onChange={e => setNewNextWeekWeeks(e.target.value)}
-                    title="Number of weeks to keep this instruction active"
-                    style={{ width: 44, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 6px', color: 'var(--ink)', fontSize: 12, outline: 'none', textAlign: 'center' }}
-                  />
-                  <span style={{ fontSize: 11, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>wk</span>
-                </div>
-                <button onClick={addNextWeek} style={{ background: 'var(--rule)', border: 'none', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
-                  <Plus size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
+        </div>
+
+        {/* Right side rail: controls and the agent, beside the tasks */}
+        <div className="wp-bside">
 
         {/* Task feedback + manual edit */}
-        <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
+        <section style={{ ...panelStyle, padding: '20px 22px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: editingTasks ? 16 : 0 }}>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Task Controls</h2>
+              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Task controls</h2>
               <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
                 Edit tasks manually or give Agent 2 feedback on this week's selection
               </p>
@@ -1352,24 +1234,16 @@ export default function WeeklyPlan() {
         </section>
 
         {/* Agent 2 compact box */}
-        <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
+        <section style={{ ...panelStyle, padding: '20px 22px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Agent 2</h2>
+              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Agent 2</h2>
               <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
                 Chat resets each week · DB keeps last 2 weeks for context
               </p>
             </div>
-            <button
-              onClick={() => setChatOpen(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                background: 'var(--ink)', color: 'var(--bone)', border: 'none',
-                borderRadius: 0, padding: '10px 16px', fontWeight: 700, fontSize: 13,
-                cursor: 'pointer', flexShrink: 0,
-              }}
-            >
-              <MessageSquare size={14} /> Talk to Agent 2
+            <button className="wp-btn wp-btn-primary" onClick={() => setChatOpen(true)}>
+              <MessageSquare size={13} /> Talk to Agent 2
             </button>
           </div>
           <p style={{ margin: '0 0 12px', color: 'var(--ink-soft)', fontSize: 13 }}>Things you can ask:</p>
@@ -1394,20 +1268,139 @@ export default function WeeklyPlan() {
 
         {/* Opportunities */}
         {opportunities.length > 0 && (
-          <section style={{ ...panelStyle, padding: 20 }}>
-            <h2 style={{ margin: '0 0 14px', fontSize: 18 }}>Opportunities</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              {opportunities.slice(0, 4).map((item, i) => (
-                <div key={i} style={{ background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0, padding: 14 }}>
-                  <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>{item.title || item.name}</p>
-                  <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 12 }}>
-                    {item.platform}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
-                  </p>
-                </div>
-              ))}
-            </div>
+          <section style={{ ...panelStyle, padding: '20px 22px' }}>
+            <h2 style={{ margin: '0 0 8px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Opportunities</h2>
+            {opportunities.slice(0, 4).map((item, i) => (
+              <div key={i} style={{ borderTop: i ? '1px solid var(--rule)' : 'none', padding: i ? '11px 0' : '4px 0 11px' }}>
+                <p style={{ margin: '0 0 3px', fontSize: 13.5, fontWeight: 700, lineHeight: 1.4 }}>{item.title || item.name}</p>
+                <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 12 }}>
+                  {item.platform}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
+                </p>
+              </div>
+            ))}
           </section>
         )}
+        </div>
+
+        {/* Left side rail: the long view and standing preferences */}
+        <div className="wp-aside">
+
+        {/* Long-horizon plan */}
+        {longHorizonLanes.length > 0 && (
+          <section style={{ ...panelStyle, padding: '20px 22px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', marginBottom: 6 }}>
+              <h2 style={{ margin: 0, fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Long-scale plan</h2>
+              <span style={{ ...monoLabel, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {longHorizonPlan.horizon_months || roadmap.destination?.planning_horizon_months || 12} months
+              </span>
+            </div>
+            <p style={{ margin: '0 0 6px', color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.5 }}>
+              Delta keeps these lanes alive across the selected timeline, then chooses the right weekly slice.
+            </p>
+            {longHorizonLanes.map((lane, index) => (
+              <div key={lane.name} style={{ borderTop: index ? '1px solid var(--rule)' : 'none', padding: index ? '12px 0' : '12px 0 12px' }}>
+                <p style={{ margin: '0 0 2px', color: 'var(--ink)', fontSize: 13.5, fontWeight: 700 }}>{lane.name}</p>
+                <p style={{ margin: '0 0 5px', color: 'var(--ink-soft)', fontSize: 12 }}>{lane.cadence}</p>
+                <p style={{ margin: 0, color: 'var(--ink)', fontSize: 13, lineHeight: 1.5 }}>{lane.rule}</p>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {/* Plan Preferences — permanent rules + next-week requests */}
+        <section style={{ ...panelStyle, padding: '20px 22px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Plan preferences</h2>
+              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
+                Permanent rules apply every week · Next week requests carry forward once
+              </p>
+            </div>
+            {docsLoading && <Loader2 size={15} className="wp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
+          </div>
+          <div className="plan-preferences-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+            {/* Permanent */}
+            <div>
+              <p style={{ ...monoLabel, margin: '0 0 10px' }}>Permanent rules</p>
+              {contextDocs.permanent.length === 0 && (
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No permanent rules yet. Add one below.</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                {contextDocs.permanent.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 0, padding: '7px 10px' }}>
+                    <span style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.4 }}>{item}</span>
+                    <button onClick={() => removePermanent(i)} aria-label="Remove rule" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 8, flexShrink: 0 }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={newPermanent}
+                  onChange={e => setNewPermanent(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addPermanent()}
+                  placeholder="e.g. Never more than 2 tasks"
+                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
+                />
+                <button onClick={addPermanent} style={{ background: 'var(--rule)', border: 'none', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+            {/* Next week requests */}
+            <div style={{ borderTop: '1px solid var(--rule)', paddingTop: 14 }}>
+              <p style={{ ...monoLabel, margin: '0 0 10px' }}>Next week requests</p>
+              {contextDocs.next_week.length === 0 && (
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No requests yet. Add one below or tell Agent 2.</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                {contextDocs.next_week.map((item, i) => {
+                  const text = typeof item === 'string' ? item : item.text;
+                  const weeksLeft = typeof item === 'object' ? item.weeks_remaining : 1;
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--accent-surface)', borderRadius: 0, padding: '7px 10px' }}>
+                      <span style={{ flex: 1, fontSize: 13, color: 'var(--ink)', lineHeight: 1.4 }}>{text}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 0, background: 'var(--accent-surface)', color: weeksLeft <= 1 ? 'var(--oxblood)' : 'var(--ink-soft)', flexShrink: 0 }}>
+                        {weeksLeft}w
+                      </span>
+                      <button onClick={() => removeNextWeek(i)} aria-label="Remove request" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 8, flexShrink: 0 }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input
+                  value={newNextWeek}
+                  onChange={e => setNewNextWeek(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addNextWeek()}
+                  placeholder="e.g. Include a REST API project"
+                  style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={newNextWeekWeeks}
+                    onChange={e => setNewNextWeekWeeks(e.target.value)}
+                    title="Number of weeks to keep this instruction active"
+                    style={{ width: 44, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 6px', color: 'var(--ink)', fontSize: 12, outline: 'none', textAlign: 'center' }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>wk</span>
+                </div>
+                <button onClick={addNextWeek} style={{ background: 'var(--rule)', border: 'none', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', cursor: 'pointer' }}>
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        </div>
+        </div>
       </div>
 
       {/* Skip task dialog */}
@@ -1557,7 +1550,7 @@ export default function WeeklyPlan() {
 
       {/* Expired-week carry-over prompt */}
       {expiredOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,25,24,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
           <div style={{ ...panelStyle, background: 'var(--bone)', padding: 24, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>This week's time is up</h2>
             <p style={{ margin: '0 0 16px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.5 }}>
@@ -1590,8 +1583,60 @@ export default function WeeklyPlan() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @media (max-width: 640px) {
-          .plan-preferences-grid { grid-template-columns: 1fr !important; }
+        .wp-btn {
+          font-family: 'IBM Plex Mono', ui-monospace, monospace;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          border-radius: 0;
+          padding: 11px 18px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+        .wp-btn:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        .wp-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .wp-btn-primary { background: var(--oxblood); color: var(--bone); border: 1px solid var(--oxblood); }
+        .wp-btn-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); }
+        .wp-btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+        .wp-btn-ghost:hover:not(:disabled) { background: var(--ink); color: var(--bone); }
+        .wp-task { transition: background-color 0.15s ease; }
+        .wp-task:hover { background: var(--accent-surface) !important; }
+        .wp-task:focus-visible { outline: 2px solid var(--oxblood); outline-offset: -2px; }
+        .wp-main {
+          display: grid;
+          gap: 20px;
+          align-items: start;
+          grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
+          grid-template-areas: "aside center bside";
+        }
+        .wp-center { grid-area: center; display: grid; gap: 20px; min-width: 0; }
+        .wp-aside { grid-area: aside; display: grid; gap: 20px; min-width: 0; align-content: start; }
+        .wp-bside { grid-area: bside; display: grid; gap: 20px; min-width: 0; align-content: start; }
+        @media (max-width: 1180px) {
+          .wp-main {
+            grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+            grid-template-areas:
+              "center bside"
+              "center aside";
+          }
+        }
+        @media (max-width: 940px) {
+          .wp-main {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+              "center"
+              "bside"
+              "aside";
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wp-spin { animation: none !important; }
+          .wp-btn, .wp-task { transition: none; }
         }
       `}</style>
     </main>

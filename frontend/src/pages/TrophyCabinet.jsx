@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Trophy, Award, BadgeCheck, GraduationCap, FolderGit2, Medal,
-  Plus, X, Trash2, ExternalLink, Loader2, Calendar as CalendarIcon, Building2,
+  Plus, X, Trash2, ExternalLink, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { achievementsAPI } from '../lib/api';
@@ -13,7 +13,19 @@ const panelStyle = {
   borderRadius: 0,
 };
 
-// Type → icon + accent colour + label. Drives the badge and card styling.
+const serif = "'Cormorant Garamond', Georgia, serif";
+const mono = "'IBM Plex Mono', ui-monospace, monospace";
+
+const monoLabel = {
+  fontFamily: mono,
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'var(--ink-soft)',
+};
+
+// Type → icon + accent colour + label. Drives the ledger's left column.
 const TYPES = {
   certificate: { label: 'Certificate', icon: BadgeCheck, color: 'var(--ink-soft)' },
   project: { label: 'Project', icon: FolderGit2, color: 'var(--oxblood)' },
@@ -103,54 +115,39 @@ export default function TrophyCabinet() {
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3.5rem' }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto' }}>
 
         {/* Header */}
-        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 28 }}>
+        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 18, alignItems: 'flex-end', marginBottom: 22 }}>
           <div>
-            <p style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 650, margin: '0 0 10px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <Trophy size={15} style={{ color: 'var(--oxblood)' }} /> Trophy Cabinet
-            </p>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(2rem, 5vw, 3.2rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0, maxWidth: 720 }}>
+            <h1 style={{ fontFamily: serif, fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', lineHeight: 1.1, letterSpacing: 0, margin: 0, maxWidth: 640 }}>
               Everything you've earned, in one place.
             </h1>
-            <p style={{ margin: '14px 0 0', color: 'var(--ink-soft)', fontSize: 15, lineHeight: 1.55, maxWidth: 620 }}>
-              Track the certificates, projects, and awards you've collected on your journey. Add anything you're proud of.
+            <p style={{ margin: '10px 0 0', color: 'var(--ink-soft)', fontSize: 14.5, lineHeight: 1.55, maxWidth: '58ch' }}>
+              The certificates, projects, and awards you've collected on your journey. Add anything you're proud of.
             </p>
           </div>
-          <button
-            onClick={openAdd}
-            style={{
-              background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0,
-              padding: '11px 18px', fontWeight: 700, flexShrink: 0,
-              display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-            }}
-          >
-            <Plus size={16} /> Add achievement
+          <button className="tc-btn tc-btn-primary" onClick={openAdd}>
+            <Plus size={14} /> Add achievement
           </button>
         </header>
 
-        {/* Filter chips */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 22 }}>
+        {/* Filter tabs */}
+        <div role="tablist" aria-label="Filter achievements" style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--rule)', marginBottom: 22, overflowX: 'auto' }}>
           {['all', ...TYPE_KEYS].map((key) => {
             const isActive = filter === key;
             const label = key === 'all' ? 'All' : TYPES[key].label + 's';
-            const count = counts[key] || 0;
             return (
               <button
                 key={key}
+                role="tab"
+                aria-selected={isActive}
+                className={`tc-tab${isActive ? ' tc-tab-active' : ''}`}
                 onClick={() => setFilter(key)}
-                style={{
-                  background: isActive ? 'var(--ink)' : 'var(--accent-surface)',
-                  color: isActive ? 'var(--bone)' : 'var(--ink)',
-                  border: '1px solid var(--rule)', borderRadius: 0,
-                  padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 7,
-                }}
               >
                 {label}
-                <span style={{ opacity: 0.6, fontSize: 12 }}>{count}</span>
+                <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 500, marginLeft: 7, opacity: 0.75 }}>{counts[key] || 0}</span>
               </button>
             );
           })}
@@ -158,106 +155,76 @@ export default function TrophyCabinet() {
 
         {/* Content */}
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ink-soft)', padding: '40px 0' }}>
-            <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading your cabinet...
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ink-soft)', padding: '40px 0', fontSize: 14 }}>
+            <Loader2 size={17} className="tc-spin" style={{ animation: 'spin 1s linear infinite' }} /> Loading your cabinet...
           </div>
         ) : visible.length === 0 ? (
-          <section style={{ ...panelStyle, padding: '48px 24px', textAlign: 'center' }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 0, margin: '0 auto 16px',
-              background: 'var(--accent-surface)', border: '1px solid var(--rule)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Trophy size={26} style={{ color: 'var(--oxblood)' }} />
-            </div>
-            <h2 style={{ margin: '0 0 8px', fontSize: 20 }}>
-              {items.length === 0 ? 'Your cabinet is empty' : 'Nothing here yet'}
+          <section style={{ ...panelStyle, padding: '30px 26px' }}>
+            <h2 style={{ margin: '0 0 8px', fontFamily: serif, fontSize: 22, fontWeight: 600 }}>
+              {items.length === 0 ? 'Your cabinet is empty.' : 'Nothing of this type yet.'}
             </h2>
-            <p style={{ margin: '0 0 20px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55 }}>
+            <p style={{ margin: '0 0 20px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.6, maxWidth: '58ch' }}>
               {items.length === 0
-                ? 'Add your first certificate, project, or award to start building your trophy cabinet.'
-                : 'No achievements of this type yet. Try another filter or add one.'}
+                ? 'Certificates, projects, awards, courses — anything you\'ve earned belongs here. Each entry strengthens the record behind your resume.'
+                : 'Try another filter, or add one now.'}
             </p>
-            <button
-              onClick={openAdd}
-              style={{
-                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0,
-                padding: '11px 18px', fontWeight: 700, cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-              }}
-            >
-              <Plus size={16} /> Add achievement
+            <button className="tc-btn tc-btn-primary" onClick={openAdd}>
+              <Plus size={14} /> {items.length === 0 ? 'Add your first achievement' : 'Add achievement'}
             </button>
           </section>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-            {visible.map((it) => {
+          <section style={{ ...panelStyle }}>
+            {visible.map((it, i) => {
               const meta = TYPES[it.type] || TYPES.other;
               const Icon = meta.icon;
+              const metaLine = [it.organization, it.date_achieved].filter(Boolean).join('  ·  ');
               return (
-                <div key={it.id} style={{ ...panelStyle, padding: 18, display: 'flex', flexDirection: 'column', gap: 10, position: 'relative' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      background: 'var(--accent-surface)', border: `1px solid ${meta.color}44`,
-                      color: meta.color, borderRadius: 0, padding: '4px 10px', fontSize: 11, fontWeight: 700,
-                      textTransform: 'uppercase', letterSpacing: 0.5,
-                    }}>
-                      <Icon size={12} /> {meta.label}
-                    </span>
-                    <button
-                      onClick={() => setConfirmDelete(it)}
-                      disabled={deletingId === it.id}
-                      aria-label={`Remove ${it.title}`}
-                      title="Remove"
-                      style={{
-                        background: 'none', border: 'none', color: 'var(--ink-soft)',
-                        cursor: 'pointer', padding: 10, display: 'flex',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--oxblood)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ink-soft)'; }}
-                    >
-                      {deletingId === it.id
-                        ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                        : <Trash2 size={14} />}
-                    </button>
+                <article
+                  key={it.id}
+                  className="tc-row"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '104px minmax(0, 1fr) auto',
+                    gap: 18,
+                    padding: '18px 22px',
+                    borderTop: i ? '1px solid var(--rule)' : 'none',
+                    alignItems: 'start',
+                  }}
+                >
+                  <span className="tc-type" style={{ ...monoLabel, color: meta.color, display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                    <Icon size={12} /> {meta.label}
+                  </span>
+
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 700, lineHeight: 1.4 }}>{it.title}</h3>
+                    {metaLine && (
+                      <p style={{ margin: '4px 0 0', color: 'var(--ink-soft)', fontSize: 12.5, lineHeight: 1.5 }}>{metaLine}</p>
+                    )}
+                    {it.description && (
+                      <p style={{ margin: '7px 0 0', color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.55, maxWidth: '65ch' }}>{it.description}</p>
+                    )}
+                    {it.url && (
+                      <a className="tc-link" href={it.url} target="_blank" rel="noreferrer">
+                        View credential <ExternalLink size={12} />
+                      </a>
+                    )}
                   </div>
 
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>{it.title}</h3>
-
-                  {(it.organization || it.date_achieved) && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, color: 'var(--ink-soft)', fontSize: 13 }}>
-                      {it.organization && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                          <Building2 size={12} /> {it.organization}
-                        </span>
-                      )}
-                      {it.date_achieved && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                          <CalendarIcon size={12} /> {it.date_achieved}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {it.description && (
-                    <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.55 }}>{it.description}</p>
-                  )}
-
-                  {it.url && (
-                    <a
-                      href={it.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink)', fontSize: 13, textDecoration: 'underline', marginTop: 'auto' }}
-                    >
-                      <ExternalLink size={13} /> View credential
-                    </a>
-                  )}
-                </div>
+                  <button
+                    className="tc-del"
+                    onClick={() => setConfirmDelete(it)}
+                    disabled={deletingId === it.id}
+                    aria-label={`Remove ${it.title}`}
+                    title="Remove"
+                  >
+                    {deletingId === it.id
+                      ? <Loader2 size={14} className="tc-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                      : <Trash2 size={14} />}
+                  </button>
+                </article>
               );
             })}
-          </div>
+          </section>
         )}
       </div>
 
@@ -265,21 +232,15 @@ export default function TrophyCabinet() {
       {confirmDelete && (
         <>
           <div onClick={() => setConfirmDelete(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(26,25,24,0.45)', zIndex: 80 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 81, background: 'var(--paper)', border: '1px solid var(--rule)', padding: 28, width: 'min(90vw, 420px)' }}>
-            <p style={{ color: 'var(--ink-soft)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px' }}>Remove achievement</p>
-            <p style={{ color: 'var(--ink)', fontSize: 15, fontWeight: 600, margin: '0 0 20px', lineHeight: 1.4 }}>{confirmDelete.title}</p>
-            <p style={{ color: 'var(--ink-soft)', fontSize: 13, margin: '0 0 18px' }}>This permanently removes it from your trophy cabinet. This can't be undone.</p>
+          <div role="dialog" aria-modal="true" aria-label="Remove achievement" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 81, background: 'var(--paper)', border: '1px solid var(--rule)', padding: 28, width: 'min(90vw, 420px)' }}>
+            <p style={{ ...monoLabel, margin: '0 0 8px' }}>Remove achievement</p>
+            <p style={{ color: 'var(--ink)', fontSize: 15, fontWeight: 600, margin: '0 0 12px', lineHeight: 1.4 }}>{confirmDelete.title}</p>
+            <p style={{ color: 'var(--ink-soft)', fontSize: 13, margin: '0 0 20px', lineHeight: 1.5 }}>This permanently removes it from your trophy cabinet. This can't be undone.</p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => setConfirmDelete(null)}
-                style={{ flex: 1, background: 'none', border: '1px solid var(--rule)', padding: '12px 16px', color: 'var(--ink)', cursor: 'pointer', fontSize: 13 }}
-              >
+              <button className="tc-btn tc-btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmDelete(null)}>
                 Cancel
               </button>
-              <button
-                onClick={() => removeAchievement(confirmDelete.id)}
-                style={{ flex: 1, background: 'var(--oxblood)', border: '1px solid var(--oxblood)', padding: '12px 16px', color: 'var(--bone)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-              >
+              <button className="tc-btn tc-btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => removeAchievement(confirmDelete.id)}>
                 Remove
               </button>
             </div>
@@ -291,14 +252,14 @@ export default function TrophyCabinet() {
       {modalOpen && (
         <>
           <div onClick={() => !saving && setModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(26,25,24,0.45)', zIndex: 80 }} />
-          <div style={{
+          <div role="dialog" aria-modal="true" aria-label="Add achievement" style={{
             position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 81,
             background: 'var(--paper)', border: '1px solid var(--rule)', borderRadius: 0,
             padding: 26, width: 'min(94vw, 480px)', maxHeight: '88vh', overflowY: 'auto',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontSize: 19, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <Award size={18} style={{ color: 'var(--oxblood)' }} /> Add achievement
+              <h2 style={{ margin: 0, fontFamily: serif, fontSize: 21, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Award size={17} style={{ color: 'var(--oxblood)' }} /> Add achievement
               </h2>
               <button onClick={() => !saving && setModalOpen(false)} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--ink-soft)', cursor: 'pointer', padding: 10, display: 'flex' }}>
                 <X size={18} />
@@ -318,16 +279,10 @@ export default function TrophyCabinet() {
                       <button
                         key={key}
                         type="button"
+                        className={`tc-chip${active ? ' tc-chip-active' : ''}`}
                         onClick={() => setForm((f) => ({ ...f, type: key }))}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 6,
-                          background: active ? 'var(--rule)' : 'var(--accent-surface)',
-                          border: `1px solid ${active ? meta.color + '88' : 'var(--rule)'}`,
-                          color: active ? 'var(--ink)' : 'var(--ink-soft)',
-                          borderRadius: 0, padding: '8px 12px', fontSize: 13, cursor: 'pointer', fontWeight: 600,
-                        }}
                       >
-                        <Icon size={13} style={{ color: meta.color }} /> {meta.label}
+                        <Icon size={13} /> {meta.label}
                       </button>
                     );
                   })}
@@ -336,37 +291,39 @@ export default function TrophyCabinet() {
 
               <div>
                 <label style={labelStyle}>Title <span style={{ color: 'var(--oxblood)' }}>*</span></label>
-                <input value={form.title} onChange={setField('title')} placeholder="e.g. AWS Certified Cloud Practitioner" style={inputStyle} autoFocus />
+                <input className="tc-input" value={form.title} onChange={setField('title')} placeholder="e.g. AWS Certified Cloud Practitioner" autoFocus />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Organization</label>
-                  <input value={form.organization} onChange={setField('organization')} placeholder="e.g. Amazon, Coursera" style={inputStyle} />
+                  <input className="tc-input" value={form.organization} onChange={setField('organization')} placeholder="e.g. Amazon, Coursera" />
                 </div>
                 <div>
                   <label style={labelStyle}>Date</label>
-                  <input value={form.date_achieved} onChange={setField('date_achieved')} placeholder="e.g. Jun 2025" style={inputStyle} />
+                  <input className="tc-input" value={form.date_achieved} onChange={setField('date_achieved')} placeholder="e.g. Jun 2025" />
                 </div>
               </div>
 
               <div>
                 <label style={labelStyle}>Link (optional)</label>
-                <input value={form.url} onChange={setField('url')} placeholder="https://..." style={inputStyle} />
+                <input className="tc-input" value={form.url} onChange={setField('url')} placeholder="https://..." />
               </div>
 
               <div>
                 <label style={labelStyle}>Description (optional)</label>
-                <textarea value={form.description} onChange={setField('description')} placeholder="What did you build or learn? Why does it matter?" rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                <textarea className="tc-input" value={form.description} onChange={setField('description')} placeholder="What did you build or learn? Why does it matter?" rows={3} style={{ resize: 'vertical' }} />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button onClick={() => setModalOpen(false)} disabled={saving} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '9px 16px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>
+              <button className="tc-btn tc-btn-ghost" onClick={() => setModalOpen(false)} disabled={saving}>
                 Cancel
               </button>
-              <button onClick={saveAchievement} disabled={saving} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
+              <button className="tc-btn tc-btn-primary" onClick={saveAchievement} disabled={saving}>
+                {saving
+                  ? <Loader2 size={13} className="tc-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Plus size={13} />}
                 Add to cabinet
               </button>
             </div>
@@ -374,27 +331,121 @@ export default function TrophyCabinet() {
         </>
       )}
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .tc-btn {
+          font-family: 'IBM Plex Mono', ui-monospace, monospace;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          border-radius: 0;
+          padding: 11px 18px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+          flex-shrink: 0;
+        }
+        .tc-btn:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        .tc-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .tc-btn-primary { background: var(--oxblood); color: var(--bone); border: 1px solid var(--oxblood); }
+        .tc-btn-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); }
+        .tc-btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+        .tc-btn-ghost:hover:not(:disabled) { background: var(--ink); color: var(--bone); }
+        .tc-tab {
+          background: none;
+          border: none;
+          border-bottom: 2px solid transparent;
+          padding: 10px 2px 12px;
+          margin-bottom: -1px;
+          color: var(--ink-soft);
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: color 0.15s ease, border-color 0.15s ease;
+        }
+        .tc-tab:hover { color: var(--ink); }
+        .tc-tab:focus-visible { outline: 2px solid var(--oxblood); outline-offset: -2px; }
+        .tc-tab-active { color: var(--ink); border-bottom-color: var(--oxblood); }
+        .tc-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: var(--accent-surface);
+          border: 1px solid var(--rule);
+          color: var(--ink);
+          border-radius: 0;
+          padding: 8px 12px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .tc-chip:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        .tc-chip-active { background: var(--ink); color: var(--bone); border-color: var(--ink); }
+        .tc-input {
+          width: 100%;
+          background: var(--paper);
+          border: 1px solid var(--rule);
+          border-radius: 0;
+          padding: 10px 12px;
+          color: var(--ink);
+          font-size: 14px;
+          font-family: inherit;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.15s ease;
+        }
+        .tc-input::placeholder { color: var(--ink-soft); }
+        .tc-input:focus { border-color: var(--oxblood); }
+        .tc-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 9px;
+          color: var(--ink);
+          font-size: 13px;
+          font-weight: 600;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          transition: color 0.15s ease;
+        }
+        .tc-link:hover { color: var(--oxblood); }
+        .tc-link:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        .tc-del {
+          background: none;
+          border: none;
+          color: var(--ink-soft);
+          cursor: pointer;
+          padding: 8px;
+          display: flex;
+          transition: color 0.15s ease;
+        }
+        .tc-del:hover:not(:disabled) { color: var(--oxblood); }
+        .tc-del:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        @media (max-width: 560px) {
+          .tc-row { grid-template-columns: minmax(0, 1fr) auto !important; }
+          .tc-type { grid-column: 1 / -1; margin-top: 0 !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .tc-spin { animation: none !important; }
+          .tc-btn, .tc-tab, .tc-chip, .tc-input, .tc-link, .tc-del { transition: none; }
+        }
+      `}</style>
     </main>
   );
 }
 
 const labelStyle = {
   display: 'block',
-  fontSize: 12,
+  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
   color: 'var(--ink-soft)',
-  marginBottom: 6,
-  fontWeight: 600,
-};
-
-const inputStyle = {
-  width: '100%',
-  background: 'var(--accent-surface)',
-  border: '1px solid var(--rule)',
-  borderRadius: 0,
-  padding: '10px 12px',
-  color: 'var(--ink)',
-  fontSize: 14,
-  outline: 'none',
-  boxSizing: 'border-box',
+  marginBottom: 7,
 };

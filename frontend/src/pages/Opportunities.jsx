@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Briefcase, MapPin, Sparkles, RefreshCw, Loader2, ExternalLink, Building2,
+  MapPin, RefreshCw, Loader2, ExternalLink,
   SlidersHorizontal, Check, TrendingUp, AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,6 +11,18 @@ const panelStyle = {
   background: 'var(--paper)',
   border: '1px solid var(--rule)',
   borderRadius: 0,
+};
+
+const serif = "'Cormorant Garamond', Georgia, serif";
+const mono = "'IBM Plex Mono', ui-monospace, monospace";
+
+const monoLabel = {
+  fontFamily: mono,
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'var(--ink-soft)',
 };
 
 const ROLE_TYPE_OPTIONS = [
@@ -25,9 +37,14 @@ const ROLE_TYPE_LABEL = { internship: 'Internship', full_time: 'Full-time', part
 
 const DEFAULT_PREFS = { location: '', role_types: ['internship', 'full_time'], work_mode: 'any', industries: '', notes: '' };
 
-function scoreColor(score) {
-  if (score >= 75) return 'var(--oxblood)';
-  return 'var(--ink-soft)';
+function SkillsLine({ label, skills, tone = 'var(--ink)' }) {
+  if (!skills?.length) return null;
+  return (
+    <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7 }}>
+      <span style={{ ...monoLabel, marginRight: 10 }}>{label}</span>
+      <span style={{ color: tone }}>{skills.join('  ·  ')}</span>
+    </p>
+  );
 }
 
 export default function Opportunities() {
@@ -115,58 +132,45 @@ export default function Opportunities() {
     return parts.join(' · ');
   }, [prefs]);
 
+  const ranked = useMemo(
+    () => [...opportunities].sort((a, b) => (b.match_score || 0) - (a.match_score || 0)),
+    [opportunities],
+  );
+
   const isEmpty = !loading && opportunities.length === 0;
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3.5rem' }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto' }}>
 
         {/* Header */}
-        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 18, alignItems: 'flex-start', marginBottom: 24 }}>
+        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 18, alignItems: 'flex-end', marginBottom: 18 }}>
           <div>
-            <p style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 650, margin: '0 0 10px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <Briefcase size={15} style={{ color: 'var(--oxblood)' }} /> Opportunities
-            </p>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(2rem, 5vw, 3.2rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0, maxWidth: 720 }}>
+            <h1 style={{ fontFamily: serif, fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', lineHeight: 1.1, letterSpacing: 0, margin: 0, maxWidth: 640 }}>
               Roles matched to where you are now.
             </h1>
-            <p style={{ margin: '14px 0 0', color: 'var(--ink-soft)', fontSize: 15, lineHeight: 1.55, maxWidth: 640 }}>
-              AI-suggested jobs and internships based on your profile. As your skills grow, your matches sharpen. Set preferences to steer them.
+            <p style={{ margin: '10px 0 0', color: 'var(--ink-soft)', fontSize: 14.5, lineHeight: 1.55, maxWidth: '58ch' }}>
+              Suggested jobs and internships based on your profile. As your skills grow, your matches sharpen.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-            <button
-              onClick={() => setPrefsOpen((o) => !o)}
-              style={{
-                background: 'var(--accent-surface)', color: 'var(--ink)',
-                border: '1px solid var(--rule)', borderRadius: 0,
-                padding: '11px 16px', fontWeight: 600, fontSize: 13,
-                display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer',
-              }}
-            >
-              <SlidersHorizontal size={14} /> Preferences
+            <button className="opp-btn opp-btn-ghost" onClick={() => setPrefsOpen((o) => !o)}>
+              <SlidersHorizontal size={13} /> Preferences
             </button>
-            <button
-              onClick={generate}
-              disabled={generating}
-              style={{
-                background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0,
-                padding: '11px 18px', fontWeight: 700,
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                cursor: generating ? 'not-allowed' : 'pointer', flexShrink: 0,
-              }}
-            >
-              {generating ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={15} />}
+            <button className="opp-btn opp-btn-primary" onClick={generate} disabled={generating}>
+              {generating
+                ? <Loader2 size={13} className="opp-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                : <RefreshCw size={13} />}
               {opportunities.length ? 'Refresh' : 'Find opportunities'}
             </button>
           </div>
         </header>
 
         {/* Preferences summary line */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-soft)', fontSize: 13, marginBottom: 18 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, color: 'var(--ink-soft)', fontSize: 13, marginBottom: 18 }}>
           <MapPin size={13} /> {prefsSummary}
           {generatedAt && (
-            <span style={{ marginLeft: 'auto', color: 'var(--ink-soft)' }}>
+            <span style={{ ...monoLabel, marginLeft: 'auto' }}>
               Updated {new Date(generatedAt).toLocaleDateString()}
             </span>
           )}
@@ -174,16 +178,16 @@ export default function Opportunities() {
 
         {/* Preferences panel */}
         {prefsOpen && (
-          <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
-            <h2 style={{ margin: '0 0 16px', fontSize: 17 }}>Your preferences</h2>
+          <section style={{ ...panelStyle, padding: 22, marginBottom: 20 }}>
+            <h2 style={{ margin: '0 0 16px', fontFamily: serif, fontSize: 20, fontWeight: 600 }}>Your preferences</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
               <div>
                 <label style={labelStyle}>Preferred location</label>
                 <input
+                  className="opp-input"
                   value={prefs.location}
                   onChange={(e) => setPrefs((p) => ({ ...p, location: e.target.value }))}
                   placeholder="e.g. Bangalore, Remote, Europe"
-                  style={inputStyle}
                 />
               </div>
               <div>
@@ -193,8 +197,8 @@ export default function Opportunities() {
                     <button
                       key={m}
                       type="button"
+                      className={`opp-chip${prefs.work_mode === m ? ' opp-chip-active' : ''}`}
                       onClick={() => setPrefs((p) => ({ ...p, work_mode: m }))}
-                      style={chipStyle(prefs.work_mode === m)}
                     >
                       {m === 'any' ? 'Any' : m.charAt(0).toUpperCase() + m.slice(1)}
                     </button>
@@ -207,7 +211,12 @@ export default function Opportunities() {
                   {ROLE_TYPE_OPTIONS.map((rt) => {
                     const active = prefs.role_types.includes(rt.key);
                     return (
-                      <button key={rt.key} type="button" onClick={() => toggleRoleType(rt.key)} style={chipStyle(active)}>
+                      <button
+                        key={rt.key}
+                        type="button"
+                        className={`opp-chip${active ? ' opp-chip-active' : ''}`}
+                        onClick={() => toggleRoleType(rt.key)}
+                      >
                         {active && <Check size={12} style={{ marginRight: 4 }} />}{rt.label}
                       </button>
                     );
@@ -217,29 +226,32 @@ export default function Opportunities() {
               <div>
                 <label style={labelStyle}>Preferred industries</label>
                 <input
+                  className="opp-input"
                   value={prefs.industries}
                   onChange={(e) => setPrefs((p) => ({ ...p, industries: e.target.value }))}
                   placeholder="e.g. Fintech, AI, Healthcare"
-                  style={inputStyle}
                 />
               </div>
             </div>
             <div style={{ marginTop: 16 }}>
               <label style={labelStyle}>Anything else to steer your matches?</label>
               <textarea
+                className="opp-input"
                 value={prefs.notes}
                 onChange={(e) => setPrefs((p) => ({ ...p, notes: e.target.value }))}
                 placeholder="e.g. Prefer startups over big tech, open to relocation, want mentorship..."
                 rows={2}
-                style={{ ...inputStyle, resize: 'vertical' }}
+                style={{ resize: 'vertical' }}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-              <button onClick={() => setPrefsOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '9px 16px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>
+              <button className="opp-btn opp-btn-ghost" onClick={() => setPrefsOpen(false)}>
                 Cancel
               </button>
-              <button onClick={savePreferences} disabled={savingPrefs} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: savingPrefs ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                {savingPrefs ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
+              <button className="opp-btn opp-btn-primary" onClick={savePreferences} disabled={savingPrefs}>
+                {savingPrefs
+                  ? <Loader2 size={13} className="opp-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Check size={13} />}
                 Save preferences
               </button>
             </div>
@@ -249,11 +261,11 @@ export default function Opportunities() {
         {/* Stale banner */}
         {stale && !generating && (
           <div style={{ ...panelStyle, padding: '12px 16px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--accent-surface)' }}>
-            <TrendingUp size={16} style={{ color: 'var(--oxblood)', flexShrink: 0 }} />
+            <TrendingUp size={15} style={{ color: 'var(--oxblood)', flexShrink: 0 }} />
             <span style={{ fontSize: 13, color: 'var(--ink)', flex: 1 }}>
               Your profile has improved since these were generated. Refresh for sharper matches.
             </span>
-            <button onClick={generate} style={{ background: 'var(--oxblood)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button className="opp-btn opp-btn-primary" style={{ padding: '8px 14px' }} onClick={generate}>
               Refresh
             </button>
           </div>
@@ -261,157 +273,189 @@ export default function Opportunities() {
 
         {/* Content */}
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ink-soft)', padding: '40px 0' }}>
-            <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading your board...
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ink-soft)', padding: '40px 0', fontSize: 14 }}>
+            <Loader2 size={17} className="opp-spin" style={{ animation: 'spin 1s linear infinite' }} /> Loading your board...
           </div>
         ) : generating ? (
-          <section style={{ ...panelStyle, padding: '48px 24px', textAlign: 'center' }}>
-            <Loader2 size={26} style={{ animation: 'spin 1s linear infinite', color: 'var(--oxblood)', marginBottom: 14 }} />
-            <h2 style={{ margin: '0 0 8px', fontSize: 19 }}>Matching roles to your profile...</h2>
-            <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14 }}>Reading your skills, experience, and preferences. This takes a few seconds.</p>
+          <section style={{ ...panelStyle, padding: '30px 26px' }}>
+            <h2 style={{ margin: '0 0 8px', fontFamily: serif, fontSize: 21, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Loader2 size={17} className="opp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--oxblood)' }} />
+              Matching roles to your profile...
+            </h2>
+            <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55, maxWidth: '58ch' }}>
+              Reading your skills, experience, and preferences. This takes a few seconds.
+            </p>
           </section>
         ) : isEmpty ? (
-          <section style={{ ...panelStyle, padding: '48px 24px', textAlign: 'center' }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: 0, margin: '0 auto 16px',
-              background: 'var(--accent-surface)', border: '1px solid var(--rule)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Sparkles size={24} style={{ color: 'var(--oxblood)' }} />
-            </div>
-            <h2 style={{ margin: '0 0 8px', fontSize: 20 }}>No suggestions yet</h2>
-            <p style={{ margin: '0 0 20px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55 }}>
-              Set your preferences, then let Delta match jobs and internships to your current profile.
+          <section style={{ ...panelStyle, padding: '30px 26px' }}>
+            <h2 style={{ margin: '0 0 8px', fontFamily: serif, fontSize: 22, fontWeight: 600 }}>No suggestions yet</h2>
+            <p style={{ margin: '0 0 20px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.6, maxWidth: '58ch' }}>
+              Delta reads your profile — skills, projects, preferences — and matches roles to it, ranked by fit.
+              Set your preferences to steer the search, then generate your first board.
             </p>
-            <button
-              onClick={generate}
-              style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '11px 18px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
-            >
-              <Sparkles size={16} /> Find my opportunities
+            <button className="opp-btn opp-btn-primary" onClick={generate}>
+              <RefreshCw size={13} /> Find my opportunities
             </button>
           </section>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-            {opportunities.map((op, i) => (
-              <div key={i} style={{ ...panelStyle, padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                  <div>
-                    <span style={{
-                      display: 'inline-block', background: 'var(--accent-surface)', color: 'var(--oxblood)',
-                      borderRadius: 0, padding: '3px 9px', fontSize: 10, fontWeight: 700,
-                      textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8,
-                    }}>
-                      {ROLE_TYPE_LABEL[op.role_type] || op.role_type}
-                    </span>
-                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, lineHeight: 1.35 }}>{op.title}</h3>
-                  </div>
-                  <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: scoreColor(op.match_score), lineHeight: 1 }}>{op.match_score}</div>
-                    <div style={{ fontSize: 9, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>match</div>
-                  </div>
+          <section style={{ ...panelStyle }}>
+            {ranked.map((op, i) => (
+              <article
+                key={i}
+                className="opp-row"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '72px minmax(0, 1fr) auto',
+                  gap: 22,
+                  padding: '20px 22px',
+                  borderTop: i ? '1px solid var(--rule)' : 'none',
+                  alignItems: 'start',
+                }}
+              >
+                <div className="opp-score" style={{ paddingTop: 2 }}>
+                  <span style={{
+                    display: 'block',
+                    fontSize: 27,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    color: (op.match_score || 0) >= 75 ? 'var(--oxblood)' : 'var(--ink)',
+                  }}>
+                    {op.match_score}
+                  </span>
+                  <span style={{ ...monoLabel, display: 'block', marginTop: 5 }}>match</span>
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, color: 'var(--ink-soft)', fontSize: 12 }}>
-                  {op.target_companies && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                      <Building2 size={12} /> {op.target_companies}
-                    </span>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ margin: 0, fontSize: 16.5, fontWeight: 700, lineHeight: 1.35 }}>{op.title}</h3>
+                  <p style={{ margin: '5px 0 0', color: 'var(--ink-soft)', fontSize: 12.5, lineHeight: 1.55 }}>
+                    {[
+                      ROLE_TYPE_LABEL[op.role_type] || op.role_type,
+                      op.target_companies,
+                      op.location ? `${op.location}${op.work_mode ? ` (${op.work_mode})` : ''}` : null,
+                    ].filter(Boolean).join('  ·  ')}
+                  </p>
+
+                  {op.why_it_fits && (
+                    <p style={{ margin: '9px 0 0', color: 'var(--ink)', fontSize: 13.5, lineHeight: 1.6, maxWidth: '68ch' }}>
+                      {op.why_it_fits}
+                    </p>
                   )}
-                  {op.location && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                      <MapPin size={12} /> {op.location}{op.work_mode ? ` · ${op.work_mode}` : ''}
-                    </span>
+
+                  {(op.skills_matched?.length > 0 || op.skills_to_build?.length > 0) && (
+                    <div style={{ display: 'grid', gap: 3, marginTop: 10 }}>
+                      <SkillsLine label="You have" skills={op.skills_matched} />
+                      <SkillsLine label="Worth building" skills={op.skills_to_build} tone="var(--ink-soft)" />
+                    </div>
                   )}
                 </div>
-
-                {op.why_it_fits && (
-                  <p style={{ margin: 0, color: 'var(--ink)', fontSize: 13, lineHeight: 1.55 }}>{op.why_it_fits}</p>
-                )}
-
-                {op.skills_matched?.length > 0 && (
-                  <div>
-                    <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>You have</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {op.skills_matched.map((s, j) => (
-                        <span key={j} style={{ background: 'var(--accent-surface)', color: 'var(--ink)', borderRadius: 0, padding: '3px 8px', fontSize: 11, border: '1px solid var(--rule)' }}>{s}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {op.skills_to_build?.length > 0 && (
-                  <div>
-                    <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Build to stand out</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {op.skills_to_build.map((s, j) => (
-                        <span key={j} style={{ background: 'var(--accent-surface)', color: 'var(--ink-soft)', borderRadius: 0, padding: '3px 8px', fontSize: 11, border: '1px solid var(--rule)' }}>{s}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {op.search_url && (
-                  <a
-                    href={op.search_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                      background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0,
-                      padding: '9px 12px', color: 'var(--ink)', fontSize: 13, fontWeight: 600, textDecoration: 'none',
-                    }}
-                  >
-                    <ExternalLink size={13} /> View live openings
+                  <a className="opp-link" style={{ marginTop: 4 }} href={op.search_url} target="_blank" rel="noreferrer">
+                    View live openings <ExternalLink size={12} />
                   </a>
                 )}
-              </div>
+              </article>
             ))}
-          </div>
+          </section>
         )}
 
         {/* Honest note about how suggestions work */}
         {!loading && !generating && opportunities.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 20, color: 'var(--ink-soft)', fontSize: 12, lineHeight: 1.5 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 18, color: 'var(--ink-soft)', fontSize: 12, lineHeight: 1.5, maxWidth: '80ch' }}>
             <AlertCircle size={13} style={{ flexShrink: 0, marginTop: 2 }} />
             <span>These are AI role matches for your current profile, each linking to live job-board search results. They aren't specific verified postings — always confirm details on the employer's page.</span>
           </div>
         )}
       </div>
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .opp-btn {
+          font-family: 'IBM Plex Mono', ui-monospace, monospace;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          border-radius: 0;
+          padding: 11px 18px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+        .opp-btn:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        .opp-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .opp-btn-primary { background: var(--oxblood); color: var(--bone); border: 1px solid var(--oxblood); }
+        .opp-btn-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); }
+        .opp-btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+        .opp-btn-ghost:hover:not(:disabled) { background: var(--ink); color: var(--bone); }
+        .opp-chip {
+          background: var(--accent-surface);
+          color: var(--ink);
+          border: 1px solid var(--rule);
+          border-radius: 0;
+          padding: 7px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .opp-chip:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        .opp-chip-active { background: var(--ink); color: var(--bone); border-color: var(--ink); }
+        .opp-input {
+          width: 100%;
+          background: var(--paper);
+          border: 1px solid var(--rule);
+          border-radius: 0;
+          padding: 10px 12px;
+          color: var(--ink);
+          font-size: 14px;
+          font-family: inherit;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.15s ease;
+        }
+        .opp-input::placeholder { color: var(--ink-soft); }
+        .opp-input:focus { border-color: var(--oxblood); }
+        .opp-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          color: var(--ink);
+          font-size: 13px;
+          font-weight: 600;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          transition: color 0.15s ease;
+        }
+        .opp-link:hover { color: var(--oxblood); }
+        .opp-link:focus-visible { outline: 2px solid var(--oxblood); outline-offset: 2px; }
+        @media (max-width: 680px) {
+          .opp-row { grid-template-columns: 1fr !important; gap: 10px !important; }
+          .opp-score { display: flex; align-items: baseline; gap: 8px; padding-top: 0 !important; }
+          .opp-score span { margin-top: 0 !important; }
+          .opp-row .opp-link { margin-top: 0 !important; justify-self: start; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .opp-spin { animation: none !important; }
+          .opp-btn, .opp-chip, .opp-input, .opp-link { transition: none; }
+        }
+      `}</style>
     </main>
   );
 }
 
 const labelStyle = {
   display: 'block',
-  fontSize: 12,
+  fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
   color: 'var(--ink-soft)',
-  marginBottom: 6,
-  fontWeight: 600,
+  marginBottom: 7,
 };
-
-const inputStyle = {
-  width: '100%',
-  background: 'var(--accent-surface)',
-  border: '1px solid var(--rule)',
-  borderRadius: 0,
-  padding: '10px 12px',
-  color: 'var(--ink)',
-  fontSize: 14,
-  outline: 'none',
-  boxSizing: 'border-box',
-};
-
-const chipStyle = (active) => ({
-  background: active ? 'var(--ink)' : 'var(--accent-surface)',
-  color: active ? 'var(--bone)' : 'var(--ink)',
-  border: '1px solid var(--rule)',
-  borderRadius: 0,
-  padding: '7px 12px',
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-});
