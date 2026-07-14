@@ -387,6 +387,30 @@ def _is_cs_engineering_user(profile: dict, skills: list[SkillNode], user: User) 
     return any(kw in combined for kw in cs_keywords)
 
 
+def _drop_avoided_actions(actions: list[dict], avoided: list[str]) -> list[dict]:
+    """Remove tasks matching any topic the user has permanently asked to avoid
+    (e.g. a saved "no LeetCode ever" preference). Matches on the visible task text."""
+    if not avoided:
+        return actions
+    kept = []
+    for a in actions:
+        blob = " ".join(
+            str(a.get(k, "")) for k in ("title", "skill", "description", "source", "node_id", "id")
+        ).lower()
+        if any(term in blob for term in avoided):
+            continue
+        kept.append(a)
+    return kept
+
+
+def _avoided_topics(user_id: str) -> list[str]:
+    try:
+        from app.services.user_context_store import get_avoided_topics
+        return get_avoided_topics(user_id)
+    except Exception:
+        return []
+
+
 def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User, cycle_count: int = 0) -> list[dict]:
     if not _is_cs_engineering_user(profile, skills, user):
         return []
@@ -405,7 +429,7 @@ def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User,
         parts.append(f"{hard}H")
     count_label = f"{count} problems ({'+'.join(parts)})" if parts else f"{count} problems"
     slug = topic.lower().replace(" ", "-").replace("/", "-")
-    return [{
+    action = {
         "id": f"recurring-leetcode-cycle-{cycle_count}-{slug}",
         "node_id": f"recurring-leetcode-cycle-{cycle_count}",
         "type": "practice",
@@ -418,7 +442,9 @@ def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User,
         "url": "https://leetcode.com/problemset/",
         "cadence": "weekly",
         "recurring": True,
-    }]
+    }
+    # Honour a permanent "no LeetCode / no DSA" preference: skip injecting it entirely.
+    return _drop_avoided_actions([action], _avoided_topics(user.id))
 
 
 def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, market: MarketSnapshot) -> list[dict]:
@@ -1844,6 +1870,13 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     if blocking_events:
         weekly_focus["phase_name"] = "Event-focused week"
         weekly_focus["primary_actions"] = _event_block_actions(blocking_events)
+    # Final safety net: drop anything the user permanently asked to avoid (e.g. a saved
+    # "no LeetCode" preference), even if the LLM brief or a template re-added it.
+    avoided = _avoided_topics(user.id)
+    if avoided:
+        weekly_focus["primary_actions"] = _drop_avoided_actions(
+            weekly_focus.get("primary_actions") or [], avoided
+        )
     # A freshly generated week is also authoritative — lock it so a later context-load
     # does not silently regenerate different tasks over it.
     weekly_focus["manual"] = True

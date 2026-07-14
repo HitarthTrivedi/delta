@@ -126,6 +126,70 @@ def get_permanent_instructions(user_id: str) -> list[str]:
     return _extract_bullets(doc, "# PERMANENT INSTRUCTIONS", ["# PRESENT WEEK REQUESTS", WEEK_END_SEP])
 
 
+# ── Avoided topics ───────────────────────────────────────────────────────────
+# A permanent instruction like "I don't want LeetCode ever" must not just steer
+# Agent 2's chat — it must stop the weekly generator from re-adding that topic.
+# extract_avoided_topics pulls the concrete topic word(s) out of avoidance-style
+# instructions so the roadmap engine can drop matching tasks. Pacing rules
+# ("no more than 2 tasks") are intentionally ignored — they aren't topics.
+_AVOID_MARKERS = (
+    "don't want", "dont want", "do not want", "not interested in", "no more",
+    "stop giving", "stop assigning", "stop adding", "stop including",
+    "never give", "never assign", "never include", "never add",
+    "get rid of", "not want", "don't like", "dont like",
+    "no ", "avoid ", "without ", "hate ", "dislike ", "remove ", "skip ",
+)
+# Words that mean the instruction is about pace/quantity, not a topic to exclude.
+_PACING_TOKENS = {
+    "task", "tasks", "more", "less", "fewer", "many", "much", "fast", "faster",
+    "slow", "slower", "pace", "hour", "hours", "week", "weekly", "time", "day",
+    "days", "load", "intensity", "thing", "things",
+}
+_TOPIC_STOPWORDS = {
+    "the", "any", "all", "and", "for", "with", "want", "ever", "please", "just",
+    "them", "that", "this", "give", "giving", "assign", "assigning", "include",
+    "including", "not", "dont", "don", "have", "having", "get", "getting", "put",
+    "add", "adding", "again", "kind", "kinds", "type", "types", "sort", "than",
+    "too", "very", "some", "you", "your", "give", "stuff",
+}
+
+
+def extract_avoided_topics(instructions: list[str]) -> list[str]:
+    """Return concrete topic keywords the user has permanently asked to avoid."""
+    topics: list[str] = []
+    for line in instructions or []:
+        low = (line or "").lower().strip()
+        if not low:
+            continue
+        cut = None
+        for marker in _AVOID_MARKERS:
+            pos = low.find(marker)
+            if pos != -1 and (cut is None or pos < cut[0]):
+                cut = (pos, pos + len(marker))
+        if cut is None:
+            continue
+        tail = low[cut[1]:]
+        tokens = re.findall(r"[a-z][a-z+#.-]{1,}", tail)
+        significant = [
+            t for t in tokens
+            if len(t) >= 3 and t not in _TOPIC_STOPWORDS and t not in _PACING_TOKENS
+        ]
+        # Purely a pacing/quantity rule (e.g. "no more than 2 tasks") — not a topic.
+        if not significant:
+            continue
+        for t in significant[:2]:  # a short noun phrase; avoid over-broad matches
+            if t not in topics:
+                topics.append(t)
+    return topics
+
+
+def get_avoided_topics(user_id: str) -> list[str]:
+    try:
+        return extract_avoided_topics(get_permanent_instructions(user_id))
+    except Exception:
+        return []
+
+
 def get_next_week_requests(user_id: str) -> list[dict]:
     """Return timed next-week requests as [{text, weeks_remaining}] from the JSON blob."""
     return _load_blob(user_id).get("timed_requests") or []
