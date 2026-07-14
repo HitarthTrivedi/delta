@@ -190,3 +190,4 @@ hi
 - `backend/server.py` appears to be an older MongoDB-based server and is not used by the current Dockerfile or local FastAPI run command.
 - The backend creates SQLite tables automatically on startup through `Base.metadata.create_all(bind=engine)`.
 - If the frontend cannot reach the backend, confirm `REACT_APP_API_URL=http://localhost:8000/api` in `frontend/.env` and restart `npm start`.
+hi
