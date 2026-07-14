@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import ThemeToggle from './ThemeToggle';
 
 const navItems = [
   { label: 'Intake', path: '/intake', icon: ClipboardList },
@@ -79,6 +80,9 @@ export default function Navbar({ user }) {
             <div className="w-8 h-8 rounded-full bg-accent-surface border border-rule flex items-center justify-center text-ink font-display text-sm font-semibold shrink-0">
               {(user?.name || 'G')[0].toUpperCase()}
             </div>
+
+            {/* Theme toggle */}
+            <ThemeToggle className="w-11 h-11" />
 
             {/* Logout — desktop only */}
             <button

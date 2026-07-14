@@ -3,6 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
+import { ThemeProvider, useTheme } from "next-themes";
 import { Loader2 } from "lucide-react";
 
 // Landing components
@@ -220,6 +221,17 @@ function AppContent() {
   );
 }
 
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+  return (
+    <Toaster
+      theme={resolvedTheme === "dark" ? "dark" : "light"}
+      position="bottom-right"
+      richColors
+    />
+  );
+}
+
 function App() {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
 
@@ -230,12 +242,14 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="App">
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-        <Toaster theme="dark" position="bottom-right" richColors />
-      </div>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <div className="App">
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+          <ThemedToaster />
+        </div>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

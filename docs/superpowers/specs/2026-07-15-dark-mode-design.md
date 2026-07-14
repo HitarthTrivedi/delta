@@ -36,8 +36,14 @@ an explicit choice via a toggle is remembered in localStorage.
    - `components/Header.jsx` — desktop actions group and mobile menu (landing).
 3. **Theme-aware Toaster** — replace `theme="dark"` with `resolvedTheme` from
    `useTheme()` (requires the Toaster to render inside the provider).
-4. **Stray color patches** — convert the hardcoded colors listed above to
-   CSS-variable-driven or dark-aware values so dark mode has no light leftovers.
+4. **Stray color audit** — investigation showed the hardcoded colors listed
+   above are all intentionally theme-independent: the LoginPage hexes are the
+   Google logo (brand), the LoginPage gradient is a photo scrim, the
+   `rgba(26,25,24,0.45)` modal scrims stay dark in both themes by design,
+   `Onboarding.jsx` already uses `rgb(var(--bone-rgb) / 0.92)`, and
+   `FloatingShapes`/`ParticleBackground`/`Testimonials` are dead code (imported
+   nowhere — left untouched per repo guidelines). Any real leaks found during
+   verification get fixed individually using existing tokens.
 
 ## Out of scope (YAGNI)
 

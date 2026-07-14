@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ThemeToggle from './ui/ThemeToggle';
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -72,16 +73,20 @@ const Header = () => {
           >
             Get Started &#8599;
           </button>
+          <ThemeToggle className="w-9 h-9" />
         </div>
 
-        {/* Mobile burger */}
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden bg-transparent border border-rule text-ink p-2 cursor-pointer"
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-        </button>
+        {/* Mobile: theme toggle + burger */}
+        <div className="md:hidden flex items-center gap-2">
+          <ThemeToggle className="w-[38px] h-[38px]" />
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="bg-transparent border border-rule text-ink p-2 cursor-pointer"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
