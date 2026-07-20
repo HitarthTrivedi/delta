@@ -1,32 +1,21 @@
-"""Email service — Gmail SMTP for Delta daily reminders."""
+"""Email service — Resend HTTP API for Delta daily reminders."""
 from __future__ import annotations
 
 import logging
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import resend
 
 from app.config import settings
 
 logger = logging.getLogger("delta.email")
 
 
-_SMTP_TIMEOUT = 20  # seconds — prevents indefinite blocking on slow/unreachable SMTP
-
-
-def _smtp_connection():
-    server = smtplib.SMTP("smtp.gmail.com", 587, timeout=_SMTP_TIMEOUT)
-    server.ehlo()
-    server.starttls()
-    server.login(settings.REMINDER_FROM_EMAIL, settings.REMINDER_FROM_PASSWORD)
-    return server
-
-
 def send_reminder_email(to_email: str, user_name: str, pending_tasks: list[str], week_number: int) -> bool:
-    """Send a daily task reminder. Returns True on success, False on skip/failure."""
-    if not settings.REMINDER_FROM_EMAIL or not settings.REMINDER_FROM_PASSWORD:
-        logger.warning("REMINDER_FROM_EMAIL / REMINDER_FROM_PASSWORD not set — skipping.")
+    """Send a daily task reminder via Resend. Returns True on success, False on failure."""
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set — skipping reminder email.")
         return False
+
+    resend.api_key = settings.RESEND_API_KEY
 
     subject = f"Delta — {len(pending_tasks)} task{'s' if len(pending_tasks) != 1 else ''} still pending this week"
 
@@ -83,15 +72,13 @@ def send_reminder_email(to_email: str, user_name: str, pending_tasks: list[str],
 </body>
 </html>"""
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"Delta by Alpha.Kore <{settings.REMINDER_FROM_EMAIL}>"
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html"))
-
     try:
-        with _smtp_connection() as server:
-            server.sendmail(settings.REMINDER_FROM_EMAIL, to_email, msg.as_string())
+        resend.Emails.send({
+            "from": f"Delta by Alpha.Kore <{settings.RESEND_FROM_EMAIL}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": html,
+        })
         logger.info("Reminder sent → %s", to_email)
         return True
     except Exception as exc:
