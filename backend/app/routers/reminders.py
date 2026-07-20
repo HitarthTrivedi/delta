@@ -41,18 +41,27 @@ def _run_reminders_background():
     sent = skipped = failed = 0
     try:
         users = db.query(User).all()
+        logger.info("Reminder run started: %d total users found", len(users))
+
         for user in users:
             if not user.email:
+                logger.info("SKIP user %s — no email", user.id)
                 skipped += 1
                 continue
 
             roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
             if not roadmap:
+                logger.info("SKIP user %s (%s) — no roadmap", user.id, user.email)
                 skipped += 1
                 continue
 
             pending = _pending_tasks(roadmap)
             if not pending:
+                logger.info(
+                    "SKIP user %s (%s) — no pending tasks (weekly_focus=%s)",
+                    user.id, user.email,
+                    str(roadmap.weekly_focus)[:200] if roadmap.weekly_focus else "None",
+                )
                 skipped += 1
                 continue
 
