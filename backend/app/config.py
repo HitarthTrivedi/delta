@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     JOBPOSTS_SOURCE_MODE: str = os.getenv("JOBPOSTS_SOURCE_MODE", "")
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+    BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
+    BREVO_FROM_EMAIL: str = os.getenv("BREVO_FROM_EMAIL", "alpha.kore25@gmail.com")
+    BREVO_FROM_NAME: str = os.getenv("BREVO_FROM_NAME", "Delta by Alpha.Kore")
     REMINDER_SECRET: str = os.getenv("REMINDER_SECRET", "")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://delta-ai.vercel.app")
 

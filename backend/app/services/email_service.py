@@ -1,21 +1,21 @@
-"""Email service — Resend HTTP API for Delta daily reminders."""
+"""Email service — Brevo (Sendinblue) HTTP API for Delta daily reminders."""
 from __future__ import annotations
 
 import logging
-import resend
+import requests
 
 from app.config import settings
 
 logger = logging.getLogger("delta.email")
 
+BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email"
+
 
 def send_reminder_email(to_email: str, user_name: str, pending_tasks: list[str], week_number: int) -> bool:
-    """Send a daily task reminder via Resend. Returns True on success, False on failure."""
-    if not settings.RESEND_API_KEY:
-        logger.warning("RESEND_API_KEY not set — skipping reminder email.")
+    """Send a daily task reminder via Brevo. Returns True on success, False on failure."""
+    if not settings.BREVO_API_KEY:
+        logger.warning("BREVO_API_KEY not set — skipping reminder email.")
         return False
-
-    resend.api_key = settings.RESEND_API_KEY
 
     subject = f"Delta — {len(pending_tasks)} task{'s' if len(pending_tasks) != 1 else ''} still pending this week"
 
@@ -72,15 +72,30 @@ def send_reminder_email(to_email: str, user_name: str, pending_tasks: list[str],
 </body>
 </html>"""
 
+    payload = {
+        "sender": {
+            "name": settings.BREVO_FROM_NAME,
+            "email": settings.BREVO_FROM_EMAIL,
+        },
+        "to": [{"email": to_email, "name": user_name}],
+        "subject": subject,
+        "htmlContent": html,
+    }
+
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": settings.BREVO_API_KEY,
+    }
+
     try:
-        resend.Emails.send({
-            "from": f"Delta by Alpha.Kore <{settings.RESEND_FROM_EMAIL}>",
-            "to": [to_email],
-            "subject": subject,
-            "html": html,
-        })
-        logger.info("Reminder sent → %s", to_email)
-        return True
+        response = requests.post(BREVO_SEND_URL, json=payload, headers=headers, timeout=15)
+        if response.status_code in (200, 201):
+            logger.info("Reminder sent → %s", to_email)
+            return True
+        else:
+            logger.error("Brevo rejected email to %s: %s %s", to_email, response.status_code, response.text)
+            return False
     except Exception as exc:
         logger.error("Failed to send reminder to %s: %s", to_email, exc)
         return False
