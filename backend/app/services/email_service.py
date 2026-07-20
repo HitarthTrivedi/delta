@@ -11,8 +11,11 @@ from app.config import settings
 logger = logging.getLogger("delta.email")
 
 
+_SMTP_TIMEOUT = 20  # seconds — prevents indefinite blocking on slow/unreachable SMTP
+
+
 def _smtp_connection():
-    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server = smtplib.SMTP("smtp.gmail.com", 587, timeout=_SMTP_TIMEOUT)
     server.ehlo()
     server.starttls()
     server.login(settings.REMINDER_FROM_EMAIL, settings.REMINDER_FROM_PASSWORD)
@@ -46,7 +49,7 @@ def send_reminder_email(to_email: str, user_name: str, pending_tasks: list[str],
           <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.1em;
                     text-transform:uppercase;color:#444;">Delta &middot; Week {week_number}</p>
           <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff;line-height:1.2;">
-            Hey {user_name}, you still have work to finish.
+            Hey {user_name}, finished with your usual daily tasks?
           </h1>
         </td></tr>
 
@@ -63,7 +66,7 @@ def send_reminder_email(to_email: str, user_name: str, pending_tasks: list[str],
             Open Delta &rarr;
           </a>
           <p style="margin:20px 0 0;font-size:13px;color:#444;line-height:1.6;">
-            Small weekly progress compounds faster than you think.<br>
+            If your regular daily tasks are over, get to work on your pending Delta tasks to stay on track!<br>
             Agent 2 is watching your pace.
           </p>
         </td></tr>
