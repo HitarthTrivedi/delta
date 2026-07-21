@@ -20,6 +20,8 @@ class RecommendationResponse(BaseModel):
     evidence_url: Optional[str] = None
     user_rating: Optional[int] = None
     was_relevant: Optional[bool] = None
+    # Difficulty label: Beginner | Easy | Intermediate | Advanced | Expert
+    difficulty_level: Optional[str] = "Beginner"
     created_at: Optional[datetime] = None
 
     class Config:
@@ -38,6 +40,8 @@ class RoadmapNode(BaseModel):
     architect_warning: Optional[str] = None
     certification: Optional[str] = None
     resource_url: Optional[str] = None
+    # Difficulty label: Beginner | Easy | Intermediate | Advanced | Expert
+    difficulty_level: Optional[str] = "Beginner"
 
 class RoadmapPhase(BaseModel):
     id: str

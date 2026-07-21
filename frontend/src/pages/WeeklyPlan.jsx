@@ -436,7 +436,13 @@ export default function WeeklyPlan() {
       if (regenerate) toast.success('Agent 2 loaded your first weekly plan.');
     } catch (err) {
       console.error(err);
-      toast.error('Unable to load Agent 2 plan. Using a safe starter week.');
+      // Only show the error toast for real failures, not timeouts/slow generation
+      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout');
+      if (!isTimeout) {
+        toast.error('Unable to load Agent 2 plan. Using a safe starter week.');
+      } else {
+        toast.error('Taking longer than usual — refresh in a moment.');
+      }
     } finally {
       setLoading(false);
     }
@@ -1068,6 +1074,45 @@ export default function WeeklyPlan() {
                     <span style={{ display: 'block', fontSize: 15, fontWeight: 700, marginBottom: 5, lineHeight: 1.4, color: isDone ? 'var(--ink-soft)' : 'var(--ink)', textDecoration: isDone ? 'line-through' : 'none' }}>
                       {action.title}
                     </span>
+                    {action.difficulty_level && (() => {
+                      const LEVELS = ['Beginner', 'Easy', 'Intermediate', 'Advanced', 'Expert'];
+                      const COLORS = {
+                        Beginner:     '#66645e',
+                        Easy:         '#4a7c59',
+                        Intermediate: '#7d5a2b',
+                        Advanced:     '#7d3a2b',
+                        Expert:       '#7d252b',
+                      };
+                      const BG = {
+                        Beginner:     'rgba(102,100,94,0.08)',
+                        Easy:         'rgba(74,124,89,0.10)',
+                        Intermediate: 'rgba(125,90,43,0.10)',
+                        Advanced:     'rgba(125,58,43,0.10)',
+                        Expert:       'rgba(125,37,43,0.10)',
+                      };
+                      const filled = LEVELS.indexOf(action.difficulty_level) + 1;
+                      const color = COLORS[action.difficulty_level] || 'var(--ink-soft)';
+                      return (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                            padding: '2px 7px', borderRadius: 2,
+                            border: '1px solid var(--rule)',
+                            background: BG[action.difficulty_level] || 'var(--accent-surface)',
+                            color,
+                          }}>
+                            {action.difficulty_level}
+                          </span>
+                          <span style={{ display: 'inline-flex', gap: 2 }}>
+                            {[1,2,3,4,5].map(i => (
+                              <svg key={i} width="11" height="11" viewBox="0 0 24 24" fill={i <= filled ? '#c8b89a' : 'none'} stroke={'#c8b89a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: i <= filled ? 1 : 0.2 }}>
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                              </svg>
+                            ))}
+                          </span>
+                        </span>
+                      );
+                    })()}
                     <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.55, maxWidth: '68ch' }}>{action.detail}</span>
                     {action.problems?.length > 0 ? (
                       <span style={{ display: 'block', marginTop: 10 }}>

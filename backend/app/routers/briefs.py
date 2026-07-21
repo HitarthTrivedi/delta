@@ -171,7 +171,12 @@ def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db)
         
         # Determine projected delta impact: locked nodes have higher learning impact
         impact = 4.0 if node.get("status") == "locked" else 2.5
-        
+
+        # Derive difficulty label from node; fall back to status-based heuristic
+        difficulty = node.get("difficulty_level") or (
+            "Beginner" if node.get("status") == "locked" else "Easy"
+        )
+
         rec = Recommendation(
             id=str(uuid.uuid4()),
             brief_id=brief_id,
@@ -184,6 +189,7 @@ def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db)
             market_signal_text=node.get("tech_twist", "High market demand"),
             projected_delta_impact=impact,
             evidence_collection_path=f"Build a GitHub project for {node['label']} and submit the repository link.",
+            difficulty_level=difficulty,
         )
         db.add(rec)
 

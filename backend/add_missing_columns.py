@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-db_path = r"c:\Users\Shank\Documents\Delta\delta\backend\delta.db"
+db_path = r"c:\Users\Shank\Documents\Delta\delta-hitarth\backend\delta.db"
 
 
 def ensure_columns(cursor, table, specs):
@@ -183,6 +183,10 @@ else:
             FOREIGN KEY(user_id) REFERENCES users (id)
         )
     """)
+
+    ensure_columns(cursor, "recommendations", {
+        "difficulty_level": "VARCHAR DEFAULT 'Beginner'",
+    })
 
     conn.commit()
         

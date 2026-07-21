@@ -23,6 +23,8 @@ class Recommendation(Base):
     evidence_url = Column(String, nullable=True)
     user_rating = Column(Integer, nullable=True)
     was_relevant = Column(Boolean, nullable=True)
+    # Difficulty label for the task: Beginner | Easy | Intermediate | Advanced | Expert
+    difficulty_level = Column(String, nullable=True, default="Beginner")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     brief = relationship("WeeklyBrief", back_populates="recommendation_items")

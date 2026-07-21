@@ -200,10 +200,12 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
        - "architect_warning": a security standard, debugging tip, or production pitfall to avoid.
        - "certification": a premium industry certification mapped to this specific node (e.g. "Google Cloud Data Engineer (+15% weight)")
        - "resource_url": a valid roadmap.sh or official documentation link.
+       - "difficulty_level": one of "Beginner", "Easy", "Intermediate", "Advanced", "Expert" — reflect how challenging this node is for someone at week {cycle_count + 1} of their journey.
+       - "complexity_score": a float between 1.0 and 5.0 — the intrinsic learning difficulty of this skill FOR THIS SPECIFIC ROLE (not universal). Example: C++ for a systems engineer = 4.5, C++ for an AI developer = 3.0. Python for a data scientist = 1.5. RAG pipelines for an AI developer = 3.5. Be role-aware.
     4. Roadmap Status:
        - For each node, match its "skill_name" (case-insensitive) against the user's current skills.
-       - Set its "status" to "mastered" if the user has >= 6 proficiency.
-       - Set its "status" to "in_progress" if the user has > 0 and < 6 proficiency; this means prior exposure, not zero knowledge.
+       - Set its "status" to "mastered" if the user has >= 8 proficiency.
+       - Set its "status" to "in_progress" if the user has > 0 and < 8 proficiency; this means prior exposure, not zero knowledge.
        - Set its "status" to "locked" otherwise.
        
     BRIEF COMPOSITION INSTRUCTIONS:
@@ -238,7 +240,9 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
               "architect_warning": "string",
               "certification": "string",
               "resource_url": "string",
-              "status": "locked|in_progress|mastered"
+              "status": "locked|in_progress|mastered",
+              "difficulty_level": "Beginner|Easy|Intermediate|Advanced|Expert",
+              "complexity_score": 1.0
             }}
           ]
         }}
@@ -291,6 +295,23 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
             for node in phase.get("nodes", []):
                 s_name = node.get("skill_name") or node.get("label") or ""
                 node["status"] = _get_node_status(s_name, user_skill_map)
+                proficiency = user_skill_map.get(s_name.lower(), 0)
+                # Use LLM-generated complexity_score if present and valid,
+                # otherwise fall back to central_engine SKILL_COMPLEXITY dict.
+                # This makes complexity role-aware (C++ for AI dev ≠ C++ for systems dev).
+                llm_complexity = node.get("complexity_score")
+                if llm_complexity is not None:
+                    try:
+                        llm_complexity = float(llm_complexity)
+                        llm_complexity = max(1.0, min(5.0, llm_complexity))
+                        node["complexity_score"] = llm_complexity
+                    except (TypeError, ValueError):
+                        node.pop("complexity_score", None)
+                        llm_complexity = None
+                node["difficulty_level"] = _node_difficulty_level(
+                    cycle_count, node["status"], s_name, proficiency,
+                    demanded, llm_complexity
+                )
                 
         # Fill in generated timestamp if missing
         if "roadmap_generated_at" not in data:
@@ -306,19 +327,30 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
         import traceback
         traceback.print_exc()
         print(f"=========================================================================")
-        return _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded)
+        return _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded, cycle_count, completed_task_titles)
 
 def _get_node_status(skill_name: str, skill_map: dict) -> str:
     """Helper to return active visual node status."""
     proficiency = skill_map.get(skill_name.lower())
     if proficiency is None:
         return "locked"
-    elif proficiency >= 6:
+    elif proficiency >= 8:
         return "mastered"
     else:
         return "in_progress"
 
-def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded) -> dict:
+
+def _node_difficulty_level(cycle_count: int, status: str, skill_name: str = "", proficiency: float = 0, demanded: list | None = None, llm_complexity: float | None = None) -> str:
+    """
+    Delegate to the same scoring model used by central_engine so that roadmap
+    node cards and weekly task actions always show consistent labels.
+    Passes llm_complexity through so role-aware scores override the static dict.
+    """
+    from app.services.central_engine import _task_difficulty_level
+    task_type = "project" if status != "mastered" else "practice"
+    return _task_difficulty_level(skill_name, proficiency, task_type, cycle_count, demanded or [], llm_complexity)
+
+def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded, cycle_count: int = 0, completed_task_titles: list | None = None) -> dict:
     """Enterprise-grade static fallback compiler to ensure server stability."""
     phases = [
         {
@@ -331,6 +363,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
                     "label": "Advanced Python & Pytest",
                     "skill_name": "Python",
                     "status": _get_node_status("python", user_skill_map),
+                    "difficulty_level": _node_difficulty_level(cycle_count, _get_node_status("python", user_skill_map), "Python", user_skill_map.get("python", 0), demanded),
                     "description": "Functional patterns, testing pipelines, and environment isolation.",
                     "tech_twist": "Python 3.11+ speeds up startup times. Stop using heavy virt env packages when 'uv' or 'poetry' compiles packages 10x faster.",
                     "architect_warning": "Writing code without 80%+ unit test coverage means constant refactoring in production. Use pytest-cov immediately.",
@@ -342,6 +375,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
                     "label": "FastAPI & Pydantic v2 Models",
                     "skill_name": "FastAPI",
                     "status": _get_node_status("fastapi", user_skill_map),
+                    "difficulty_level": _node_difficulty_level(cycle_count, _get_node_status("fastapi", user_skill_map), "FastAPI", user_skill_map.get("fastapi", 0), demanded),
                     "description": "Strict type-validation, request sanitization, and structured API endpoints.",
                     "tech_twist": "FastAPI is built on Pydantic. Pydantic v2 has native Rust speeds. Do not use old Config classes; inherit Settings and allow extra='ignore' to avoid load breaks.",
                     "architect_warning": "Avoid global db sessions inside routes. Always inject sessions via FastAPI Depends() to prevent thread locks.",
@@ -353,6 +387,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
                     "label": "Relational Databases & SQL Engine",
                     "skill_name": "SQL",
                     "status": _get_node_status("sql", user_skill_map),
+                    "difficulty_level": _node_difficulty_level(cycle_count, _get_node_status("sql", user_skill_map), "SQL", user_skill_map.get("sql", 0), demanded),
                     "description": "SQLite and PostgreSQL architectures, indexes, and eager loading.",
                     "tech_twist": "Using ORM models directly in requests is an anti-pattern. Always declare Pydantic request/response schemas to separate model logic.",
                     "architect_warning": "N+1 query problems kill performance. Always use SQLAlchemy's joinedload() for foreign key relationships.",
@@ -371,6 +406,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
                     "label": "Docker Containerization",
                     "skill_name": "Docker",
                     "status": _get_node_status("docker", user_skill_map),
+                    "difficulty_level": _node_difficulty_level(cycle_count, _get_node_status("docker", user_skill_map), "Docker", user_skill_map.get("docker", 0), demanded),
                     "description": "Multi-stage builds, image layers caching, volume mounting.",
                     "tech_twist": "Stop shipping heavy base python images. Use python:3.11-slim and leverage multi-stage builds to cut image size from 1GB to 120MB.",
                     "architect_warning": "Running containers as root inside production is a massive CVE security vulnerability. Always declare USER appuser.",
@@ -382,6 +418,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
                     "label": "System Design & Distributed Queues",
                     "skill_name": "System Design",
                     "status": _get_node_status("system design", user_skill_map),
+                    "difficulty_level": _node_difficulty_level(cycle_count, _get_node_status("system design", user_skill_map), "System Design", user_skill_map.get("system design", 0), demanded),
                     "description": "Horizontal scaling, load balancing, Redis caching, Celery task workers.",
                     "tech_twist": "For heavy background processes, do not use threads inside FastAPI. Offload everything to Celery workers using Redis as a message broker.",
                     "architect_warning": "Synchronous database queries inside distributed task managers lead to bottleneck crashes. Keep DB connections pooled.",
@@ -400,6 +437,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
                     "label": "LLM Orchestration & RAG Pipelines",
                     "skill_name": "LLMs",
                     "status": _get_node_status("llms", user_skill_map),
+                    "difficulty_level": _node_difficulty_level(cycle_count, _get_node_status("llms", user_skill_map), "LLMs", user_skill_map.get("llms", 0), demanded),
                     "description": "LangChain, LlamaIndex, Vector Search (ChromaDB, PGVector), AI Agents logic.",
                     "tech_twist": "Prompting is only the first step. For enterprise RAG, implement hybrid search (semantic + BM25 keyword matching) to achieve high recall.",
                     "architect_warning": "Naive RAG pipelines fail in production. Implement recursive character chunking and reranking models (e.g., Cohere) to keep context dense.",
@@ -411,6 +449,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
                     "label": "MLOps & Vector Scale",
                     "skill_name": "MLOps",
                     "status": _get_node_status("mlops", user_skill_map),
+                    "difficulty_level": _node_difficulty_level(cycle_count, _get_node_status("mlops", user_skill_map), "MLOps", user_skill_map.get("mlops", 0), demanded),
                     "description": "Deploying agent workers in Kubernetes, tracking embeddings latency, scaling data pipelines.",
                     "tech_twist": "Kubernetes is the standard for vector pipeline horizontal scaling. Use KEDA (Kubernetes Event-driven Autoscaling) to scale pod workers dynamically.",
                     "architect_warning": "Embeddings calculation is highly compute-intensive. Cache embeddings queries in Redis to bypass redundant model calls.",
@@ -421,8 +460,8 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
         }
     ]
 
-    mastered_count = sum(1 for s in skills if s.proficiency >= 6)
-    in_progress_count = sum(1 for s in skills if 0 < s.proficiency < 6)
+    mastered_count = sum(1 for s in skills if s.proficiency >= 8)
+    in_progress_count = sum(1 for s in skills if 0 < s.proficiency < 8)
     
     if mastered_count >= 3:
         track_status = "ahead"
@@ -475,6 +514,17 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
         "What specific target domain or career path do you want delta to refine next?",
         "Would you prefer highly visual video tutorials or deep-dive text documentation for your current phase?"
     ]
+
+    # Filter out already-completed nodes so the static fallback never repeats tasks
+    completed_lower = {str(t).lower().strip() for t in (completed_task_titles or [])}
+    for phase in phases:
+        phase["nodes"] = [
+            node for node in phase["nodes"]
+            if not any(
+                str(node.get("label", "")).lower() in c or c in str(node.get("label", "")).lower()
+                for c in completed_lower
+            )
+        ]
 
     return {
         "phases": phases,

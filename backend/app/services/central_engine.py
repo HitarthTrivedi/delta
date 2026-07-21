@@ -1,7 +1,10 @@
 """Central career engine for delta's personalized operating system."""
 import datetime
 import json
+import logging
 import uuid
+
+logger = logging.getLogger("delta.difficulty")
 
 from sqlalchemy.orm import Session
 
@@ -85,18 +88,70 @@ def _sync_profile_skills_to_db(db: Session, user: User) -> list[SkillNode]:
     if not profile_skills:
         return skills
 
-    experience = _norm_skill(profile.get("experience_level") or "")
-    base_proficiency = 6 if experience in {"intermediate", "advanced"} else 4
+    # ── Depth-aware proficiency scoring ──────────────────────────────────────
+    # Instead of flat 6 for everyone, score each skill based on the quality
+    # of evidence the user provided during ingestion.
+    #
+    # Evidence tiers:
+    #   github / verified_project → 8   (built something, publicly visible)
+    #   resume_project            → 7   (listed a project using this skill)
+    #   resume_profile            → 6   (listed on resume, no specific project)
+    #   claimed / self_reported   → 5   (said they know it, no evidence)
+    #   inferred                  → 4   (we guessed from context)
+    #   default / unknown         → 4
+    #
+    # Additionally: if the profile has a project that explicitly mentions
+    # the skill name, bump by +1 (max 9).
+    EVIDENCE_PROFICIENCY = {
+        "github":           8,
+        "verified_project": 8,
+        "resume_project":   7,
+        "resume_profile":   6,
+        "claimed":          5,
+        "self_reported":    5,
+        "inferred":         4,
+    }
+
+    # Build a set of skills mentioned in projects for the +1 project mention boost
+    projects_text = " ".join(
+        str(p) for p in (profile.get("projects") or [])
+    ).lower()
+    past_exp = str(profile.get("past_experience") or "").lower()
+    resume_text = str(profile.get("resume_text") or "").lower()
+    project_evidence_text = projects_text + " " + past_exp + " " + resume_text
+
+    def _skill_proficiency_from_evidence(skill_name: str, existing_skill: SkillNode | None) -> tuple[int, str]:
+        """Return (proficiency, evidence_type) for a skill based on evidence quality."""
+        # If already in DB with a non-default evidence type, respect it
+        if existing_skill and existing_skill.evidence_type not in {None, "resume_profile", "claimed"}:
+            return existing_skill.proficiency, existing_skill.evidence_type
+
+        # Determine evidence type from profile context
+        ev = "claimed"
+        if existing_skill and existing_skill.evidence_type:
+            ev = existing_skill.evidence_type
+
+        base = EVIDENCE_PROFICIENCY.get(ev, 4)
+
+        # Project mention boost: if the skill name appears in project descriptions
+        skill_lower = str(skill_name).lower()
+        if skill_lower in project_evidence_text:
+            base = min(9, base + 1)
+
+        return base, ev
+
     changed = False
     for skill_name in profile_skills[:40]:
         key = _norm_skill(skill_name)
         if not key:
             continue
         existing_skill = existing.get(key)
+        new_proficiency, evidence_type = _skill_proficiency_from_evidence(skill_name, existing_skill)
+
         if existing_skill:
-            if existing_skill.proficiency < base_proficiency:
-                existing_skill.proficiency = base_proficiency
-                existing_skill.evidence_type = existing_skill.evidence_type or "resume_profile"
+            if existing_skill.proficiency < new_proficiency:
+                existing_skill.proficiency = new_proficiency
+                existing_skill.evidence_type = evidence_type
                 existing_skill.evidence_weight = max(existing_skill.evidence_weight or 0, 0.65)
                 changed = True
             continue
@@ -105,8 +160,8 @@ def _sync_profile_skills_to_db(db: Session, user: User) -> list[SkillNode]:
             user_id=user.id,
             name=skill_name,
             category="resume",
-            proficiency=base_proficiency,
-            evidence_type="resume_profile",
+            proficiency=new_proficiency,
+            evidence_type=evidence_type,
             evidence_weight=0.65,
         )
         db.add(new_skill)
@@ -257,6 +312,7 @@ def _break_week_actions(profile: dict, user: User, reason: str = "") -> list[dic
         "source": "delta monthly pacing guard",
         "url": "",
         "prior_exposure": True,
+        "difficulty_level": "Easy",
     }]
 
 
@@ -411,7 +467,7 @@ def _avoided_topics(user_id: str) -> list[str]:
         return []
 
 
-def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User, cycle_count: int = 0) -> list[dict]:
+def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User, cycle_count: int = 0, market: MarketSnapshot | None = None) -> list[dict]:
     if not _is_cs_engineering_user(profile, skills, user):
         return []
     topic, tip = LEETCODE_SEQUENCE[cycle_count % len(LEETCODE_SEQUENCE)]
@@ -429,6 +485,16 @@ def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User,
         parts.append(f"{hard}H")
     count_label = f"{count} problems ({'+'.join(parts)})" if parts else f"{count} problems"
     slug = topic.lower().replace(" ", "-").replace("/", "-")
+    
+    # Lookup proficiency for DSA/Algorithms skill — match any variant name
+    skill_map = {s.name.lower(): s.proficiency for s in skills}
+    DSA_KEYWORDS = ("dsa", "algorithm", "data struct", "leetcode", "interview consistency")
+    dsa_prof = next(
+        (v for k, v in skill_map.items() if any(kw in k for kw in DSA_KEYWORDS)),
+        0
+    )
+    demanded = _as_json(market.top_demanded_skills, []) if market else []
+    
     action = {
         "id": f"recurring-leetcode-cycle-{cycle_count}-{slug}",
         "node_id": f"recurring-leetcode-cycle-{cycle_count}",
@@ -442,12 +508,13 @@ def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User,
         "url": "https://leetcode.com/problemset/",
         "cadence": "weekly",
         "recurring": True,
+        "difficulty_level": _task_difficulty_level("DSA", dsa_prof, "practice", cycle_count, demanded),
     }
     # Honour a permanent "no LeetCode / no DSA" preference: skip injecting it entirely.
     return _drop_avoided_actions([action], _avoided_topics(user.id))
 
 
-def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, market: MarketSnapshot) -> list[dict]:
+def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, market: MarketSnapshot, cycle_count: int = 0) -> list[dict]:
     raw = _as_json(market.raw_data, {})
     emerging = _as_json(market.emerging_skills, [])
     demanded = _as_json(market.top_demanded_skills, [])
@@ -456,10 +523,15 @@ def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, 
     trend = (emerging or demanded or ["market-backed proof"])[0]
     pattern = project_patterns[0] if project_patterns else f"Build a small proof using {trend} and explain the tradeoffs."
     warning = market_warnings[0] if market_warnings else "Make the proof measurable, deployed or documented, and easy for a recruiter to inspect."
+    
+    # Lookup proficiency for the trend skill
+    skill_map = {s.name.lower(): s.proficiency for s in skills}
+    trend_prof = skill_map.get(str(trend).lower(), 0)
+    
     return [{
         "id": f"trend-proof-{str(trend).lower().replace(' ', '-').replace('/', '-')[:40]}",
         "node_id": "market-trend-response",
-        "type": "project",
+        "type": "trend",
         "title": f"Trend proof: {trend}",
         "skill": str(trend).title(),
         "description": (
@@ -470,6 +542,7 @@ def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, 
         "source": raw.get("source") or market.target_role or "delta market pulse",
         "url": "",
         "cadence": "trend",
+        "difficulty_level": _task_difficulty_level(str(trend), trend_prof, "trend", cycle_count, demanded),
     }]
 
 
@@ -703,6 +776,12 @@ def _domain_proof_actions(profile: dict, skills: list[SkillNode], user: User, db
         action_id = action.get("id") or action.get("title")
         if str(action_id).strip().lower() not in completed_or_skipped:
             filtered_actions.append(action)
+
+    # Stamp difficulty — domain proof tasks are always at least Intermediate
+    # since they require applying existing resume/project knowledge.
+    for action in filtered_actions:
+        if "difficulty_level" not in action:
+            action["difficulty_level"] = "Intermediate"
     return filtered_actions
 
 
@@ -762,6 +841,7 @@ def _event_block_actions(events: list[dict]) -> list[dict]:
         "url": "",
         "due_date": event.get("end_date") or event.get("date"),
         "event_context": event,
+        "difficulty_level": "Easy",
     }]
 
 
@@ -1669,10 +1749,25 @@ def log_journey_event(
 
 def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> RoadmapState:
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
-    cycle_count = db.query(JourneyEvent).filter(
+    completed_cycles = db.query(JourneyEvent).filter(
         JourneyEvent.user_id == user.id,
         JourneyEvent.event_type == "weekly_cycle_completed",
     ).count()
+    # Task 7 — Hybrid cycle_count: max(completed_cycles, weeks_since_signup // 2)
+    # Prevents the difficulty curve from stalling for users who skip weeks.
+    # Dividing weeks_since_signup by 2 is conservative — a 10-week-old account
+    # with 0 cycles gets cycle_count=5, not 10, so it doesn't overestimate.
+    try:
+        if user.created_at:
+            created = user.created_at
+            # Handle both naive and timezone-aware datetimes
+            now = datetime.datetime.now(datetime.timezone.utc) if created.tzinfo else datetime.datetime.utcnow()
+            weeks_since_signup = max(0, int((now - created).days / 7))
+        else:
+            weeks_since_signup = 0
+    except Exception:
+        weeks_since_signup = 0
+    cycle_count = max(completed_cycles, weeks_since_signup // 2)
     try:
         from app.services.profile_store import load_profile
         profile = load_profile(user.id, db=db)
@@ -1686,11 +1781,24 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     if roadmap and not regenerate:
         weekly_focus = _as_json(roadmap.weekly_focus, {})
         actions = weekly_focus.get("primary_actions") or []
-        has_stable_actions = actions and all(action.get("id") and action.get("title") for action in actions)
-        # If Agent 2 (or the user) explicitly set this week, it is the source of truth.
-        # Return it untouched — never auto-regenerate over an explicit decision.
-        if has_stable_actions and weekly_focus.get("manual"):
+        has_stable_actions = bool(actions) and all(action.get("id") and action.get("title") for action in actions)
+
+        # Return early if tasks already exist — never regenerate on a plain page load
+        if has_stable_actions:
             return roadmap
+
+        # Also return early if a generation was attempted very recently (< 90s ago).
+        # This prevents an infinite regeneration loop when Gemini keeps timing out
+        # and producing 0 tasks — each page load would re-trigger the LLM call.
+        last_attempted = weekly_focus.get("last_generation_attempted_at")
+        if last_attempted:
+            try:
+                last_dt = datetime.datetime.fromisoformat(last_attempted)
+                elapsed = (datetime.datetime.utcnow() - last_dt).total_seconds()
+                if elapsed < 90:
+                    return roadmap
+            except Exception:
+                pass
         low_level_start = any(str(action.get("title", "")).lower().startswith("start ") for action in actions)
         skills_for_profile = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
         profile_says_advanced = _has_prior_profile_depth(profile, skills_for_profile, user)
@@ -1722,8 +1830,8 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             elif profile_says_advanced and low_level_start:
                 proof_actions = _domain_proof_actions(profile, skills_for_profile, user, db)
                 if proof_actions:
-                    recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
-                    trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
+                    recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count, market)
+                    trend_actions = _trend_response_actions(profile, skills_for_profile, user, market, cycle_count)
                     long_plan = _long_horizon_plan(profile, skills_for_profile, user, market)
                     # Only swap out the beginner-level ("Start ...") tasks for
                     # role-appropriate proof work — keep every other task the user
@@ -1749,8 +1857,8 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                     db.commit()
                     db.refresh(roadmap)
             elif not weekly_focus.get("long_horizon_lanes"):
-                recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count)
-                trend_actions = _trend_response_actions(profile, skills_for_profile, user, market)
+                recurring_actions = _recurring_habit_actions(profile, skills_for_profile, user, cycle_count, market)
+                trend_actions = _trend_response_actions(profile, skills_for_profile, user, market, cycle_count)
                 # Keep every task already chosen this week; only add durable lanes
                 # that aren't already present, up to the user's capacity-based cap.
                 weekly_focus["primary_actions"] = _merge_capped_actions(
@@ -1798,6 +1906,16 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         and cycle_count % break_interval == 0
     )
 
+    # Stamp attempt timestamp so rapid page refreshes don't re-trigger generation
+    if roadmap:
+        try:
+            _wf = _as_json(roadmap.weekly_focus, {})
+            _wf["last_generation_attempted_at"] = datetime.datetime.utcnow().isoformat()
+            roadmap.weekly_focus = _dump(_wf)
+            db.commit()
+        except Exception:
+            pass
+
     roadmap_payload = generate_weekly_brief(
         user, skills, market,
         agent2_memory=agent2_memory or {},
@@ -1809,6 +1927,23 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     )
 
     phases = roadmap_payload.get("phases", [])
+
+    # ── Smart fallback: prefer existing roadmap phases over generic static ones ──
+    # When the LLM times out, generate_weekly_brief returns a static fallback with
+    # generic nodes (Python/FastAPI/SQL/Docker/LLMs/MLOps). If the user already has
+    # a real roadmap stored in the DB from a previous successful LLM call, use those
+    # phases instead — they're personalised to the user's actual goal.
+    STATIC_FALLBACK_IDS = {"node-python", "node-fastapi", "node-sql", "node-docker", "node-system-design", "node-llms", "node-mlops"}
+    returned_ids = {node.get("id") for phase in phases for node in phase.get("nodes", [])}
+    is_generic_fallback = bool(returned_ids) and returned_ids.issubset(STATIC_FALLBACK_IDS)
+
+    if is_generic_fallback and roadmap and roadmap.phases:
+        stored_phases = _as_json(roadmap.phases, [])
+        if stored_phases:
+            print("[INFO] LLM returned generic static fallback — using existing personalised roadmap phases from DB.")
+            phases = stored_phases
+            roadmap_payload["phases"] = phases
+
     active_phase = _select_active_phase(phases)
 
     destination = {
@@ -1822,12 +1957,13 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     weekly_focus = {
         "phase_id": active_phase.get("id") if active_phase else None,
         "phase_name": active_phase.get("name") if active_phase else None,
-        "primary_actions": _derive_weekly_actions(active_phase),
+        "primary_actions": _derive_weekly_actions(active_phase, cycle_count, skills, market),
         "planning_horizon_months": destination["planning_horizon_months"],
         "long_horizon_lanes": long_plan["lanes"],
+        "cycle_count": cycle_count,
     }
-    recurring_actions = _recurring_habit_actions(profile, skills, user, cycle_count)
-    trend_actions = _trend_response_actions(profile, skills, user, market)
+    recurring_actions = _recurring_habit_actions(profile, skills, user, cycle_count, market)
+    trend_actions = _trend_response_actions(profile, skills, user, market, cycle_count)
     weekly_cap = _capacity_based_task_cap(user, profile)
     if recurring_actions:
         weekly_focus["primary_actions"] = _merge_capped_actions(weekly_focus["primary_actions"], recurring_actions, cap=weekly_cap)
@@ -1877,9 +2013,16 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         weekly_focus["primary_actions"] = _drop_avoided_actions(
             weekly_focus.get("primary_actions") or [], avoided
         )
-    # A freshly generated week is also authoritative — lock it so a later context-load
-    # does not silently regenerate different tasks over it.
-    weekly_focus["manual"] = True
+    # Lock the week only if we have a meaningful task list (>= 2 tasks with id+title).
+    # This prevents a timeout/partial result from locking an empty or broken week,
+    # which would cause the placeholder tasks to persist until next week's cycle.
+    final_actions = weekly_focus.get("primary_actions") or []
+    has_enough_tasks = sum(1 for a in final_actions if a.get("id") and a.get("title")) >= 2
+    if has_enough_tasks:
+        weekly_focus["manual"] = True
+    else:
+        weekly_focus.pop("manual", None)
+        print(f"[WARN] Not locking week — only {len(final_actions)} valid task(s) generated. Will retry on next load.")
     proof_requirements = _derive_proof_requirements(phases)
 
     if roadmap:
@@ -2080,6 +2223,190 @@ def _get_or_create_market_snapshot(db: Session, user: User) -> MarketSnapshot:
     return market
 
 
+# ---------------------------------------------------------------------------
+# Intrinsic skill complexity scores (1 = easiest, 5 = hardest).
+# These are fixed — they reflect how hard a skill objectively is to learn,
+# independent of the user. Unknown skills default to 3 (moderate).
+# ---------------------------------------------------------------------------
+SKILL_COMPLEXITY: dict[str, float] = {
+    # Foundations
+    "html":             1.0,
+    "css":              1.0,
+    "git":              1.0,
+    "python":           1.5,
+    "sql":              1.5,
+    "javascript":       2.0,
+    # Mid-tier
+    "fastapi":          2.0,
+    "flask":            2.0,
+    "django":           2.5,
+    "react":            2.5,
+    "typescript":       2.5,
+    "postgresql":       2.5,
+    "rest apis":        2.0,
+    "node.js":          2.5,
+    # Advanced
+    "docker":           3.0,
+    "redis":            3.0,
+    "aws":              3.5,
+    "system design":    4.0,
+    "llms":             4.0,
+    "rag":              3.5,
+    "rag pipelines":    3.5,
+    "machine learning": 3.5,
+    "data structures":  3.0,
+    "algorithms":       3.5,
+    "dsa":              3.5,
+    # AI / Agentic
+    "llm integration":              3.5,
+    "ai agent workflow design":     3.5,
+    "concurrent architectures":     3.5,
+    "containerization & persistence": 3.0,
+    "deep learning optimization":   4.0,
+    "advanced vector persistence":  3.5,
+    "agent evaluation engineering": 3.5,
+    "adversarial ai architecture":  4.0,
+    "scalable system design":       4.0,
+    "ai system observability":      3.5,
+    "autograd engine development":  4.0,
+    "transformer decoder implementation": 4.0,
+    "web development":              2.0,
+    # Expert
+    "mlops":            4.5,
+    "kubernetes":       4.5,
+    "distributed systems": 4.5,
+    "compilers":        5.0,
+    "c++":              4.0,
+    "rust":             4.5,
+    "go":               3.5,
+}
+
+_SCORE_TO_LABEL = [
+    (1.5, "Beginner"),
+    (2.5, "Easy"),
+    (3.5, "Intermediate"),
+    (4.5, "Advanced"),
+]
+
+
+def _score_to_label(score: float) -> str:
+    for threshold, label in _SCORE_TO_LABEL:
+        if score <= threshold:
+            return label
+    return "Expert"
+
+
+def _task_difficulty_level(
+    skill_name: str = "",
+    proficiency: float = 0,
+    task_type: str = "project",
+    cycle_count: int = 0,
+    top_demanded_skills: list | None = None,
+    llm_complexity: float | None = None,
+) -> str:
+    """
+    Compute a difficulty label using five weighted factors:
+
+    1. Skill complexity  — intrinsic hardness of the skill for this role (1–5).
+                          Prefers LLM-generated role-aware score over static dict.
+    2. Proficiency gap   — how far the user is from mastering it
+    3. Task type         — applying (project/trend) is harder than practicing
+    4. Cycle modifier    — small boost as journey matures (raises the bar)
+    5. Market boost      — +0.5 if skill is actively demanded in the market
+
+    Final score is clamped to [1, 5] and mapped to a label.
+    """
+    top_demanded_skills = top_demanded_skills or []
+
+    # 1. Intrinsic skill complexity — prefer LLM-generated role-aware score
+    if llm_complexity is not None:
+        try:
+            complexity = max(1.0, min(5.0, float(llm_complexity)))
+        except (TypeError, ValueError):
+            complexity = None
+    else:
+        complexity = None
+
+    if complexity is None:
+        key = str(skill_name).lower().strip()
+        complexity = SKILL_COMPLEXITY.get(key, 3.0)
+
+    # 2. Proficiency gap modifier
+    if proficiency == 0:
+        gap = 2.0       # never touched — feels hardest
+    elif proficiency <= 3:
+        gap = 1.0       # just started
+    elif proficiency <= 5:
+        gap = 0.0       # mid-way, neutral
+    elif proficiency <= 7:
+        gap = -0.5      # working knowledge — familiar territory
+    else:
+        gap = -1.0      # nearly mastered — feels easier
+
+    # 3. Task type modifier
+    # For skilled users (proficiency > 5), reduce project overhead since
+    # they already know the domain — the stretch comes from the skill complexity itself.
+    if task_type == "break":
+        return "Easy"
+    if task_type in ("project", "trend"):
+        type_mod = 0.5 if proficiency > 5 else 1.0
+    else:
+        type_mod = 0.0  # practice
+
+    # 4. Cycle modifier — small maturity ramp
+    if cycle_count <= 4:
+        cycle_mod = 0.0
+    elif cycle_count <= 12:
+        cycle_mod = 0.5
+    elif cycle_count <= 26:
+        cycle_mod = 1.0
+    else:
+        cycle_mod = 1.5
+
+    # 5. Market demand boost
+    key = str(skill_name).lower().strip()
+    demanded_lower = [str(s).lower() for s in top_demanded_skills]
+    market_boost = 0.5 if key in demanded_lower else 0.0
+
+    raw_score = complexity + gap + type_mod + cycle_mod + market_boost
+    score = max(1.0, min(5.0, raw_score))
+    label = _score_to_label(score)
+
+    # ── Instrumentation / validation layer ───────────────────────────────────
+    # Logs every factor so silent failures become visible in server output.
+    # Warns when:
+    #   - complexity came from the static dict fallback (LLM score missing)
+    #   - proficiency was 0 but skill exists in the name (possible lookup miss)
+    #   - raw_score was clamped (score exceeded 1–5 bounds before clamping)
+    _complexity_source = "llm" if llm_complexity is not None else "static_dict"
+    if _complexity_source == "static_dict" and key not in SKILL_COMPLEXITY:
+        logger.warning(
+            "[difficulty] UNKNOWN SKILL '%s' — defaulted complexity=3.0. "
+            "Add to SKILL_COMPLEXITY or ensure LLM returns complexity_score.",
+            skill_name,
+        )
+    if proficiency == 0 and skill_name:
+        logger.debug(
+            "[difficulty] proficiency=0 for '%s' — possible skill name lookup miss "
+            "(check SkillNode names in DB match this skill_name).",
+            skill_name,
+        )
+    if raw_score != score:
+        logger.debug(
+            "[difficulty] raw_score=%.2f was clamped to %.2f for skill '%s'.",
+            raw_score, score, skill_name,
+        )
+    logger.debug(
+        "[difficulty] skill='%s' complexity=%.1f(%s) gap=%.1f type_mod=%.1f "
+        "cycle_mod=%.1f market_boost=%.1f → raw=%.2f score=%.2f label=%s",
+        skill_name, complexity, _complexity_source, gap, type_mod,
+        cycle_mod, market_boost, raw_score, score, label,
+    )
+    # ─────────────────────────────────────────────────────────────────────────
+
+    return label
+
+
 def _derive_open_questions(user: User, structured: dict) -> list[str]:
     questions = []
     if not user.target_role:
@@ -2101,13 +2428,168 @@ def _select_active_phase(phases: list[dict]) -> dict:
     return phases[-1] if phases else {}
 
 
-def _derive_weekly_actions(active_phase: dict) -> list[dict]:
+def _user_baseline_score(skills: list[SkillNode] | None, active_phase: dict | None = None) -> float:
+    """
+    Derive a difficulty floor from the user's skill proficiencies.
+
+    Task 4 fix: if active_phase is provided, only looks at skills that match
+    nodes in that phase (phase-specific baseline). This prevents unrelated
+    strong skills from inflating the cap for a phase the user hasn't touched.
+
+    Falls back to top-5 overall if no phase skills match.
+
+    Tiers (based on relevant avg proficiency):
+        0-2  → 1.5
+        3-4  → 2.5
+        5-6  → 4.5  (working knowledge → Advanced tasks allowed)
+        7+   → 5.0
+    """
+    if not skills:
+        return 1.5
+
+    skill_map = {s.name.lower(): s.proficiency for s in skills}
+
+    # Phase-specific: find proficiencies for skills in the active phase
+    phase_profs = []
+    if active_phase:
+        for node in active_phase.get("nodes", []):
+            s_name = (node.get("skill_name") or node.get("label") or "").lower()
+            # Fuzzy match
+            matched = skill_map.get(s_name)
+            if matched is None:
+                for stored_key, prof in skill_map.items():
+                    if s_name in stored_key or stored_key in s_name:
+                        matched = prof
+                        break
+            if matched is not None:
+                phase_profs.append(matched)
+
+    # Use phase proficiencies if we found matches, otherwise top-5 overall
+    if phase_profs:
+        avg = sum(phase_profs) / len(phase_profs)
+        source = "phase-specific"
+    else:
+        top5 = sorted(skill_map.values(), reverse=True)[:5]
+        avg = sum(top5) / len(top5) if top5 else 0
+        source = "top-5-overall"
+
+    logger.debug("[difficulty] baseline avg=%.1f source=%s", avg, source)
+
+    if avg <= 2:
+        return 1.5
+    if avg <= 4:
+        return 2.5
+    if avg <= 6:
+        return 3.5   # working knowledge → up to Intermediate
+    if avg <= 7.5:
+        return 4.0   # strong working knowledge → up to Advanced
+    if avg <= 9:
+        return 4.5   # near-mastered → Advanced/Expert boundary
+    return 5.0       # fully mastered → Expert allowed
+
+
+def _max_difficulty_score(cycle_count: int, skills: list[SkillNode] | None = None, active_phase: dict | None = None, market: MarketSnapshot | None = None) -> float:
+    """
+    Return the effective difficulty ceiling for this week's tasks.
+
+    Three inputs combined — whichever is highest wins:
+      1. week_cap    — rises with cycle_count (platform experience)
+      2. baseline    — rises with phase-specific proficiency (Task 4)
+      3. market_cap  — if market is booming for the active phase skills,
+                       slightly raise the bar since hiring standards are higher (Task 5)
+
+    week  1-4:   week_cap = 2.5
+    week  5-12:  week_cap = 3.5
+    week 13-26:  week_cap = 4.5
+    week 27+:    week_cap = 5.0
+    """
+    if cycle_count <= 4:
+        week_cap = 2.5
+    elif cycle_count <= 12:
+        week_cap = 3.5
+    elif cycle_count <= 26:
+        week_cap = 4.5
+    else:
+        week_cap = 5.0
+
+    baseline = _user_baseline_score(skills, active_phase)
+
+    # Task 5 — market-snapshot-driven cap boost
+    # If >= 2 skills in the active phase are in the top demanded skills,
+    # the market is actively testing for this domain → raise cap by 0.5
+    market_cap_boost = 0.0
+    if market and active_phase:
+        demanded = [str(s).lower() for s in _as_json(market.top_demanded_skills, [])]
+        phase_skill_names = [
+            (node.get("skill_name") or node.get("label") or "").lower()
+            for node in active_phase.get("nodes", [])
+        ]
+        demanded_hits = sum(
+            1 for s in phase_skill_names
+            if any(s in d or d in s for d in demanded)
+        )
+        if demanded_hits >= 2:
+            market_cap_boost = 0.5
+            logger.debug(
+                "[difficulty] market_cap_boost=+0.5 (%d phase skills in top demanded)",
+                demanded_hits,
+            )
+
+    effective = max(week_cap, baseline) + market_cap_boost
+    effective = min(5.0, effective)
+    logger.debug(
+        "[difficulty] cap: week_cap=%.1f baseline=%.1f market_boost=%.1f → effective=%.1f",
+        week_cap, baseline, market_cap_boost, effective,
+    )
+    return effective
+
+
+def _derive_weekly_actions(active_phase: dict, cycle_count: int = 0, skills: list[SkillNode] | None = None, market: MarketSnapshot | None = None) -> list[dict]:
     actions = []
-    for node in active_phase.get("nodes", [])[:3]:
-        if node.get("status") != "mastered":
+    skill_map = {s.name.lower(): s.proficiency for s in (skills or [])}
+    demanded = _as_json(market.top_demanded_skills, []) if market else []
+    max_score = _max_difficulty_score(cycle_count, skills, active_phase, market)
+
+    def _lookup_proficiency(skill_name: str) -> float:
+        key = str(skill_name).lower().strip()
+        if key in skill_map:
+            return skill_map[key]
+        for stored_key, prof in skill_map.items():
+            if key in stored_key or stored_key in key:
+                return prof
+        return 0
+
+    # Iterate all nodes — skip mastered and too-hard ones, fill up to 3 tasks.
+    # Task 6 — Gate fallback escalation:
+    # If 0 tasks pass at the current cap, relax by +0.5 up to 2 times.
+    # If still 0, take the single lowest-scoring node regardless of cap.
+    # Always returns at least 1 real task.
+    def _collect_actions(cap: float) -> list[dict]:
+        result = []
+        for node in active_phase.get("nodes", []):
+            if len(result) >= 3:
+                break
+            if node.get("status") == "mastered":
+                continue
+
             node_id = node.get("id") or node.get("skill_name") or node.get("label")
             label = node.get("label") or node.get("skill_name") or "Current skill"
+            skill_name = node.get("skill_name") or label
             has_prior_exposure = node.get("status") == "in_progress"
+            proficiency = _lookup_proficiency(skill_name)
+            llm_complexity = node.get("complexity_score")
+            difficulty = _task_difficulty_level(skill_name, proficiency, "project", cycle_count, demanded, llm_complexity)
+
+            key = str(skill_name).lower().strip()
+            complexity = max(1.0, min(5.0, float(llm_complexity))) if llm_complexity is not None else SKILL_COMPLEXITY.get(key, 3.0)
+            gap = 2.0 if proficiency == 0 else (1.0 if proficiency <= 3 else (0.0 if proficiency <= 5 else (-0.5 if proficiency <= 7 else -1.0)))
+            type_mod = 0.5 if proficiency > 5 else 1.0
+            cycle_mod = 0.0 if cycle_count <= 4 else (0.5 if cycle_count <= 12 else (1.0 if cycle_count <= 26 else 1.5))
+            raw_score = min(5.0, max(1.0, complexity + gap + type_mod + cycle_mod))
+
+            if raw_score > cap:
+                continue
+
             if has_prior_exposure:
                 title = f"Upgrade your {label} proof"
                 description = (
@@ -2117,6 +2599,52 @@ def _derive_weekly_actions(active_phase: dict) -> list[dict]:
             else:
                 title = f"Start {label} with one small proof"
                 description = f"Learn the minimum needed for {label}, then create one small proof instead of only watching content."
+
+            result.append({
+                "id": f"task-{node_id}",
+                "node_id": node_id,
+                "type": "project",
+                "title": title,
+                "skill": label,
+                "description": description,
+                "resource_url": node.get("resource_url"),
+                "source": "Official docs or roadmap resource",
+                "url": node.get("resource_url"),
+                "why_now": node.get("tech_twist"),
+                "prior_exposure": has_prior_exposure,
+                "difficulty_level": difficulty,
+            })
+        return result
+
+    actions = _collect_actions(max_score)
+
+    # Escalation: relax cap up to 2 times if nothing passes
+    if not actions:
+        logger.warning("[difficulty] 0 tasks at cap=%.1f — relaxing cap by +0.5", max_score)
+        actions = _collect_actions(max_score + 0.5)
+    if not actions:
+        logger.warning("[difficulty] 0 tasks at cap=%.1f — relaxing cap by +1.0", max_score)
+        actions = _collect_actions(max_score + 1.0)
+
+    # Last resort: take the single lowest-scoring non-mastered node
+    if not actions:
+        logger.warning("[difficulty] cap escalation exhausted — taking lowest-score node unconditionally")
+        for node in active_phase.get("nodes", []):
+            if node.get("status") == "mastered":
+                continue
+            node_id = node.get("id") or node.get("skill_name") or node.get("label")
+            label = node.get("label") or node.get("skill_name") or "Current skill"
+            skill_name = node.get("skill_name") or label
+            has_prior_exposure = node.get("status") == "in_progress"
+            proficiency = _lookup_proficiency(skill_name)
+            llm_complexity = node.get("complexity_score")
+            difficulty = _task_difficulty_level(skill_name, proficiency, "project", cycle_count, demanded, llm_complexity)
+            title = f"Upgrade your {label} proof" if has_prior_exposure else f"Start {label} with one small proof"
+            description = (
+                f"You already have some {label} background. Build something slightly stronger than your resume proof."
+                if has_prior_exposure else
+                f"Learn the minimum needed for {label}, then create one small proof instead of only watching content."
+            )
             actions.append({
                 "id": f"task-{node_id}",
                 "node_id": node_id,
@@ -2129,7 +2657,10 @@ def _derive_weekly_actions(active_phase: dict) -> list[dict]:
                 "url": node.get("resource_url"),
                 "why_now": node.get("tech_twist"),
                 "prior_exposure": has_prior_exposure,
+                "difficulty_level": difficulty,
             })
+            break  # just the first non-mastered node
+
     return actions
 
 
