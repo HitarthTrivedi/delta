@@ -1269,10 +1269,17 @@ def evaluate_week_status(db: Session, user: User, roadmap: "RoadmapState | None"
     # can never itself look expired). Using calendar-day difference makes it fire on
     # the 8th day regardless of the signup time-of-day.
     valid_cycles = _valid_weekly_cycle_events(db, user.id)
-    week_assigned_at = (
-        (valid_cycles[-1].created_at if valid_cycles else user.created_at)
-        or (now - datetime.timedelta(days=1))
-    )
+    if valid_cycles:
+        # Use the last explicit week-advance event as the anchor.
+        week_assigned_at = valid_cycles[-1].created_at or (now - datetime.timedelta(days=1))
+    else:
+        # First week: anchor to whichever is MORE RECENT — account creation
+        # or roadmap creation. This prevents users who signed up weeks ago
+        # but only just completed onboarding from immediately seeing an
+        # "expired week" prompt on their very first visit.
+        roadmap_created = getattr(roadmap, "created_at", None) if roadmap else None
+        candidates = [t for t in [user.created_at, roadmap_created] if t is not None]
+        week_assigned_at = max(candidates) if candidates else (now - datetime.timedelta(days=1))
     days_since_assigned = (now.date() - week_assigned_at.date()).days
     expired = bool(incomplete_actions) and days_since_assigned >= 7
     return {
