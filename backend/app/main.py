@@ -49,6 +49,16 @@ async def security_and_size_guard(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Piggyback the daily reminder sweep on real user traffic, so reminders still
+    # go out on a host that sleeps when idle (the scheduler thread dies with it).
+    # Runs after the response is built and hands off to a thread — never delays
+    # the request. Health/root pings don't count as user activity.
+    if request.url.path not in ("/", "/health"):
+        try:
+            from app.services.reminder_service import maybe_run_daily_sweep
+            maybe_run_daily_sweep()
+        except Exception as exc:
+            logging.getLogger("delta").warning("reminder sweep hook failed: %s", exc)
     return response
 
 
@@ -104,7 +114,12 @@ def startup():
                 conn.execute(text("ALTER TABLE roadmap_states ADD COLUMN IF NOT EXISTS plan_style TEXT"))
                 conn.execute(text("ALTER TABLE roadmap_states ADD COLUMN IF NOT EXISTS day_schedule TEXT"))
                 conn.execute(text("ALTER TABLE roadmap_states ADD COLUMN IF NOT EXISTS day_plan TEXT"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_reminded_on DATE"))
             else:
+                try:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN last_reminded_on DATE"))
+                except Exception:
+                    pass
                 for col in ("profile_data", "agent2_memory_data"):
                     try:
                         conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} TEXT"))
@@ -154,6 +169,14 @@ def startup():
 
     import threading
     threading.Thread(target=_warm, name="delta-warmup", daemon=True).start()
+
+    # Daily task reminders run inside this process — the external cron job was
+    # unreliable. Idempotent per user per day, so restarts never double-send.
+    try:
+        from app.services.reminder_service import start_reminder_scheduler
+        start_reminder_scheduler()
+    except Exception as e:
+        print(f"[WARN] reminder scheduler not started: {e}")
 
     print("[OK] delta 2.0 API started - tables synced")
 

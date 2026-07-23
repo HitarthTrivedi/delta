@@ -24,3 +24,5 @@ psycopg2-binary>=2.9.0  # PostgreSQL driver for production (Render)
 redis>=5.0.0  # shared cache for market/search/embedding results
 cachetools>=5.3.0  # in-process TTL fallback when Redis is unavailable
 resend>=2.0.0     # transactional email via HTTPS (replaces SMTP which Railway blocks)
+tzdata>=2024.1    # IANA tz db for zoneinfo — python:3.11-slim ships without it,
+                  # so reminder "9am local" would silently fall back to UTC

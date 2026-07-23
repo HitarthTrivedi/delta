@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Float, Text, DateTime, Boolean
+from sqlalchemy import Column, String, Integer, Float, Text, Date, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
@@ -16,6 +16,7 @@ class User(Base):
     learning_style = Column(String, nullable=True)
     profile_data = Column(Text, nullable=True)      # JSON blob of onboarding intake profile
     agent2_memory_data = Column(Text, nullable=True) # JSON blob for Agent 2 chat memory/context
+    last_reminded_on = Column(Date, nullable=True)  # date of the last reminder email sent
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

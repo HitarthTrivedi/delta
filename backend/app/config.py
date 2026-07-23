@@ -82,10 +82,25 @@ class Settings(BaseSettings):
     JOBPOSTS_SOURCE_MODE: str = os.getenv("JOBPOSTS_SOURCE_MODE", "")
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+    # Gmail API (preferred transport — sends from our own mailbox over HTTPS,
+    # so Railway's outbound SMTP block doesn't apply). Requires OAuth2: there is
+    # no API-key path for sending mail.
+    GMAIL_CLIENT_ID: str = os.getenv("GMAIL_CLIENT_ID", "")
+    GMAIL_CLIENT_SECRET: str = os.getenv("GMAIL_CLIENT_SECRET", "")
+    GMAIL_REFRESH_TOKEN: str = os.getenv("GMAIL_REFRESH_TOKEN", "")
+    GMAIL_FROM_EMAIL: str = os.getenv("GMAIL_FROM_EMAIL", "")
+    GMAIL_FROM_NAME: str = os.getenv("GMAIL_FROM_NAME", "Delta by Alpha.Kore")
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
     BREVO_FROM_EMAIL: str = os.getenv("BREVO_FROM_EMAIL", "alpha.kore25@gmail.com")
     BREVO_FROM_NAME: str = os.getenv("BREVO_FROM_NAME", "Delta by Alpha.Kore")
     REMINDER_SECRET: str = os.getenv("REMINDER_SECRET", "")
+    # Daily reminders. On a host that sleeps when idle, the sweep is triggered by
+    # the first user request at/after REMINDER_HOUR_LOCAL in REMINDER_TIMEZONE —
+    # so "9" means 9am for the users, not 9am UTC.
+    REMINDERS_ENABLED: bool = os.getenv("REMINDERS_ENABLED", "true").lower() == "true"
+    REMINDER_TIMEZONE: str = os.getenv("REMINDER_TIMEZONE", "Asia/Kolkata")
+    REMINDER_HOUR_LOCAL: int = int(os.getenv("REMINDER_HOUR_LOCAL", "9"))
+    REMINDER_CHECK_INTERVAL_SECONDS: int = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "900"))
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://delta-ai.vercel.app")
 
     class Config:

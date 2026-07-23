@@ -1728,7 +1728,7 @@ def log_journey_event(
                         id=str(uuid.uuid4()),
                         user_id=user_id,
                         name=skill_name.strip(),
-                        proficiency=6,  # Mastered threshold is >= 6
+                        proficiency=6,  # "in progress" — mastered threshold is >= 8
                         evidence_type="claimed",
                         evidence_weight=0.5
                     )
@@ -1790,8 +1790,12 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         actions = weekly_focus.get("primary_actions") or []
         has_stable_actions = bool(actions) and all(action.get("id") and action.get("title") for action in actions)
 
-        # Return early if tasks already exist — never regenerate on a plain page load
-        if has_stable_actions:
+        # Return early for a locked week — never regenerate on a plain page load.
+        # The `manual` check matters: without it every stable week returned here,
+        # making the `if has_stable_actions:` branch below unreachable and silently
+        # disabling event-blocked weeks, their restore, and the long-horizon upgrade.
+        # Weeks that failed to lock (< 2 valid tasks) still fall through and retry.
+        if has_stable_actions and weekly_focus.get("manual"):
             return roadmap
 
         # Also return early if a generation was attempted very recently (< 90s ago).
@@ -2393,7 +2397,9 @@ def _task_difficulty_level(
             skill_name,
         )
     if proficiency == 0 and skill_name:
-        logger.debug(
+        # Warning, not debug: a silent lookup miss here is what made every LeetCode
+        # task score as Expert, so this needs to be visible at default log level.
+        logger.warning(
             "[difficulty] proficiency=0 for '%s' — possible skill name lookup miss "
             "(check SkillNode names in DB match this skill_name).",
             skill_name,
@@ -2446,10 +2452,12 @@ def _user_baseline_score(skills: list[SkillNode] | None, active_phase: dict | No
     Falls back to top-5 overall if no phase skills match.
 
     Tiers (based on relevant avg proficiency):
-        0-2  → 1.5
-        3-4  → 2.5
-        5-6  → 4.5  (working knowledge → Advanced tasks allowed)
-        7+   → 5.0
+        0-2    → 1.5
+        3-4    → 2.5
+        5-6    → 3.5  (working knowledge → up to Intermediate)
+        6-7.5  → 4.0  (strong working knowledge → up to Advanced)
+        7.5-9  → 4.5  (near-mastered → Advanced/Expert boundary)
+        9+     → 5.0  (fully mastered → Expert allowed)
     """
     if not skills:
         return 1.5

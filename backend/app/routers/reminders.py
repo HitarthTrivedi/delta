@@ -1,105 +1,34 @@
-"""Daily reminder endpoint — called once per day by a cron job."""
+"""Manual reminder trigger.
+
+Reminders normally fire from the in-process scheduler in reminder_service (Railway
+cron proved unreliable). This endpoint stays for on-demand testing — it forces a
+send, bypassing the once-a-day guard, so you can verify the email without waiting
+for the scheduled hour.
+"""
 import hmac
-import json
 import logging
 import threading
+
 from fastapi import APIRouter, Header, HTTPException
 
 from app.config import settings
-from app.database import SessionLocal
-from app.models import RoadmapState, User
-from app.services.email_service import send_reminder_email
+from app.services.reminder_service import run_daily_reminders
 
 logger = logging.getLogger("delta.reminders")
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])
-
-
-def _as_json(value, fallback):
-    if value is None:
-        return fallback
-    if isinstance(value, (dict, list)):
-        return value
-    try:
-        return json.loads(value)
-    except Exception:
-        return fallback
-
-
-def _pending_tasks(roadmap: RoadmapState) -> list[str]:
-    """Return titles of tasks in the current weekly focus."""
-    weekly_focus = _as_json(roadmap.weekly_focus, {})
-    actions = weekly_focus.get("primary_actions") or []
-    return [a.get("title") or a.get("label") or "Task" for a in actions if a.get("title") or a.get("label")]
-
-
-def _run_reminders_background():
-    """
-    Send reminder emails in a separate thread so the HTTP response can return
-    immediately (202) without blocking the cron job's timeout window.
-    """
-    db = SessionLocal()
-    sent = skipped = failed = 0
-    try:
-        users = db.query(User).all()
-        logger.warning("Reminder run started: %d total users found", len(users))
-
-        for user in users:
-            if not user.email:
-                logger.warning("SKIP user %s — no email", user.id)
-                skipped += 1
-                continue
-
-            roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
-            if not roadmap:
-                logger.warning("SKIP user %s (%s) — no roadmap", user.id, user.email)
-                skipped += 1
-                continue
-
-            pending = _pending_tasks(roadmap)
-            if not pending:
-                logger.warning(
-                    "SKIP user %s (%s) — no pending tasks (weekly_focus=%s)",
-                    user.id, user.email,
-                    str(roadmap.weekly_focus)[:200] if roadmap.weekly_focus else "None",
-                )
-                skipped += 1
-                continue
-
-            week_number = getattr(roadmap, "week_number", 1) or 1
-            name = user.name or user.email.split("@")[0]
-
-            ok = send_reminder_email(
-                to_email=user.email,
-                user_name=name,
-                pending_tasks=pending,
-                week_number=week_number,
-            )
-            if ok:
-                sent += 1
-            else:
-                failed += 1
-    except Exception as exc:
-        logger.error("Background reminder run failed: %s", exc)
-    finally:
-        db.close()
-
-    logger.warning("Daily reminders complete: sent=%d skipped=%d failed=%d", sent, skipped, failed)
 
 
 @router.post("/daily", status_code=202)
 def trigger_daily_reminders(
     x_reminder_secret: str = Header(default=""),
 ):
-    """
-    Kick off daily task reminder emails for all users with an active roadmap.
+    """Force a reminder run for all users, ignoring the once-a-day guard.
 
-    Returns 202 immediately and sends emails in a background thread — this
-    prevents cron-job HTTP timeouts regardless of how many users need emails.
+    Returns 202 immediately and sends in a background thread so the caller never
+    blocks on the email round-trips.
 
-    Protected by X-Reminder-Secret header matching REMINDER_SECRET env var.
-
-    Example curl:
-        curl -X POST https://<your-backend>.railway.app/api/reminders/daily \\
+    Protected by X-Reminder-Secret matching the REMINDER_SECRET env var:
+        curl -X POST https://<backend>/api/reminders/daily \\
              -H "X-Reminder-Secret: <REMINDER_SECRET>"
     """
     if not settings.REMINDER_SECRET:
@@ -107,6 +36,10 @@ def trigger_daily_reminders(
     if not hmac.compare_digest(x_reminder_secret or "", settings.REMINDER_SECRET):
         raise HTTPException(status_code=401, detail="Invalid reminder secret.")
 
-    thread = threading.Thread(target=_run_reminders_background, name="delta-reminders", daemon=True)
-    thread.start()
-    return {"status": "accepted", "message": "Reminder run started in background. Check server logs for results."}
+    threading.Thread(
+        target=run_daily_reminders,
+        kwargs={"force": True},
+        name="delta-reminders-manual",
+        daemon=True,
+    ).start()
+    return {"status": "accepted", "message": "Reminder run started. Check server logs for results."}
