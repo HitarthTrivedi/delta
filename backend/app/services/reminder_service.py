@@ -19,6 +19,7 @@ import logging
 import threading
 import time
 
+import requests
 from sqlalchemy import update
 
 from app.config import settings
@@ -73,6 +74,58 @@ def _is_real_email(email: str | None) -> bool:
     if domain in _PLACEHOLDER_EMAIL_DOMAINS or domain.endswith(".local"):
         return False
     return True
+
+
+def _supabase_base_url() -> str:
+    """Project base URL (…supabase.co) derived from the configured REST URL."""
+    base = (settings.SUPABASE_URL or "").strip()
+    for suffix in ("/rest/v1/", "/rest/v1"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+            break
+    return base.rstrip("/")
+
+
+def _supabase_admin_email(user_id: str) -> str | None:
+    """Look up a user's real email in Supabase auth via the admin API.
+
+    Users authenticate through Supabase, so their real address lives in auth.users,
+    not our local table (which only ever held a user_<id>@delta.local placeholder).
+    Requires the service-role key. Returns None on any failure — the caller then
+    just skips that user rather than bouncing mail to a dead address.
+    """
+    base = _supabase_base_url()
+    key = settings.SUPABASE_SERVICE_ROLE_KEY
+    if not base or not key:
+        return None
+    try:
+        resp = requests.get(
+            f"{base}/auth/v1/admin/users/{user_id}",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=10,
+        )
+    except Exception as exc:
+        logger.warning("Supabase admin lookup failed for %s: %s", user_id, exc)
+        return None
+    if resp.status_code != 200:
+        logger.warning("Supabase admin lookup for %s returned %s", user_id, resp.status_code)
+        return None
+    email = (resp.json() or {}).get("email")
+    return email if _is_real_email(email) else None
+
+
+def _resolve_email(db, user: User) -> str | None:
+    """Deliverable email for a user, backfilling from Supabase when ours is a
+    placeholder. The real address is persisted so the lookup happens only once."""
+    if _is_real_email(user.email):
+        return user.email
+    real = _supabase_admin_email(user.id)
+    if real:
+        user.email = real
+        db.commit()
+        logger.info("Backfilled real email for user %s from Supabase auth.", user.id)
+        return real
+    return None
 
 
 def _as_json(value, fallback):
@@ -185,9 +238,12 @@ def run_daily_reminders(force: bool = False) -> dict:
         logger.info("Reminder sweep started: %d users", len(users))
 
         for user in users:
-            # Skip empty and synthetic placeholder addresses (user_<id>@delta.local,
-            # seed accounts) — sending to them only produces bounces to the sender.
-            if not _is_real_email(user.email):
+            # Real users still carry a user_<id>@delta.local placeholder in our table;
+            # resolve their actual address from Supabase auth (cached back after the
+            # first lookup). Skip only if we genuinely can't find a deliverable one —
+            # emailing a placeholder just bounces to the sender.
+            email = _resolve_email(db, user)
+            if not email:
                 skipped += 1
                 continue
 
@@ -210,8 +266,8 @@ def run_daily_reminders(force: bool = False) -> dict:
                 continue
 
             ok = send_reminder_email(
-                to_email=user.email,
-                user_name=user.name or user.email.split("@")[0],
+                to_email=email,
+                user_name=user.name or email.split("@")[0],
                 pending_tasks=pending,
                 week_number=week_number,
                 personal_tasks=personal,
