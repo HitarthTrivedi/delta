@@ -56,6 +56,25 @@ def _past_send_hour() -> bool:
     return _local_now().hour >= settings.REMINDER_HOUR_LOCAL
 
 
+# Synthetic addresses the app stamps on auto-created rows before a real email is
+# known (users.py) and on seed accounts. These are undeliverable — sending to them
+# just bounces back to the sender — so the sweep must skip them.
+_PLACEHOLDER_EMAIL_DOMAINS = ("delta.local", "delta.dev", "example.com")
+
+
+def _is_real_email(email: str | None) -> bool:
+    """True only for an address we can actually deliver to."""
+    if not email or "@" not in email:
+        return False
+    local, _, domain = email.rpartition("@")
+    domain = domain.lower().strip()
+    if not local or "." not in domain:  # a real domain needs a TLD
+        return False
+    if domain in _PLACEHOLDER_EMAIL_DOMAINS or domain.endswith(".local"):
+        return False
+    return True
+
+
 def _as_json(value, fallback):
     if value is None:
         return fallback
@@ -166,7 +185,9 @@ def run_daily_reminders(force: bool = False) -> dict:
         logger.info("Reminder sweep started: %d users", len(users))
 
         for user in users:
-            if not user.email:
+            # Skip empty and synthetic placeholder addresses (user_<id>@delta.local,
+            # seed accounts) — sending to them only produces bounces to the sender.
+            if not _is_real_email(user.email):
                 skipped += 1
                 continue
 
