@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    # JDoodle — code execution for the Coding Sandbox (free tier: 200 runs/day).
+    # Get credentials at jdoodle.com/compiler-api. Without them, the sandbox's
+    # run/submit endpoints return a clear "not configured" error.
+    JDOODLE_CLIENT_ID: str = os.getenv("JDOODLE_CLIENT_ID", "")
+    JDOODLE_CLIENT_SECRET: str = os.getenv("JDOODLE_CLIENT_SECRET", "")
     # Security controls
     # ALLOW_HEADER_AUTH: when true, trust the unverified X-User-Id header (dev only).
     # MUST stay false in production — a verified Supabase JWT is then required.

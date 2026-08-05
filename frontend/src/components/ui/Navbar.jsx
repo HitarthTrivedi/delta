@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, LogOut, Menu, X } from 'lucide-react';
+import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, Dumbbell, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import ThemeToggle from './ThemeToggle';
 
@@ -9,6 +9,7 @@ const navItems = [
   { label: 'Roadmap', path: '/roadmap', icon: Map },
   { label: 'Progress', path: '/progress-report', icon: BarChart3 },
   { label: 'Opportunities', path: '/opportunities', icon: Briefcase },
+  { label: 'Practice', path: '/practice', icon: Dumbbell },
   { label: 'Trophies', path: '/achievements', icon: Trophy },
   { label: 'Resume', path: '/resume', icon: FileText },
 ];
@@ -31,7 +32,8 @@ export default function Navbar({ user }) {
   const isActive = (path) =>
     location.pathname === path ||
     (path === '/intake' && location.pathname === '/onboarding') ||
-    (path === '/roadmap' && location.pathname === '/weekly-plan');
+    (path === '/roadmap' && location.pathname === '/weekly-plan') ||
+    (path === '/practice' && location.pathname.startsWith('/practice/'));
 
   return (
     <>

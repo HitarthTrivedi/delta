@@ -10,11 +10,12 @@ from app.models.semantic_memory import SemanticNodeModel, SemanticEdgeModel, Ten
 from app.models.feedback import Feedback
 from app.models.achievement import Achievement
 from app.models.opportunity_board import OpportunityBoard
+from app.models.sandbox_session import SandboxSession
 
 __all__ = [
     "User", "SkillNode", "DeltaScore", "WeeklyBrief",
     "Recommendation", "MarketSnapshot", "PersonalizationProfile",
     "CareerMemoryProfile", "JourneyEvent", "RoadmapState", "ResumeProfile",
     "SemanticNodeModel", "SemanticEdgeModel", "TensionNodeModel", "IngestionSession",
-    "Feedback", "Achievement", "OpportunityBoard",
+    "Feedback", "Achievement", "OpportunityBoard", "SandboxSession",
 ]

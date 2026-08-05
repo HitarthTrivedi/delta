@@ -10,7 +10,7 @@
 > - [../README.md](../README.md) — local setup and run instructions.
 > - [PRIVACY_POLICY.md](./PRIVACY_POLICY.md) / [TERMS_OF_SERVICE.md](./TERMS_OF_SERVICE.md) — legal documents (DPDP Act, India).
 
-**Last updated:** 2026-07-02 · **Version:** 2.0.0
+**Last updated:** 2026-08-05 · **Version:** 2.0.0
 
 ---
 
@@ -280,6 +280,48 @@ This is the full user-facing surface. Each feature lists **what it does** and
 - **What:** Ledger, Briefs, Pulse, Portfolio, Profile views.
 - **How:** `pages/FeaturePages.jsx` (named exports mapped to lazy routes).
 
+### 6.16 Coding Sandbox *(new)*
+- **What:** Practice space to solve real coding problems. Pick a problem from a
+  curated, topic-organized bank (the same NeetCode-150 list used to build
+  weekly LeetCode tasks), write code in a real editor, run it against custom
+  input, or submit for automatic pass/fail grading against hidden test cases.
+- **How:** `models/sandbox_session.py` (`type='coding'`, generic across both
+  sandboxes), `routers/sandbox_coding.py` (list problems / start / run /
+  submit / sessions, `10/min` on run+submit), `services/sandbox_problems.py`
+  (reuses `central_engine.LEETCODE_PROBLEMS`/`LEETCODE_SEQUENCE` for the
+  curated index; AI-generates and caches the full problem package — statement,
+  examples, per-language starter code, hidden test cases — on first open).
+  Problems are **I/O-contract based** (read stdin, print stdout), so one
+  grader (a whitespace-tolerant stdout diff, `services/code_runner.py`) works
+  identically across every supported language.
+  Code execution is delegated to **JDoodle** (`services/code_runner.py`) — not
+  run in-process, since arbitrary user code can't be safely sandboxed on the
+  hosting tier. Without `JDOODLE_CLIENT_ID`/`JDOODLE_CLIENT_SECRET` configured,
+  run/submit return a clear "not configured" message rather than failing
+  silently; problem browsing/generation still works. A full solve logs a
+  `task_completed` journey event and bumps the matched skill's proficiency
+  (`services/sandbox_common.bump_skill`). UI: `pages/CodingSandbox.jsx`
+  (Monaco editor via `@monaco-editor/react`, CDN-loaded, no bundle cost).
+
+### 6.17 Mock Interview Sandbox *(new)*
+- **What:** A voice-or-text AI interviewer. Pick technical / behavioral /
+  system-design, answer up to 6 questions tailored to the user's profile and
+  target role (each a natural follow-up on the previous answer), then get a
+  structured feedback report — overall score, strengths, concrete
+  improvements, and per-question notes.
+- **How:** `models/sandbox_session.py` (`type='interview'`),
+  `routers/sandbox_interview.py` (start `10/min`, respond `20/min`, finish
+  `10/min`), `services/interview_ai.py` (opening question / next question /
+  feedback, grounded in `profile_store.profile_as_compact_context`). Same
+  `task_completed` journey event + skill bump on completion as the coding
+  sandbox. UI: `pages/InterviewSandbox.jsx` — questions are read aloud via the
+  browser's native `speechSynthesis`, answers captured via native
+  `SpeechRecognition`/`webkitSpeechRecognition` with a feature-detected
+  fallback to a plain textarea (Firefox/Safari have weak/no support) — no paid
+  speech API, no new dependency.
+- **Both sandboxes** are reachable from a `/practice` hub (`pages/PracticeHub.jsx`)
+  showing solved/completed counts, linked from the Navbar's **Practice** item.
+
 ---
 
 ## 7. Backend architecture — how it works
@@ -420,6 +462,7 @@ Sync SQLAlchemy ORM; tables auto-created on startup. Most tables key off
 | `personalization_profiles` | `personalization.py` | Personalization settings | `user_id` **unique** |
 | `opportunity_boards` *(new)* | `opportunity_board.py` | AI-matched jobs board | `user_id` **unique**; `preferences`, `opportunities` (JSON), `profile_signature`, `generated_at` |
 | `achievements` *(new)* | `achievement.py` | Trophy-cabinet entries | `user_id` (idx), `type`, `title`, `organization`, `date_achieved`, `url`, `description` |
+| `sandbox_sessions` *(new)* | `sandbox_session.py` | Coding + interview practice attempts | `user_id` (idx), `type` (`coding`\|`interview`), `title`, `status`, `data` (JSON — problem/transcript payload), `score`, `completed_at` |
 | `feedbacks` | `feedback.py` | User feedback submissions | `created_at` |
 | `semantic_nodes` / `semantic_edges` / `tension_nodes` | `semantic_memory.py` | Embedding-backed memory graph + tensions | `user_id` (idx) |
 | `ingestion_sessions` | `semantic_memory.py` | Onboarding/ingestion session state | `user_id` (idx) |
@@ -480,6 +523,15 @@ All routes are under `/api`. Owner-scoped routes require **both**
 | **achievements** *(new)* | GET | `/achievements/{user_id}` | List achievements |
 | | POST | `/achievements/{user_id}` | Add achievement |
 | | DELETE | `/achievements/{user_id}/{achievement_id}` | Delete achievement |
+| **sandbox/coding** *(new)* | GET | `/sandbox/coding/{user_id}/problems` | Curated problem list + solved flags |
+| | POST | `/sandbox/coding/{user_id}/problems/start` | Generate/open a problem *(LLM)* |
+| | POST | `/sandbox/coding/{user_id}/sessions/{id}/run` | Run code, no grading *(JDoodle; 10/min)* |
+| | POST | `/sandbox/coding/{user_id}/sessions/{id}/submit` | Grade against hidden tests *(JDoodle; 10/min)* |
+| | GET | `/sandbox/coding/{user_id}/sessions` | Submission history |
+| **sandbox/interview** *(new)* | POST | `/sandbox/interview/{user_id}/start` | Start a mock interview *(LLM; 10/min)* |
+| | POST | `/sandbox/interview/{user_id}/sessions/{id}/respond` | Answer → next question *(LLM; 20/min)* |
+| | POST | `/sandbox/interview/{user_id}/sessions/{id}/finish` | Generate feedback report *(LLM; 10/min)* |
+| | GET | `/sandbox/interview/{user_id}/sessions` | Interview history |
 | **calendar** | GET | `/calendar/events` · `/sources` | Events + source statuses |
 | **dossier** | GET | `/dossier/weekly/{user_id}` | Weekly dossier |
 | **reminders** | POST | `/reminders/daily` | Trigger daily reminder emails *(secret-protected cron)* |
@@ -500,7 +552,8 @@ auth gating, and route-level code-splitting.
   `/early-access`, `/privacy`, `/terms`, `/login`.
 - **Auth only (no onboarding required):** `/onboarding`, `/intake`.
 - **Auth + onboarding complete:** `/dashboard`, `/weekly-plan`, `/roadmap`,
-  `/progress-report`, `/resume`, `/achievements`, `/opportunities`, `/ledger`,
+  `/progress-report`, `/resume`, `/achievements`, `/opportunities`,
+  `/practice`, `/practice/coding`, `/practice/interview`, `/ledger`,
   `/briefs`, `/pulse`, `/calendar`, `/portfolio`, `/profile`.
 - Gating: `<RequireAuth>` (Zustand `userId`/`loading`) then `<ProtectedRoute>`
   (`onboarding_complete`).
@@ -515,12 +568,16 @@ auth gating, and route-level code-splitting.
 - **API client:** `lib/api.js` — one Axios instance (90s default timeout) with
   request/response interceptors, exposing typed method groups (`usersAPI`,
   `briefsAPI`, `chatAPI`, `careerOSAPI`, `resumeAPI`, `opportunitiesAPI`,
-  `achievementsAPI`, `ingestionAPI`, …). The long weekly-cycle call overrides to
-  300s.
+  `achievementsAPI`, `sandboxCodingAPI`, `sandboxInterviewAPI`, `ingestionAPI`, …).
+  The long weekly-cycle call overrides to 300s.
 
 **Rendering:** route pages loaded with `React.lazy` + `<Suspense>` (separate
 chunks); design system in `components/ui/*` (Radix + Tailwind), `GlassPanel`,
-`Navbar`; animations via Framer Motion; charts via Recharts.
+`Navbar`; animations via Framer Motion; charts via Recharts. The Coding
+Sandbox loads **Monaco** (`@monaco-editor/react`, CDN-fetched at runtime — no
+bundle-size cost) for the code editor; the Mock Interview Sandbox uses the
+browser's **native Web Speech API** (`speechSynthesis` / `SpeechRecognition`)
+for voice — no additional package, no paid speech service.
 
 ---
 
@@ -543,7 +600,10 @@ on `require_owner` (`dependencies/auth.py`). It:
 A `401` on the client triggers `logout()` + redirect to `/login`.
 
 **Other controls:**
-- **Rate limiting** (slowapi): `/briefs/generate` 5/hr, `/chat/message` 20/min.
+- **Rate limiting** (slowapi): `/briefs/generate` 5/hr, `/chat/message` 20/min,
+  sandbox coding run/submit 10/min, sandbox interview respond 20/min
+  (start/finish 10/min) — the coding limits guard the external JDoodle quota,
+  the interview limits mirror the existing chat LLM-call precedent.
 - **CORS**: allow-list (`localhost:3000`, `127.0.0.1:3000`, the Vercel origin;
   overridable via `CORS_ORIGINS`).
 - **Transport**: HTTPS in production (Vercel + Render).
@@ -600,6 +660,7 @@ actions; route code-splitting; 90s Axios default (300s for weekly-cycle).
 | **GitHub / StackExchange / Arbeitnow** | Market signals | `market_pulse.py` | Role/skill queries (no user PII) |
 | **LeetCode / Codeforces / Kaggle / Unstop / Devpost** | Opportunities | `opportunity_adapters.py` | Public queries (no user PII); mock by default |
 | **LinkedIn** | Job-search deeplinks | `opportunity_ai.py` | **Nothing** — only a URL is constructed for the user to click |
+| **JDoodle** | Code execution (Coding Sandbox) | `code_runner.py` | The user's submitted source code + generated test-case stdin (no account/profile data) |
 | **Gmail SMTP** | Daily reminder emails | `email_service.py` | Recipient email + task titles |
 | **Redis** | Shared cache | `cache.py` | Market/search/embedding artifacts (optional; fail-open) |
 | **Vercel** | Frontend hosting | — | Standard web/CDN logs |
@@ -626,6 +687,7 @@ See [§18](#18-personal-data-map-for-privacydpdp) and the
 | `CORS_ORIGINS` | localhost + Vercel origin | Allowed origins (CSV) |
 | `*_SOURCE_MODE` (`OPPORTUNITY`, `LEETCODE`, …) | `mock` | Live vs mock adapters |
 | `REMINDER_FROM_EMAIL` / `REMINDER_FROM_PASSWORD` / `REMINDER_SECRET` | — | Gmail SMTP + cron protection |
+| `JDOODLE_CLIENT_ID` / `JDOODLE_CLIENT_SECRET` | — | Code execution for the Coding Sandbox (free tier: 200 runs/day, jdoodle.com/compiler-api). Without these, run/submit return a clear "not configured" message instead of failing |
 | `FRONTEND_URL` | `https://delta-ai.vercel.app` | Links in emails |
 | `SQL_ECHO` | `false` | Log all SQL |
 

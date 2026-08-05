@@ -225,6 +225,23 @@ export const achievementsAPI = {
   remove: (userId, achievementId) => api.delete(`/achievements/${userId}/${achievementId}`).then(r => r.data),
 };
 
+// ── Coding Sandbox API ──
+export const sandboxCodingAPI = {
+  getProblems: (userId) => api.get(`/sandbox/coding/${userId}/problems`).then(r => r.data),
+  startProblem: (userId, topic, problemId) => api.post(`/sandbox/coding/${userId}/problems/start`, { topic, problem_id: problemId }, { timeout: 60000 }).then(r => r.data),
+  run: (userId, sessionId, language, code, stdin = '') => api.post(`/sandbox/coding/${userId}/sessions/${sessionId}/run`, { language, code, stdin }, { timeout: 30000 }).then(r => r.data),
+  submit: (userId, sessionId, language, code) => api.post(`/sandbox/coding/${userId}/sessions/${sessionId}/submit`, { language, code }, { timeout: 60000 }).then(r => r.data),
+  getSessions: (userId) => api.get(`/sandbox/coding/${userId}/sessions`).then(r => r.data),
+};
+
+// ── Mock Interview Sandbox API ──
+export const sandboxInterviewAPI = {
+  start: (userId, roleType) => api.post(`/sandbox/interview/${userId}/start`, { role_type: roleType }, { timeout: 60000 }).then(r => r.data),
+  respond: (userId, sessionId, answer) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/respond`, { answer }, { timeout: 60000 }).then(r => r.data),
+  finish: (userId, sessionId) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/finish`, {}, { timeout: 60000 }).then(r => r.data),
+  getSessions: (userId) => api.get(`/sandbox/interview/${userId}/sessions`).then(r => r.data),
+};
+
 // ── Ingestion API ──
 export const ingestionAPI = {
   start: (userId, journeyType) => api.post('/ingestion/start', { user_id: userId, journey_type: journeyType }).then(r => r.data),

@@ -205,6 +205,7 @@ Sync SQLAlchemy ORM; tables auto-created on startup via
 | `personalization_profiles` | `personalization.py` | Personalization settings | `user_id` **unique** |
 | `opportunity_boards` | `opportunity_board.py` | AI-matched jobs/internships board | `user_id` **unique**, `preferences`/`opportunities` (JSON), `profile_signature` |
 | `achievements` | `achievement.py` | Trophy-cabinet entries (certs/projects/awards) | `user_id` (idx), `type`, `title`, `organization`, `url` |
+| `sandbox_sessions` | `sandbox_session.py` | Coding + interview practice attempts | `user_id` (idx), `type` (`coding`\|`interview`), `status`, `data` (JSON), `score` |
 | `feedbacks` | `feedback.py` | User feedback submissions | `created_at` |
 | `semantic_nodes` / `semantic_edges` / `tension_nodes` | `semantic_memory.py` | Embedding-backed memory graph + detected tensions | `user_id` (idx) |
 | `ingestion_sessions` | `semantic_memory.py` | Onboarding/ingestion session state | `user_id` (idx) |
@@ -258,6 +259,8 @@ All routes are under `/api`. Ownership is enforced via the `X-User-Id` header +
 | | PUT | `/opportunities/{user_id}/preferences` | Save opportunity preferences |
 | | POST | `/opportunities/{user_id}/generate` | Regenerate AI-matched board *(LLM)* |
 | **achievements** | GET/POST/DELETE | `/achievements/{user_id}` · `/{achievement_id}` | Trophy-cabinet CRUD |
+| **sandbox/coding** | GET/POST | `/sandbox/coding/{user_id}/problems` · `/problems/start` · `/sessions/{id}/run` · `/sessions/{id}/submit` · `/sessions` | Practice problems, run/submit *(JDoodle; 10/min)* |
+| **sandbox/interview** | POST/GET | `/sandbox/interview/{user_id}/start` · `/sessions/{id}/respond` · `/sessions/{id}/finish` · `/sessions` | Mock interview flow *(LLM; 10–20/min)* |
 | **reminders** | POST | `/reminders/daily` | Send daily task-reminder emails *(secret-protected cron)* |
 | **feedback** | GET/POST | `/feedback` | Feedback |
 
@@ -313,8 +316,8 @@ auth gating, and route-level code-splitting.
 - **Auth only (no onboarding required):** `/onboarding`, `/intake`.
 - **Auth + onboarding complete:** `/dashboard`, `/weekly-plan`, `/roadmap`,
   `/progress-report`, `/resume`, `/achievements` (Trophy Cabinet),
-  `/opportunities`, `/ledger`, `/briefs`, `/pulse`, `/calendar`, `/portfolio`,
-  `/profile`.
+  `/opportunities`, `/practice` (hub), `/practice/coding`, `/practice/interview`,
+  `/ledger`, `/briefs`, `/pulse`, `/calendar`, `/portfolio`, `/profile`.
 - Gating is done by `<RequireAuth>` (checks Zustand `userId`/`loading`) and
   `<ProtectedRoute>` (checks `onboarding_complete`).
 
@@ -400,6 +403,7 @@ A shared cache with a **fail-open** design:
 | **Tavily / Serper** | Web search | `web_search.py` | Provider waterfall → mock fallback |
 | **GitHub / StackExchange / Arbeitnow** | Market signals | `market_pulse.py` | Public APIs, each timeout-bounded |
 | **LeetCode / Codeforces / Kaggle / Unstop / Devpost** | Opportunities | `opportunity_adapters.py` | Public APIs / scrapers |
+| **JDoodle** | Code execution (Coding Sandbox) | `code_runner.py` | Keyed "compiler as a service" API (free tier: 200 runs/day); user code + generated stdin only, not run in-process |
 | **Supabase** | Auth (email/password, Google OAuth) | FE `store/authStore.js`, BE `dependencies/auth.py` | JWT verified server-side |
 | **Gmail SMTP** | Daily reminder emails | `email_service.py` | Sends via `smtp.gmail.com`; triggered by the `/reminders/daily` cron |
 | **Redis** | Shared cache | `cache.py` | Optional; fail-open fallback |
@@ -419,6 +423,7 @@ A shared cache with a **fail-open** design:
 | `TAVILY_API_KEY` / `SERPER_API_KEY` | — | Web search providers |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_JWT_SECRET` | — | Auth / JWT verification |
 | `REMINDER_FROM_EMAIL` / `REMINDER_FROM_PASSWORD` / `REMINDER_SECRET` | — | Gmail SMTP creds + cron-protection secret for `/reminders/daily` |
+| `JDOODLE_CLIENT_ID` / `JDOODLE_CLIENT_SECRET` | — | Code execution for the Coding Sandbox (jdoodle.com/compiler-api, free tier 200 runs/day). Without these, run/submit return a clear "not configured" error |
 | `FRONTEND_URL` | `https://delta-ai.vercel.app` | Link target in reminder emails |
 | `SQL_ECHO` | `false` | Log all SQL |
 | `OPPORTUNITY_SOURCE_MODE` (+ `LEETCODE_`, `CODEFORCES_`, `KAGGLE_`, `UNSTOP_`, `HACKATHON_`, `JOBPOSTS_`) | `mock` | Live vs mock adapters |

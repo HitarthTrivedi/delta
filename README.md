@@ -88,6 +88,15 @@ CACHE_ENABLED=true                   # set false to disable caching entirely
 
 See [docs/ARCHITECTURE.md §11](docs/ARCHITECTURE.md#11-performance--caching-architecture) for the full caching design.
 
+### Coding Sandbox code execution (optional)
+
+The Coding Sandbox (`/practice/coding`) runs submitted code via [JDoodle's Compiler API](https://www.jdoodle.com/compiler-api) (free tier: 200 runs/day) rather than in-process — arbitrary user code can't be safely sandboxed on the hosting tier. It's **optional**: without credentials, problem browsing/generation still works, and run/submit just return a clear "not configured" message instead of failing.
+
+```env
+JDOODLE_CLIENT_ID=your_jdoodle_client_id
+JDOODLE_CLIENT_SECRET=your_jdoodle_client_secret
+```
+
 The frontend API URL should be:
 
 ```env
