@@ -5,13 +5,13 @@ import datetime
 
 
 class SandboxSession(Base):
-    """A practice attempt in either sandbox: a coding problem or a mock
-    interview. `type` discriminates the payload shape stored in `data`."""
+    """A practice attempt in any sandbox: a coding problem, a mock
+    interview, or a theory test. `type` discriminates the payload shape stored in `data`."""
     __tablename__ = "sandbox_sessions"
 
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    type = Column(String, nullable=False)  # 'coding' | 'interview'
+    type = Column(String, nullable=False)  # 'coding' | 'interview' | 'theory'
     title = Column(String, nullable=False)
     status = Column(String, default="in_progress")  # in_progress | completed
     data = Column(Text, nullable=True)  # JSON: type-specific payload

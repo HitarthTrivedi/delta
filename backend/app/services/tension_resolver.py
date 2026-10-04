@@ -157,6 +157,8 @@ Generate ONE challenge question that:
 Examples of good challenges:
 - "I've looked at deployment timelines for similar AI health tools — they average 6 months for a production-ready MVP. Given your 2-week goal, are we building a demo prototype or planning for a longer launch?"
 - "Your confidence in ML is strong, but 90% of ML Engineer postings now require model deployment experience beyond notebooks. Have you deployed a model to production, even a simple one?"
+- "You'd like to clear CA Final in six months alongside articleship. Most candidates who pass on the first attempt plan 8-10 months for both groups. Should we plan for one group first, or both with a heavier weekly load?"
+- "You feel ready for staff nurse interviews, but most hospital panels ask clinical scenario questions on emergencies and medication safety. Have you practised answering those out loud yet?"
 
 Return ONLY the challenge question text, nothing else."""
 

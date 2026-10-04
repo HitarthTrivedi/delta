@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Trophy, Award, BadgeCheck, GraduationCap, FolderGit2, Medal,
+  Trophy, Award, BadgeCheck, GraduationCap, FolderOpen, Medal,
   Plus, X, Trash2, ExternalLink, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,7 +28,7 @@ const monoLabel = {
 // Type → icon + accent colour + label. Drives the ledger's left column.
 const TYPES = {
   certificate: { label: 'Certificate', icon: BadgeCheck, color: 'var(--ink-soft)' },
-  project: { label: 'Project', icon: FolderGit2, color: 'var(--oxblood)' },
+  project: { label: 'Project', icon: FolderOpen, color: 'var(--oxblood)' },
   award: { label: 'Award', icon: Trophy, color: 'var(--oxblood)' },
   course: { label: 'Course', icon: GraduationCap, color: 'var(--ink-soft)' },
   other: { label: 'Other', icon: Medal, color: 'var(--ink-soft)' },
@@ -291,13 +291,13 @@ export default function TrophyCabinet() {
 
               <div>
                 <label style={labelStyle}>Title <span style={{ color: 'var(--oxblood)' }}>*</span></label>
-                <input className="tc-input" value={form.title} onChange={setField('title')} placeholder="e.g. AWS Certified Cloud Practitioner" autoFocus />
+                <input className="tc-input" value={form.title} onChange={setField('title')} placeholder="e.g. BLS certification, NISM Series VIII, Google Ads, AWS Cloud Practitioner" autoFocus />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Organization</label>
-                  <input className="tc-input" value={form.organization} onChange={setField('organization')} placeholder="e.g. Amazon, Coursera" />
+                  <input className="tc-input" value={form.organization} onChange={setField('organization')} placeholder="e.g. AHA, NISM, Google, Coursera" />
                 </div>
                 <div>
                   <label style={labelStyle}>Date</label>

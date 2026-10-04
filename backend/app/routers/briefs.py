@@ -20,7 +20,7 @@ from app.limiter import limiter
 router = APIRouter(prefix="/api/briefs", tags=["briefs"])
 
 EVIDENCE_WEIGHTS = {
-    "claimed": 0.4, "resume": 0.6, "github": 0.85,
+    "claimed": 0.4, "resume": 0.6, "github": 0.85, "link": 0.85,  # link = proof URL from any field
     "certification": 0.9, "verified": 1.0,
 }
 
@@ -53,7 +53,7 @@ def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db)
         market = MarketSnapshot(
             id=market_id,
             user_id=user_id,
-            target_role=user.target_role or "AI Developer / Software Engineer",
+            target_role=user.target_role or "Entry-level professional",
             snapshot_date=datetime.date.today(),
             top_demanded_skills=json.dumps(["LLMs", "Docker", "System Design", "Kubernetes", "MLOps"]),
             emerging_skills=json.dumps(["AI Agents", "RAG Pipelines", "Vector Databases"]),

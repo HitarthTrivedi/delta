@@ -21,7 +21,7 @@ from app.models import (
     User,
 )
 from app.services.brief_generator import generate_weekly_brief
-from app.services.domain_packs import infer_domain_pack
+from app.services.domain_packs import resolve_field, template_key
 from app.services.market_pulse import get_market_snapshot
 from app.services.memory_graph import MemoryGraph
 from app.services.memory_consolidation import consolidate_user_memory
@@ -104,6 +104,7 @@ def _sync_profile_skills_to_db(db: Session, user: User) -> list[SkillNode]:
     # the skill name, bump by +1 (max 9).
     EVIDENCE_PROFICIENCY = {
         "github":           8,
+        "link":             8,   # proof link submitted from the dashboard (any field)
         "verified_project": 8,
         "resume_project":   7,
         "resume_profile":   6,
@@ -189,21 +190,14 @@ def _profile_text(profile: dict, skills: list[SkillNode], user: User) -> str:
     ]).lower()
 
 
+def _field_pack(profile: dict, user: User) -> dict:
+    """The user's field (see domain_packs.resolve_field). Never assumes tech."""
+    return resolve_field({**(profile or {}), "target_role": (profile or {}).get("target_role") or user.target_role})
+
+
 def _profile_domain(profile: dict, skills: list[SkillNode], user: User) -> str:
-    text = _profile_text(profile, skills, user)
-    domains = [
-        ("ai_agents", ["multi-agent", "multi agent", "agentic rag", "adversarial ai", "llm orchestration", "long-term memory", "agent routing", "alpha.kore"]),
-        ("commerce", ["commerce", "finance", "accounting", "business", "marketing", "economics", "stock", "tax", "audit", "sales"]),
-        ("mechanical", ["mechanical", "cad", "solidworks", "autocad", "thermodynamics", "manufacturing", "robotics", "ansys"]),
-        ("electrical", ["electrical", "electronics", "circuit", "pcb", "arduino", "matlab", "power systems", "embedded", "iot"]),
-        ("arts", ["arts", "design", "fine arts", "illustration", "animation", "writing", "music", "film", "portfolio"]),
-    ]
-    scores = {
-        domain: sum(1 for marker in markers if marker in text)
-        for domain, markers in domains
-    }
-    best = max(scores, key=scores.get)
-    return best if scores[best] > 0 else "general"
+    """Template key for the proof / long-horizon templates, derived from the field pack."""
+    return template_key(_field_pack(profile, user)["id"], _profile_text(profile, skills, user))
 
 
 def _has_prior_profile_depth(profile: dict, skills: list[SkillNode], user: User) -> bool:
@@ -428,19 +422,30 @@ def _week_number_from_user(user: User) -> int:
 
 
 def _is_cs_engineering_user(profile: dict, skills: list[SkillNode], user: User) -> bool:
-    role = str(user.target_role or "").lower()
-    major = str(
-        profile.get("education", {}).get("major", "")
-        or profile.get("major", "")
-        or profile.get("field_of_study", "")
-    ).lower()
-    cs_keywords = {
-        "software", "developer", "engineer", "computer science", "cs", "cse",
-        "data scientist", "machine learning", "ml engineer", "ai", "backend",
-        "frontend", "fullstack", "sde", "swe", "programmer", "data engineer",
+    return _field_pack(profile, user)["id"] == "cs_ai"
+
+
+def _field_habit_action(profile: dict, skills: list[SkillNode], user: User, cycle_count: int, market: MarketSnapshot | None) -> dict:
+    """The non-software equivalent of the weekly LeetCode block, from the field pack."""
+    pack = _field_pack(profile, user)
+    habit = pack["weekly_habit"]
+    skill = pack["skill_taxonomy"][0] if pack["skill_taxonomy"] else "Core practice"
+    prof = {s.name.lower(): s.proficiency for s in skills}.get(skill.lower(), 0)
+    demanded = _as_json(market.top_demanded_skills, []) if market else []
+    return {
+        "id": f"recurring-habit-{pack['id']}-{cycle_count}",
+        "node_id": f"recurring-habit-cycle-{cycle_count}",
+        "type": "practice",
+        "title": habit["title"],
+        "skill": skill,
+        "description": habit["description"],
+        "why_now": "Readiness compounds through small, steady weekly practice, not short bursts.",
+        "source": f"Delta weekly practice for {pack['label']}",
+        "url": "",
+        "cadence": "weekly",
+        "recurring": True,
+        "difficulty_level": _task_difficulty_level(skill, prof, "practice", cycle_count, demanded),
     }
-    combined = f"{role} {major}"
-    return any(kw in combined for kw in cs_keywords)
 
 
 def _drop_avoided_actions(actions: list[dict], avoided: list[str]) -> list[dict]:
@@ -469,7 +474,7 @@ def _avoided_topics(user_id: str) -> list[str]:
 
 def _recurring_habit_actions(profile: dict, skills: list[SkillNode], user: User, cycle_count: int = 0, market: MarketSnapshot | None = None) -> list[dict]:
     if not _is_cs_engineering_user(profile, skills, user):
-        return []
+        return _drop_avoided_actions([_field_habit_action(profile, skills, user, cycle_count, market)], _avoided_topics(user.id))
     topic, tip = LEETCODE_SEQUENCE[cycle_count % len(LEETCODE_SEQUENCE)]
     problems = LEETCODE_PROBLEMS.get(topic, [])
     count = len(problems)
@@ -522,7 +527,7 @@ def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, 
     market_warnings = raw.get("market_warnings") or []
     trend = (emerging or demanded or ["market-backed proof"])[0]
     pattern = project_patterns[0] if project_patterns else f"Build a small proof using {trend} and explain the tradeoffs."
-    warning = market_warnings[0] if market_warnings else "Make the proof measurable, deployed or documented, and easy for a recruiter to inspect."
+    warning = market_warnings[0] if market_warnings else "Make the proof measurable, documented, and easy for a recruiter to inspect."
     
     # Lookup proficiency for the trend skill
     skill_map = {s.name.lower(): s.proficiency for s in skills}
@@ -536,7 +541,7 @@ def _trend_response_actions(profile: dict, skills: list[SkillNode], user: User, 
         "skill": str(trend).title(),
         "description": (
             f"Create one small resume-visible proof responding to this market signal: {pattern} "
-            f"Add a README section explaining why it matters now. Hiring warning to address: {warning}"
+            f"Add a short note (README, document or portfolio caption) explaining why it matters now. Hiring warning to address: {warning}"
         ),
         "why_now": "delta uses live/search-backed market signals so your roadmap keeps adapting to future demand.",
         "source": raw.get("source") or market.target_role or "delta market pulse",
@@ -877,11 +882,10 @@ def get_or_create_career_memory(db: Session, user: User) -> CareerMemoryProfile:
 
 
 def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) -> dict:
-    domain_pack = infer_domain_pack(
-        structured.get("target_domain")
-        or structured.get("domain")
-        or structured.get("ambitions")
-        or user.target_role
+    domain_pack = resolve_field(
+        {**structured, "field": structured.get("field") or structured.get("target_domain"),
+         "target_role": structured.get("target_role") or user.target_role},
+        text=structured.get("domain") or structured.get("ambitions"),
     )
     # Check if we have the new ingestion maps structure
     identity_ctx = structured.get("identity_context")
@@ -899,7 +903,7 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
             "education_stage": identity_ctx.get("education_stage") or structured.get("current_level") or "Beginner",
             "location": identity_ctx.get("location") or "unknown",
             "language_comfort": identity_ctx.get("language_comfort") or "English",
-            "background_summary": identity_ctx.get("background_summary") or f"Early career roadmap targeting {user.target_role or 'software engineering'}.",
+            "background_summary": identity_ctx.get("background_summary") or f"Early career roadmap targeting {user.target_role or domain_pack['label']}.",
             "self_awareness_level": identity_ctx.get("self_awareness_level") or "medium",
             "name_legacy": user.name,
             "email": user.email,
@@ -911,7 +915,7 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
             "education_stage": structured.get("current_level") or user.current_role or "Beginner",
             "location": "unknown",
             "language_comfort": "English",
-            "background_summary": f"Self-healed profile context for guest user targeting {user.target_role or 'software engineering'}.",
+            "background_summary": f"Self-healed profile context for guest user targeting {user.target_role or domain_pack['label']}.",
             "self_awareness_level": "medium",
             "name_legacy": user.name,
             "email": user.email,
@@ -921,9 +925,9 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
     # 2. Ambition map self-healing
     if isinstance(ambition_map, dict):
         ambitions_payload = {
-            "long_term_goals": ambition_map.get("long_term_goals") or [structured.get("ambitions") or user.target_role or "Career-ready software professional"],
+            "long_term_goals": ambition_map.get("long_term_goals") or [structured.get("ambitions") or user.target_role or f"Career-ready {domain_pack['label']} professional"],
             "short_term_targets": ambition_map.get("short_term_targets") or ["Master core APIs and build verified portfolio projects"],
-            "dream_roles": ambition_map.get("dream_roles") or [user.target_role] if user.target_role else ["Software Engineer"],
+            "dream_roles": ambition_map.get("dream_roles") or [user.target_role] if user.target_role else (domain_pack["target_roles"][:1] or ["Your chosen role"]),
             "preferred_industries": ambition_map.get("preferred_industries") or ["Technology"],
             "confidence_level": ambition_map.get("confidence_level") or "medium",
             "target_role": user.target_role,
@@ -934,9 +938,9 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
         }
     else:
         ambitions_payload = {
-            "long_term_goals": [structured.get("ambitions") or user.target_role or "Career-ready software professional"],
+            "long_term_goals": [structured.get("ambitions") or user.target_role or f"Career-ready {domain_pack['label']} professional"],
             "short_term_targets": ["Master core APIs and build verified portfolio projects"],
-            "dream_roles": [user.target_role] if user.target_role else ["Software Engineer"],
+            "dream_roles": [user.target_role] if user.target_role else (domain_pack["target_roles"][:1] or ["Your chosen role"]),
             "preferred_industries": ["Technology"],
             "confidence_level": "medium",
             "target_role": user.target_role,
@@ -964,17 +968,17 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
             "skill_depth": capability_map.get("skill_depth") or {s.name: f"Proficiency level {s.proficiency}/10" for s in skills},
             "technical_baseline": capability_map.get("technical_baseline") or "scripting-and-claimed",
             "industry_readiness_score": capability_map.get("industry_readiness_score") or 0.35,
-            "identified_gaps": capability_map.get("identified_gaps") or structured.get("gaps_identified") or ["FastAPI", "Docker", "System Design"],
+            "identified_gaps": capability_map.get("identified_gaps") or structured.get("gaps_identified") or domain_pack["skill_taxonomy"][:3],
             "domain_skill_taxonomy": domain_pack["skill_taxonomy"],
             "skills": tracked_skills,
         }
     else:
         capabilities_payload = {
-            "current_skills": structured.get("extracted_skills") or [s.name for s in skills] or ["Python"],
-            "skill_depth": {s.name: f"Proficiency level {s.proficiency}/10" for s in skills} or {"Python": "basics, syntax"},
+            "current_skills": structured.get("extracted_skills") or [s.name for s in skills] or domain_pack["skill_taxonomy"][:1],
+            "skill_depth": {s.name: f"Proficiency level {s.proficiency}/10" for s in skills} or {domain_pack["skill_taxonomy"][0]: "basics"},
             "technical_baseline": "scripting-and-claimed",
             "industry_readiness_score": 0.35,
-            "identified_gaps": structured.get("gaps_identified") or ["FastAPI", "Docker", "System Design"],
+            "identified_gaps": structured.get("gaps_identified") or domain_pack["skill_taxonomy"][:3],
             "domain_skill_taxonomy": domain_pack["skill_taxonomy"],
             "skills": tracked_skills,
         }
@@ -1008,7 +1012,7 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
         preferences_payload = {
             "learning_style": preference_map.get("learning_style") or user.learning_style or structured.get("learning_style") or "hands-on",
             "content_type": preference_map.get("content_type") or structured.get("content_preferences") or ["hands-on projects"],
-            "project_taste": preference_map.get("project_taste") or "Backend API systems",
+            "project_taste": preference_map.get("project_taste") or (domain_pack["starter_projects"][:1] or ["Practical projects"])[0],
             "communication_tone": preference_map.get("communication_tone") or "encouraging",
             "preferred_proof_types": domain_pack["proof_types"],
         }
@@ -1016,7 +1020,7 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
         preferences_payload = {
             "learning_style": user.learning_style or structured.get("learning_style") or "hands-on",
             "content_type": structured.get("content_preferences") or ["hands-on projects"],
-            "project_taste": "Backend API systems",
+            "project_taste": (domain_pack["starter_projects"][:1] or ["Practical projects"])[0],
             "communication_tone": "encouraging",
             "preferred_proof_types": domain_pack["proof_types"],
         }
@@ -1063,8 +1067,8 @@ def build_memory_payload(user: User, structured: dict, skills: list[SkillNode]) 
 
     # 8. Open questions & strategy self-healing
     open_qs = structured.get("open_questions") or _derive_open_questions(user, structured)
-    market_search_prompt = structured.get("market_search_prompt") or f"{user.target_role or 'software engineer'} entry level skill demands recruiter trends"
-    follow_up_strategy = structured.get("follow_up_question_strategy") or "First probe github repository structure, then verify docker deployment comfort in week 2"
+    market_search_prompt = structured.get("market_search_prompt") or f"{user.target_role or domain_pack['label']} entry level skill demands recruiter trends"
+    follow_up_strategy = structured.get("follow_up_question_strategy") or f"First probe existing proof of work ({domain_pack['portfolio_hint']}), then verify comfort with {', '.join(domain_pack['skill_taxonomy'][:2])} in week 2"
 
     open_questions_payload = {
         "open_questions": open_qs if isinstance(open_qs, list) else (open_qs.get("open_questions", []) if isinstance(open_qs, dict) else []),
@@ -1342,13 +1346,13 @@ def run_weekly_career_cycle(
     ).order_by(MarketSnapshot.created_at.desc()).first()
 
     if not market:
-        pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
+        pulse = get_market_snapshot(user.target_role or "Entry-level professional")
         opportunity_feed = collect_opportunities([skill.name for skill in skills], user.target_role)
         opportunity_signals = summarize_opportunity_signals(opportunity_feed)
         market = MarketSnapshot(
             id=str(uuid.uuid4()),
             user_id=user.id,
-            target_role=user.target_role or "AI Developer / Software Engineer",
+            target_role=user.target_role or "Entry-level professional",
             snapshot_date=datetime.date.today(),
             top_demanded_skills=_dump(pulse.get("top_demanded_skills", [])),
             emerging_skills=_dump(pulse.get("emerging_skills", [])),
@@ -1946,7 +1950,9 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
     # phases instead — they're personalised to the user's actual goal.
     STATIC_FALLBACK_IDS = {"node-python", "node-fastapi", "node-sql", "node-docker", "node-system-design", "node-llms", "node-mlops"}
     returned_ids = {node.get("id") for phase in phases for node in phase.get("nodes", [])}
-    is_generic_fallback = bool(returned_ids) and returned_ids.issubset(STATIC_FALLBACK_IDS)
+    is_generic_fallback = bool(returned_ids) and all(
+        i in STATIC_FALLBACK_IDS or str(i).startswith("fallback-") for i in returned_ids
+    )
 
     if is_generic_fallback and roadmap and roadmap.phases:
         stored_phases = _as_json(roadmap.phases, [])
@@ -2203,14 +2209,14 @@ def _get_or_create_market_snapshot(db: Session, user: User) -> MarketSnapshot:
     if market:
         return market
 
-    pulse = get_market_snapshot(user.target_role or "AI Developer / Software Engineer")
+    pulse = get_market_snapshot(user.target_role or "Entry-level professional")
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
     opportunity_feed = collect_opportunities([skill.name for skill in skills], user.target_role)
     opportunity_signals = summarize_opportunity_signals(opportunity_feed)
     market = MarketSnapshot(
         id=str(uuid.uuid4()),
         user_id=user.id,
-        target_role=user.target_role or "AI Developer / Software Engineer",
+        target_role=user.target_role or "Entry-level professional",
         snapshot_date=datetime.date.today(),
         top_demanded_skills=_dump(pulse.get("top_demanded_skills", [])),
         emerging_skills=_dump(pulse.get("emerging_skills", [])),
@@ -2699,7 +2705,7 @@ def _derive_proof_requirements(phases: list[dict]) -> list[dict]:
             if node.get("status") != "mastered":
                 requirements.append({
                     "skill": node.get("label"),
-                    "expected_proof": f"GitHub project, write-up, or verified certificate proving {node.get('label')}.",
+                    "expected_proof": f"A project, write-up, portfolio piece or verified certificate proving {node.get('label')}.",
                     "resume_weight": node.get("certification"),
                     "warning": node.get("architect_warning"),
                 })

@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Project context
+
+Before starting any work, read **[docs/DELTA_MASTER_PLAN.md](docs/DELTA_MASTER_PLAN.md)**. It covers the Delta vision (School / College / Recruiter), what is already built, the build order, and the conventions to follow. When you finish or start a feature, update its Status table.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
@@ -63,27 +67,3 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
----
-
-## 5. AI Model Configuration — DO NOT CHANGE WITHOUT EXPLICIT INSTRUCTION
-
-The model setup is intentional and must never be silently changed:
-
-- **`gemma-4-31b-it`** — default for EVERYTHING: roadmap generation, Agent 2 chat, onboarding pipeline, memory consolidation, market analysis, all general AI calls. Set in `config.py` as `GEMINI_MODEL` default and in `ai_service.py` fallback.
-- **`gemini-2.5-flash`** — ONLY for resume analysis. Explicitly pinned in `resume_parser.py` (`parse_resume_llm`) and `resume_service.py` (`generate_suggestions`, `optimize_for_ats`).
-
-**Why:** Gemma-4-31b-it has unlimited calls and 15 RPM on the current Google AI Studio plan. Gemini-2.5-flash has very limited quota. Swapping the default model wastes quota and causes timeouts.
-
-**Rule:** If you are touching anything related to AI model selection — even to "optimize for speed" — stop and ask Hitarth first. Do not introduce any new model string (`gemini-2.0-flash`, `gemini-1.5-flash`, etc.) without explicit approval.
-
----
-
-## 6. Git Workflow — Collaborative Repo
-
-A collaborator is actively co-developing on this repo alongside Hitarth. Follow this workflow strictly:
-
-1. **Always `git pull origin main` before making any changes.** Do not edit files on a stale local state.
-2. **Never push unless Hitarth explicitly says to.** Phrases like "push it", "go ahead and push", or "push" are required. Do not auto-push after commits.
-3. **Check `git status` before every session start** to detect uncommitted changes or merge conflicts before touching anything.
-4. **If a merge conflict is detected**, stop and surface it to Hitarth — do not auto-resolve or force push.

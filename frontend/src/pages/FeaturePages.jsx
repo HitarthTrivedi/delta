@@ -40,7 +40,7 @@ export function Ledger() {
           <Zap size={14} className="fill-emerald-400/20" /> Active Ledger Status: Online
         </h2>
         <p className="text-sm font-mono leading-relaxed text-ink-soft max-w-xl">
-          The Skill Ledger records all proof-of-work achievements. Integrate your GitHub, upload certifications, or submit links to build an bulletproof, AI-validated professional record.
+          The Skill Ledger records all proof-of-work achievements. Link your work (GitHub, Behance, Drive, portfolios), upload certifications, or submit links to build an bulletproof, AI-validated professional record.
         </p>
         <ComingSoonBadge />
       </GlassPanel>
@@ -84,7 +84,7 @@ export function Pulse() {
       <PageHeader
         title="Market Pulse"
         icon={TrendingUp}
-        description="Live demand tracking of regional technical skills for AI & engineering roles."
+        description="Live demand tracking of in-demand skills for roles in every field."
       />
       <GlassPanel className="relative overflow-hidden border-oxblood/10 bg-gradient-to-br from-bone via-bone to-bone">
         <div className="absolute top-0 right-0 w-96 h-96 bg-oxblood/5 rounded-full blur-[120px] pointer-events-none" />
@@ -92,7 +92,7 @@ export function Pulse() {
           <Zap size={14} className="fill-oxblood/20" /> Data Source: AI Analysis Engines
         </h2>
         <p className="text-sm font-mono leading-relaxed text-ink-soft max-w-xl">
-          Live index of hot skill clusters in major tech hubs (Bengaluru, NCR, Hyderabad, Mumbai). Instantly compare your active capabilities with real hiring demands.
+          Live index of in-demand skills in major hiring cities (Bengaluru, NCR, Hyderabad, Mumbai, Ahmedabad). Instantly compare your active capabilities with real hiring demands.
         </p>
         <ComingSoonBadge />
       </GlassPanel>
@@ -110,7 +110,7 @@ export function Calendar() {
       <PageHeader
         title="Event Horizon"
         icon={CalendarIcon}
-        description="Aggregated schedule of relevant local hackathons, Kaggle/LeetCode sprints, and events."
+        description="Aggregated schedule of competitions, case challenges, hackathons, internships and events in your field."
       />
       <GlassPanel className="relative overflow-hidden border-purple-500/10 bg-gradient-to-br from-bone via-bone to-bone">
         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-[120px] pointer-events-none" />
@@ -136,7 +136,7 @@ export function Portfolio() {
       <PageHeader
         title="Dossier"
         icon={FolderOpen}
-        description="Shareable, proof-of-work powered developer portfolio that stands out to recruiters."
+        description="Shareable, proof-of-work powered portfolio that stands out to recruiters."
       />
       <GlassPanel className="relative overflow-hidden border-pink-500/10 bg-gradient-to-br from-bone via-bone to-bone">
         <div className="absolute top-0 right-0 w-96 h-96 bg-pink-500/5 rounded-full blur-[120px] pointer-events-none" />
@@ -144,7 +144,7 @@ export function Portfolio() {
           <Zap size={14} className="fill-pink-400/20" /> Status: Generated
         </h2>
         <p className="text-sm font-mono leading-relaxed text-ink-soft max-w-xl">
-          Replaces standard resumes with interactive proof of capability, showcasing your real GitHub commits, build weights, and actual AI-assessed skill levels.
+          Replaces standard resumes with interactive proof of capability, showcasing your real work, verified proof, and AI-assessed skill levels.
         </p>
         <ComingSoonBadge />
       </GlassPanel>

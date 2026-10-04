@@ -1,110 +1,300 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Code2, Briefcase, ArrowRight, Loader2 } from 'lucide-react';
-import { sandboxCodingAPI, sandboxInterviewAPI } from '../lib/api';
+import { Code2, Briefcase, ListChecks, ArrowRight, Loader2, Target, Table2, LineChart as LineIcon } from 'lucide-react';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { sandboxReportAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
-const panelStyle = {
-  background: '#050505',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 8,
+const panelStyle = { background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 };
+const muted = 'rgba(255,255,255,0.5)';
+
+// Categorical slots 1-3 (dark), validated on #050505: worst CVD ΔE 9.4, all >= 3:1.
+const SERIES = {
+  theory: { color: '#3987e5', label: 'Tests' },
+  coding: { color: '#d95926', label: 'Coding' },
+  interview: { color: '#199e70', label: 'Interview' },
 };
+const INK_MUTED = '#898781';
+const GRID = '#2c2c2a';
+const STATUS = { 'Interview-ready': '#0ca30c', 'Almost there': '#c98500', 'Building up': '#d95926', 'Just starting': '#e66767', 'Not started': INK_MUTED };
+
+const TOOLS = [
+  { key: 'theory', icon: ListChecks, title: 'Knowledge & Aptitude Tests', description: 'Timed tests on any subject in your field, or an aptitude area, scored per skill.', path: '/practice/theory' },
+  { key: 'coding', icon: Code2, title: 'Coding Sandbox', description: 'Write and run real code against hidden test cases.', path: '/practice/coding' },
+  { key: 'interview', icon: Briefcase, title: 'AI Video Interview', description: 'Aria interviews you out loud on a video call; answer by voice or text.', path: '/practice/interview' },
+];
+
+function shortDate(iso) {
+  if (!iso) return '';
+  return new Date(`${iso}Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+function ChartTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+  return (
+    <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 12.5 }}>
+      <div style={{ color: muted, marginBottom: 4 }}>{shortDate(row.date)}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff' }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: SERIES[row.type].color }} aria-hidden="true" />
+        {row.title}: <strong>{row.score}</strong>
+      </div>
+    </div>
+  );
+}
 
 export default function PracticeHub() {
   const userId = useAuthStore((state) => state.userId);
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ coding: null, interview: null });
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState(false);
+  const [asTable, setAsTable] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
-    sandboxCodingAPI.getSessions(userId)
-      .then((data) => {
-        const sessions = data?.sessions || [];
-        setStats((s) => ({ ...s, coding: sessions.filter((x) => x.status === 'completed').length }));
-      })
-      .catch(() => {});
-    sandboxInterviewAPI.getSessions(userId)
-      .then((data) => {
-        const sessions = data?.sessions || [];
-        setStats((s) => ({ ...s, interview: sessions.filter((x) => x.status === 'completed').length }));
-      })
-      .catch(() => {});
+    sandboxReportAPI.get(userId).then(setReport).catch(() => setError(true));
   }, [userId]);
 
-  const cards = [
-    {
-      key: 'coding',
-      icon: Code2,
-      color: '#60a5fa',
-      title: 'Coding Sandbox',
-      description: 'Pick a problem, write real code, run it, and submit for automatic pass/fail grading.',
-      stat: stats.coding === null ? null : `${stats.coding} problem${stats.coding === 1 ? '' : 's'} solved`,
-      path: '/practice/coding',
-    },
-    {
-      key: 'interview',
-      icon: Briefcase,
-      color: '#f472b6',
-      title: 'Mock Interview',
-      description: 'An AI interviewer asks questions tailored to your profile — answer by voice or text, get feedback.',
-      stat: stats.interview === null ? null : `${stats.interview} interview${stats.interview === 1 ? '' : 's'} completed`,
-      path: '/practice/interview',
-    },
-  ];
+  // One row per graded session; each type is its own series (nulls bridged).
+  const chartRows = useMemo(() => (report?.timeline || []).map((t, i) => ({
+    ...t, idx: i, [t.type]: t.score,
+  })), [report]);
+
+  if (error) {
+    return <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '6rem 1.5rem' }}><p style={{ textAlign: 'center', color: muted }}>Couldn't load your Test Center. Refresh to try again.</p></main>;
+  }
+  if (!report) {
+    return <main style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={22} style={{ color: '#fff', animation: 'spin 1s linear infinite' }} /><style>{'@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'}</style></main>;
+  }
+
+  const score = report.readiness;
+  const ringColor = STATUS[report.label] || INK_MUTED;
+  const strongest = report.skills.slice(0, 5);
+  const weakest = [...report.skills].reverse().filter((s) => !strongest.includes(s)).slice(0, 5);
+  const seriesPresent = Object.keys(SERIES).filter((k) => report.by_type[k].count > 0);
 
   return (
     <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1.5rem 3rem' }}>
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        <header style={{ marginBottom: 32 }}>
-          <p style={{ color: 'rgba(255,255,255,0.46)', fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>
-            Practice
-          </p>
-          <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.2rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0, maxWidth: 640 }}>
-            Rehearse before it counts.
-          </h1>
-          <p style={{ margin: '14px 0 0', color: 'rgba(255,255,255,0.5)', fontSize: 15, lineHeight: 1.55, maxWidth: 600 }}>
-            Two ways to get sharper: solve real coding problems with automatic grading, or run a mock interview with an AI interviewer.
+      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
+        <header style={{ marginBottom: 8 }}>
+          <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>Test Center</p>
+          <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, margin: 0 }}>How ready are you for the real interview?</h1>
+          <p style={{ margin: '12px 0 0', color: muted, fontSize: 15, lineHeight: 1.55, maxWidth: 680 }}>
+            Every test, practice session and mock interview feeds one readiness score, broken down by skill. It's the same picture recruiters see if you opt in.
           </p>
         </header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-          {cards.map((card) => {
-            const Icon = card.icon;
+        {/* Readiness + next steps */}
+        <section style={{ ...panelStyle, padding: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
+            <div style={{ position: 'relative', width: 132, height: 132, flexShrink: 0 }}>
+              <svg viewBox="0 0 36 36" width="132" height="132" aria-hidden="true">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                {score != null && (
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke={ringColor} strokeWidth="3" strokeLinecap="round"
+                    strokeDasharray={`${score} ${100 - score}`} strokeDashoffset="25" />
+                )}
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 38, fontWeight: 800, lineHeight: 1 }}>{score ?? '—'}</span>
+                <span style={{ fontSize: 11, color: muted }}>readiness</span>
+              </div>
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>{report.label}</p>
+              <p style={{ margin: '6px 0 0', color: muted, fontSize: 13, lineHeight: 1.5 }}>
+                {report.coverage} of {report.coverage_total} test types taken.
+                {report.coverage < report.coverage_total && ' Try every test type for a complete score.'}
+              </p>
+              <p style={{ margin: '6px 0 0', color: INK_MUTED, fontSize: 12 }}>
+                {Object.entries(report.weights || {}).map(([k, w]) => `${SERIES[k]?.label || k} ${Math.round(w * 100)}%`).join(' · ')}, latest 5 of each
+              </p>
+              {report.field_label && <p style={{ margin: '4px 0 0', color: INK_MUTED, fontSize: 12 }}>Field: {report.field_label}</p>}
+            </div>
+          </div>
+          <div>
+            <h2 style={{ margin: '0 0 10px', fontSize: 13, color: muted, display: 'flex', alignItems: 'center', gap: 6 }}><Target size={14} /> Next up</h2>
+            {report.next_steps.length === 0 ? (
+              <p style={{ margin: 0, color: muted, fontSize: 13.5 }}>Nothing urgent. Keep practising to hold your score.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {report.next_steps.map((s) => (
+                  <button key={s.title} onClick={() => navigate(s.link)} style={{ ...panelStyle, background: '#0b0b0b', padding: '12px 14px', textAlign: 'left', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>{s.title}</span>
+                      <span style={{ display: 'block', fontSize: 12.5, color: muted, marginTop: 2 }}>{s.reason}</span>
+                    </span>
+                    <ArrowRight size={15} style={{ color: muted }} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Tools */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          {TOOLS.filter((t) => (report.applicable_types || Object.keys(SERIES)).includes(t.key)).map((tool) => {
+            const Icon = tool.icon;
+            const stats = report.by_type[tool.key];
             return (
               <button
-                key={card.key}
-                onClick={() => navigate(card.path)}
-                style={{
-                  ...panelStyle, padding: 26, textAlign: 'left', cursor: 'pointer', color: '#fff',
-                  display: 'flex', flexDirection: 'column', gap: 14,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; }}
+                key={tool.key}
+                onClick={() => navigate(tool.path)}
+                style={{ ...panelStyle, padding: 22, textAlign: 'left', cursor: 'pointer', color: '#fff', display: 'flex', flexDirection: 'column', gap: 12 }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
               >
-                <div style={{
-                  width: 44, height: 44, borderRadius: 10,
-                  background: `${card.color}1a`, border: `1px solid ${card.color}44`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Icon size={20} style={{ color: card.color }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: SERIES[tool.key].color }} aria-hidden="true" />
+                  <Icon size={18} />
+                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{tool.title}</h2>
                 </div>
-                <div>
-                  <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700 }}>{card.title}</h2>
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: 13.5, lineHeight: 1.55 }}>{card.description}</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12.5, minHeight: 16 }}>
-                    {card.stat === null ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : card.stat}
-                  </span>
-                  <ArrowRight size={16} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                <p style={{ margin: 0, color: muted, fontSize: 13.5, lineHeight: 1.55 }}>{tool.description}</p>
+                <div style={{ display: 'flex', gap: 18, marginTop: 'auto', paddingTop: 4, alignItems: 'flex-end' }}>
+                  {stats.count > 0 ? (
+                    <>
+                      <span><span style={{ display: 'block', fontSize: 24, fontWeight: 800 }}>{stats.average}</span><span style={{ fontSize: 11.5, color: muted }}>recent avg</span></span>
+                      <span><span style={{ display: 'block', fontSize: 16, fontWeight: 700 }}>{stats.best}</span><span style={{ fontSize: 11.5, color: muted }}>best</span></span>
+                      <span><span style={{ display: 'block', fontSize: 16, fontWeight: 700 }}>{stats.count}</span><span style={{ fontSize: 11.5, color: muted }}>done</span></span>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 13, color: muted }}>Not tried yet</span>
+                  )}
+                  <span style={{ flex: 1 }} />
+                  <ArrowRight size={16} style={{ color: muted }} />
                 </div>
               </button>
             );
           })}
         </div>
-      </div>
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        {report.applicable_types && !report.applicable_types.includes('coding') && (
+          <p style={{ margin: '-4px 0 0', fontSize: 12.5, color: muted }}>
+            Coding isn't part of your field's readiness score.{' '}
+            <button onClick={() => navigate('/practice/coding')} style={{ background: 'none', border: 'none', padding: 0, color: '#fff', textDecoration: 'underline', cursor: 'pointer', fontSize: 12.5 }}>
+              Coding sandbox (for tech roles)
+            </button>
+          </p>
+        )}
+
+        {/* Scores over time */}
+        <section style={{ ...panelStyle, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Scores over time</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              {seriesPresent.length > 1 && seriesPresent.map((k) => (
+                <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'rgba(255,255,255,0.75)' }}>
+                  <span style={{ width: 14, height: 2, background: SERIES[k].color, borderRadius: 1 }} aria-hidden="true" />{SERIES[k].label}
+                </span>
+              ))}
+              {chartRows.length > 0 && (
+                <button onClick={() => setAsTable((v) => !v)} aria-pressed={asTable} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '4px 9px', color: muted, fontSize: 12, cursor: 'pointer' }}>
+                  {asTable ? <LineIcon size={13} /> : <Table2 size={13} />} {asTable ? 'Chart' : 'Table'}
+                </button>
+              )}
+            </div>
+          </div>
+          {chartRows.length < 2 ? (
+            <p style={{ margin: 0, padding: '28px 0', textAlign: 'center', color: muted, fontSize: 13.5 }}>
+              Complete a couple of sessions and your progress line appears here.
+            </p>
+          ) : asTable ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead><tr>{['Date', 'Type', 'Session', 'Score'].map((h) => <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: muted, borderBottom: `1px solid ${GRID}`, fontWeight: 600 }}>{h}</th>)}</tr></thead>
+                <tbody>{chartRows.map((r) => (
+                  <tr key={r.id}><td style={{ padding: '6px 8px' }}>{shortDate(r.date)}</td><td style={{ padding: '6px 8px' }}>{SERIES[r.type].label}</td><td style={{ padding: '6px 8px' }}>{r.title}</td><td style={{ padding: '6px 8px', fontWeight: 700 }}>{r.score}</td></tr>
+                ))}</tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartRows} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
+                  <CartesianGrid stroke={GRID} vertical={false} />
+                  <XAxis dataKey="idx" tickFormatter={(i) => shortDate(chartRows[i]?.date)} stroke={GRID} tick={{ fill: INK_MUTED, fontSize: 11 }} tickLine={false} minTickGap={24} />
+                  <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} stroke={GRID} tick={{ fill: INK_MUTED, fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.25)', strokeWidth: 1 }} />
+                  {seriesPresent.map((k) => (
+                    <Line key={k} type="monotone" dataKey={k} name={SERIES[k].label} stroke={SERIES[k].color} strokeWidth={2} connectNulls
+                      dot={{ r: 4, fill: SERIES[k].color, stroke: '#050505', strokeWidth: 2 }} activeDot={{ r: 6, stroke: '#050505', strokeWidth: 2 }} isAnimationActive={false} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+
+        {/* Skills + interview areas */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+          <SkillList title="Strongest skills" items={strongest} empty="Take a knowledge test to see your skills here." />
+          <SkillList title="Needs work" items={weakest} empty="Not enough data yet." />
+          <section style={{ ...panelStyle, padding: 20 }}>
+            <h2 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700 }}>Interview skills</h2>
+            {report.rubric.length === 0 ? <p style={{ margin: 0, color: muted, fontSize: 13.5 }}>Finish an AI interview to see communication, depth, problem solving and clarity scores.</p> : (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {report.rubric.map((r) => <Bar key={r.key} label={r.label} value={r.score * 10} display={`${r.score}/10`} />)}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* Recent */}
+        {report.recent.length > 0 && (
+          <section style={{ ...panelStyle, padding: 20 }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>Recent sessions</h2>
+            <div style={{ display: 'grid' }}>
+              {report.recent.map((s) => {
+                const link = s.type === 'interview' ? `/practice/interview/report/${s.id}` : null;
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: `1px solid ${GRID}` }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: SERIES[s.type].color, flexShrink: 0 }} aria-hidden="true" />
+                    <span style={{ fontSize: 12, color: muted, width: 70, flexShrink: 0 }}>{SERIES[s.type].label}</span>
+                    <span style={{ flex: 1, fontSize: 13.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
+                    <span style={{ fontSize: 12, color: muted }}>{shortDate(s.date)}</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, width: 36, textAlign: 'right' }}>{s.score}</span>
+                    {link ? (
+                      <button onClick={() => navigate(link)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '4px 10px', color: '#fff', fontSize: 12, cursor: 'pointer' }}>Report</button>
+                    ) : <span style={{ width: 62 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
+      <style>{'@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'}</style>
     </main>
+  );
+}
+
+function Bar({ label, value, display, sub }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5, gap: 10 }}>
+        <span style={{ color: 'rgba(255,255,255,0.85)' }}>{label}{sub && <span style={{ color: INK_MUTED }}> · {sub}</span>}</span>
+        <span style={{ color: muted }}>{display}</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
+        <div style={{ width: `${Math.max(2, value)}%`, height: '100%', borderRadius: 3, background: 'rgba(255,255,255,0.75)' }} />
+      </div>
+    </div>
+  );
+}
+
+function SkillList({ title, items, empty }) {
+  return (
+    <section style={{ ...panelStyle, padding: 20 }}>
+      <h2 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700 }}>{title}</h2>
+      {items.length === 0 ? <p style={{ margin: 0, color: muted, fontSize: 13.5 }}>{empty}</p> : (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {items.map((s) => (
+            <Bar key={s.skill} label={s.skill} value={s.score} display={`${s.score}%`}
+              sub={[s.questions && `${s.questions} Qs`, s.coding_problems && `${s.coding_problems} coding`].filter(Boolean).join(', ')} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

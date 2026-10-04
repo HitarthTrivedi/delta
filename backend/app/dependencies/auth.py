@@ -76,6 +76,22 @@ def verify_resource_owner(
     if user_id == GUEST_ID:
         return user_id
 
+    caller_id, _ = authenticated_identity(x_user_id=x_user_id, authorization=authorization)
+    if caller_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden: you can only access your own resources.")
+    return user_id
+
+
+def authenticated_identity(
+    x_user_id: str | None = None,
+    authorization: str | None = None,
+) -> tuple[str, str | None]:
+    """
+    Return (user_id, email) for the caller. Identity is proven by a verified
+    Supabase JWT (`sub` / `email` claims). The unverified X-User-Id header is
+    accepted ONLY when ALLOW_HEADER_AUTH is enabled (local development), and
+    carries no email.
+    """
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ", 1)[1]
         try:
@@ -102,17 +118,13 @@ def verify_resource_owner(
         token_user_id = payload.get("sub")
         if not token_user_id:
             raise HTTPException(status_code=401, detail="Invalid token: missing subject claim.")
-        if token_user_id != user_id:
-            raise HTTPException(status_code=403, detail="Forbidden: you can only access your own resources.")
-        return user_id
+        return token_user_id, payload.get("email")
 
     # No JWT presented. The unverified header path is dev-only.
     if settings.ALLOW_HEADER_AUTH:
         if not x_user_id:
             raise HTTPException(status_code=401, detail="Authentication required.")
-        if x_user_id != user_id:
-            raise HTTPException(status_code=403, detail="Forbidden: you can only access your own resources.")
-        return user_id
+        return x_user_id, None
 
     raise HTTPException(status_code=401, detail="Authentication required: a valid Bearer token is missing.")
 
@@ -127,3 +139,12 @@ def require_owner(
     and Supabase JWT token verification (for secure production).
     """
     return verify_resource_owner(user_id, x_user_id=x_user_id, authorization=authorization)
+
+
+def current_identity(
+    x_user_id: Annotated[Optional[str], Header(description="Authenticated user ID from frontend")] = None,
+    authorization: Annotated[Optional[str], Header(description="Bearer <JWT> token from Supabase")] = None,
+) -> tuple[str, str | None]:
+    """Dependency for routes with no user_id path param (e.g. the recruiter
+    portal): returns the verified caller's (user_id, email)."""
+    return authenticated_identity(x_user_id=x_user_id, authorization=authorization)

@@ -6,7 +6,7 @@ product
 
 ## Users
 
-Students and early-career people (currently: computer engineering, AI/ML, and cloud computing students, with plans to expand to other fields) who need a career plan but can't afford generic advice, expensive counselors, or a chatbot that forgets them every session. They use Delta across a long horizon — years, not weeks — through recurring touchpoints: a one-time intake conversation, a weekly roadmap check-in, a progress report, and an ongoing chat with "Agent 2" for weekly planning. The core workflow is a weekly loop: review this week's tasks, mark progress, talk to the agent about adjustments, request the next week.
+Students and early-career people from every field (engineering and IT, commerce and finance, healthcare, law, design, management, teaching, hospitality, media, government exams and more) who need a career plan but can't afford generic advice, expensive counselors, or a chatbot that forgets them every session. They use Delta across a long horizon — years, not weeks — through recurring touchpoints: a one-time intake conversation, a weekly roadmap check-in, a progress report, and an ongoing chat with "Agent 2" for weekly planning. The core workflow is a weekly loop: review this week's tasks, mark progress, talk to the agent about adjustments, request the next week.
 
 ## Product Purpose
 

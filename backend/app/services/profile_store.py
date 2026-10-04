@@ -164,6 +164,11 @@ def mark_onboarding_complete(user_id: str):
     save_profile(user_id, {"onboarding_complete": True})
 
 
+def _field_label(p: dict) -> str:
+    from app.services.domain_packs import resolve_field
+    return resolve_field(p)["label"]
+
+
 def profile_as_context_string(user_id: str) -> str:
     """
     Return a flat, human-readable text block of the profile —
@@ -179,7 +184,13 @@ def profile_as_context_string(user_id: str) -> str:
         f"Email: {p.get('email', '')}",
         f"Personal introduction / backstory: {p.get('personal_introduction') or p.get('backstory') or 'Not specified'}",
         f"Transition reason: {p.get('transition_reason', 'Not specified')}",
+        f"Audience: {'Working professional (Delta for Professionals)' if p.get('audience') == 'professional' else 'Student'}",
+        f"Career field: {_field_label(p)}",
         f"Current status: {p.get('current_status', 'Not specified')}",
+        f"Current job: {p.get('current_role', 'Not specified')}",
+        f"Industry: {p.get('industry', 'Not specified')}",
+        f"Years of work experience: {p.get('years_experience', 'Not specified')}",
+        f"Goal type: {p.get('goal_type', 'Not specified')}",
         f"Education/life stage: {p.get('education_stage', 'Not specified')}",
         f"Has resume: {p.get('has_resume', 'Not specified')}",
         f"Target Role: {p.get('target_role') or p.get('goal_direction') or 'Not specified'}",
@@ -243,6 +254,12 @@ def profile_as_compact_context(user_id: str, max_chars: int = 1200) -> str:
 
     fields = [
         ("Name", p.get("name")),
+        ("Career field", _field_label(p)),
+        ("Audience", "Working professional" if p.get("audience") == "professional" else None),
+        ("Current job", p.get("current_role")),
+        ("Industry", p.get("industry")),
+        ("Years of experience", p.get("years_experience")),
+        ("Goal type", p.get("goal_type")),
         ("Target role", p.get("target_role") or p.get("goal_direction")),
         ("Goal/exam track", p.get("detected_goal_track") or p.get("target_exam")),
         ("Exam detail", p.get("exam_goal_detail")),

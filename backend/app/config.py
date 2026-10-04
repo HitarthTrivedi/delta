@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # MUST stay false in production — a verified Supabase JWT is then required.
     ALLOW_HEADER_AUTH: bool = parse_bool_env("ALLOW_HEADER_AUTH", False)
     ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
+    # Comma-separated emails allowed to approve/reject recruiter accounts.
+    ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
+    # Comma-separated emails (e.g. teachers) allowed to review/approve School lessons. Admins can too.
+    CONTENT_REVIEWER_EMAILS: str = os.getenv("CONTENT_REVIEWER_EMAILS", "")
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "5") or "5")
     MAX_TEXT_CHARS: int = int(os.getenv("MAX_TEXT_CHARS", "60000") or "60000")
     ENABLE_DOCS: bool = parse_bool_env("ENABLE_DOCS", False)

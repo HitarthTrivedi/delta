@@ -62,11 +62,11 @@ def _normalize_skill_names(items: list) -> list[str]:
 def _weaknesses(readiness: str, missing_market_proof: list[str], projects: list[dict]) -> list[str]:
     issues = []
     if readiness == "thin":
-        issues.append("Too many skill claims are still unverified. Add GitHub proof before applying aggressively.")
+        issues.append("Too many skill claims are still unverified. Add proof (projects, portfolio links or certificates) before applying aggressively.")
     if missing_market_proof:
         issues.append(f"Market proof missing for: {', '.join(missing_market_proof[:3])}.")
     if projects:
-        issues.append("The next project needs a recruiter-readable README, not only working code.")
+        issues.append("The next project needs a recruiter-readable write-up, not only the finished work.")
     return issues or ["Portfolio has enough proof for the current phase. Keep adding depth."]
 
 
@@ -81,7 +81,7 @@ def _resume_updates(verified_skills: list[dict], projects: list[dict]) -> list[s
 
 def _github_updates(projects: list[dict]) -> list[str]:
     if not projects:
-        return ["Create one public repository with clean README, setup, and demo proof."]
+        return ["Publish one piece of work (repository, portfolio page or document) with a clear summary and proof."]
     return [
         f"Create or improve repo for {project.get('title')} with setup, architecture, and screenshots."
         for project in projects[:3]

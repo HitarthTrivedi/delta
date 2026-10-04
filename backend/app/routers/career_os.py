@@ -163,17 +163,20 @@ def get_task_detail(user_id: str, payload: TaskDetailRequest, db: Session = Depe
     try:
         from app.services.ai_service import generate_json
         user = db.query(User).filter(User.id == user_id).first()
-        target_role = (user.target_role if user else None) or "Software Engineer"
+        from app.services.domain_packs import field_for_user
+        pack = field_for_user(user_id, db=db)
+        target_role = (user.target_role if user else None) or pack["label"]
 
         context = f"{payload.task_description[:300]}" if payload.task_description else ""
         prompt = (
-            f"Task: {payload.task_title}. Skill: {payload.skill or 'General'}. Role: {target_role}. {context}\n\n"
+            f"Task: {payload.task_title}. Skill: {payload.skill or 'General'}. Role: {target_role}. Field: {pack['label']}. {context}\n\n"
             "Return ONLY this JSON, no markdown:\n"
             '{"how_to_start":"one sentence","steps":["s1","s2","s3"],'
             '"resources":[{"title":"name","url":"https://real.com","type":"course","duration":"Xh","why":"reason"}],'
             '"estimated_hours":5,"timeline_note":"which part this week if long","proof_output":"what exists when done",'
             '"pro_tip":"expert insight"}\n\n'
-            "Use real URLs (leetcode.com, coursera.org, roadmap.sh, docs.python.org). Steps must be concrete actions."
+            "Use real URLs from reputable sources for THIS field (e.g. coursera.org, nptel.ac.in, swayam.gov.in, khanacademy.org, "
+            "official regulator or professional-body sites; roadmap.sh or docs only for software). Steps must be concrete actions."
         )
 
         detail = generate_json(prompt, temperature=0.3)

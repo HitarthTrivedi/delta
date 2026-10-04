@@ -24,7 +24,7 @@ def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(requi
                 name="delta Member",
                 current_role="Professional",
                 years_experience=0,
-                target_role="Software Engineer",
+                target_role=None,  # set from intake; never assume a field
                 hours_per_week=10,
                 learning_style="hands-on"
             )
@@ -62,7 +62,7 @@ def get_user_with_skills(user_id: str, db: Session = Depends(get_db), _: str = D
                 name="delta Member",
                 current_role="Professional",
                 years_experience=0,
-                target_role="Software Engineer",
+                target_role=None,  # set from intake; never assume a field
                 hours_per_week=10,
                 learning_style="hands-on"
             )

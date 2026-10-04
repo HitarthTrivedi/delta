@@ -85,6 +85,11 @@ Return ONLY valid JSON with any of these fields you can extract (omit fields you
   "name": "string",
   "email": "string",
   "current_status": "school|dropped_out|undergrad|graduate|working|career_switcher|exam_aspirant|other",
+  "field": "the person's career field, ONE of: cs_ai (software & IT), data (data & analytics), design (design & architecture), product (product management), finance (finance, accounting, CA, banking, commerce, economics), business (management, consulting, operations, HR), marketing (marketing, sales, PR), core_engineering (mechanical, civil, electrical, chemical, electronics), healthcare (medicine, nursing, pharmacy, allied health), law, education (teaching), hospitality (hotel, travel, aviation, culinary), media (journalism, content, film), public_service (government exams, civil services, defence), research (science & research), entrepreneurship, general (unsure / exploring). Only set when reasonably clear.",
+  "current_role": "string — current job title, for working people (e.g. 'Customer Support Executive')",
+  "industry": "string — the industry they work in now, for working people",
+  "years_experience": "number — total years of work experience, only if stated",
+  "goal_type": "upskill_current_role|career_switch|promotion|new_skill — for working people, what kind of goal this is. Only if clear.",
   "education_stage": "string (school class, undergrad year, dropout, graduate, working, etc.)",
   "has_resume": true,
   "target_role": "string",
@@ -93,7 +98,7 @@ Return ONLY valid JSON with any of these fields you can extract (omit fields you
   "target_attempt": "string (attempt year/intake/date — only if explicitly stated)",
   "exam_goal_detail": "string (rank, college, branch, service, MBA, masters, etc. — only if explicitly stated)",
   "known_exam_dates": ["string"],
-  "major": "string (degree major, e.g. Computer Science)",
+  "major": "string (degree major or stream, e.g. Commerce, Nursing, Mechanical Engineering)",
   "university": "string (college or university name)",
   "study_year": "string (what year are they studying in, e.g. 1st year, 2nd year, graduated)",
   "gpa": "string (current GPA, e.g. 3.8/4.0)",
@@ -128,7 +133,7 @@ Missing fields: {missing_fields}
 
 Conversation so far:
 {conversation}
-
+{audience_rules}
 Write ONE short, precise follow-up question to collect the single most important missing field.
 
 Hard rules:
@@ -185,10 +190,32 @@ OPTIONAL_FIELDS = [
     "planning_horizon_years", "planning_horizon_months", "phone_number",
     "linkedin_url", "github_url", "portfolio_url", "target_exam", "target_attempt",
     "exam_goal_detail", "known_exam_dates", "backstory", "transition_reason",
+    "audience", "current_role", "industry", "years_experience", "goal_type", "field",
     "urgency_level", "time_to_goal", "recommended_hours_per_week", "pace", "pace_reason",
     "current_status", "education_stage", "goal_direction", "projects",
     "no_experience_yet", "has_resume",
 ]
+
+
+AUDIENCES = ("student", "professional")
+
+PROFESSIONAL_RULES = """
+This person is a WORKING PROFESSIONAL (Delta for Professionals), not a college student. Ignore the education-first priority order below. Instead, collect in this order:
+1. Their current job title, industry, and years of experience.
+2. Their goal and its type: grow in the current role, switch careers, get promoted, or learn a new skill, and the concrete role/skill they are aiming at.
+3. Their current skills and what they already do at work.
+4. How much time they can really give around their job, and any deadline (an appraisal cycle, a job switch window).
+5. Then the deeper story: why now, and what success looks like.
+Do NOT ask about college, year of study, GPA or placements unless they bring it up.
+"""
+
+
+def _is_professional(profile: dict) -> bool:
+    return (profile or {}).get("audience") == "professional"
+
+
+def _audience_rules(profile: dict) -> str:
+    return PROFESSIONAL_RULES if _is_professional(profile) else ""
 
 
 class IngestionEngineV2:
@@ -231,6 +258,13 @@ class IngestionEngineV2:
             ("CAT", [r"\bcat\b", r"\bmba\b", r"\biim\b", r"\bbusiness\s+school\b", r"\bb-school\b"]),
             ("GRE", [r"\bgre\b", r"\bmasters\s+abroad\b", r"\bms\s+abroad\b", r"\bmasters\s+in\s+germany\b", r"\bmasters\s+in\s+usa\b"]),
             ("IELTS/TOEFL", [r"\bielts\b", r"\btoefl\b", r"\benglish\s+proficiency\b"]),
+            ("CA/CMA/CS", [r"\bca\s+(foundation|inter|intermediate|final|exams?)\b", r"\bchartered\s+accountan", r"\bcma\b", r"\bcompany\s+secretary\b", r"\bicai\b"]),
+            ("NEET-PG", [r"\bneet\b", r"\bneet[\s-]pg\b", r"\bnext\s+exam\b", r"\bfmge\b"]),
+            ("Nursing licensing", [r"\bnclex\b", r"\bnursing\s+council\b", r"\bnursing\s+licen"]),
+            ("CLAT/Judiciary", [r"\bclat\b", r"\bailet\b", r"\baibe\b", r"\bjudiciary\b", r"\bbar\s+exam\b"]),
+            ("UGC-NET/TET", [r"\bugc[\s-]net\b", r"\bcsir[\s-]net\b", r"\bctet\b", r"\btet\b"]),
+            ("Bank/SSC", [r"\bibps\b", r"\bsbi\s+po\b", r"\bbank\s+po\b", r"\bssc\b", r"\brbi\s+grade\s+b\b", r"\brrb\b"]),
+            ("CFA", [r"\bcfa\b"]),
             ("Placements", [r"\bplacement\b", r"\bcampus\s+interview\b", r"\binternship\s+season\b"]),
         ]
         for name, markers in tracks:
@@ -264,6 +298,21 @@ class IngestionEngineV2:
         elif track in {"GRE", "IELTS/TOEFL"}:
             months = 12
             reason = "Masters-abroad goals need intake, language tests, SOP/LOR, projects, and application deadlines, so delta inferred a 12 month planning base."
+        elif track in {"CA/CMA/CS"}:
+            months = 18
+            reason = "Professional accounting exams run in attempt cycles with long syllabi, so delta plans around exam levels and attempts."
+        elif track in {"NEET-PG", "CLAT/Judiciary"}:
+            months = 12
+            reason = f"{track} is an annual competitive exam, so delta plans a full syllabus-plus-mocks cycle."
+        elif track in {"Bank/SSC", "CFA"}:
+            months = 9
+            reason = f"{track} preparation fits a focused cycle of syllabus coverage and timed mocks."
+        elif track in {"UGC-NET/TET"}:
+            months = 8
+            reason = "Eligibility exams like UGC-NET/TET need steady syllabus revision and mocks over a few months."
+        elif track == "Nursing licensing":
+            months = 6
+            reason = "Licensing exams are near-term and practice-question heavy, so delta plans a focused review."
         elif track == "Placements":
             months = 6
             reason = "Placement or internship preparation is usually near-term, so delta inferred a shorter proof-and-interview planning base."
@@ -306,7 +355,10 @@ class IngestionEngineV2:
             missing.append("joining_reason")
         if not self._has_goal_signal(profile):
             missing.append("target_role")
-        if not self._has_stage_signal(profile):
+        if _is_professional(profile):
+            if not profile.get("current_role"):
+                missing.append("current_role")
+        elif not self._has_stage_signal(profile):
             missing.append("education_stage")
 
         skills = profile.get("skills")
@@ -378,7 +430,18 @@ class IngestionEngineV2:
         if isinstance(months, (int, float)) and 0 < months <= 3:
             urgency = "urgent"
 
-        if urgency == "urgent":
+        if _is_professional(profile):
+            # Working people learn around a full-time job: evenings and weekends.
+            if urgency == "urgent":
+                hours, pace = 10, "intensive"
+                reason = "You have a deadline and a job, so delta suggests about 10 focused hours a week: short weekday sessions plus a longer weekend block."
+            elif urgency == "relaxed":
+                hours, pace = 4, "light"
+                reason = "You're upskilling alongside work with no hard deadline, so delta suggests a light pace of about 4 hours a week that won't burn you out."
+            else:
+                hours, pace = 6, "steady"
+                reason = "delta suggests a steady 6 hours a week, a realistic amount to keep up next to a full-time job."
+        elif urgency == "urgent":
             hours, pace = 14, "intensive"
             reason = "You have a short runway to your goal, so delta suggests an intensive pace to make every week count."
         elif urgency == "relaxed":
@@ -532,6 +595,8 @@ class IngestionEngineV2:
         # Facts first — nail identity, education, and goal basics before going deep.
         if "name" in missing:
             return "What should I call you?"
+        if "current_role" in missing:
+            return "What is your current job, which industry are you in, and roughly how many years have you been working?"
         if "education_stage" in missing:
             return "What are you currently doing — school, college, graduated, or working — and if studying, which course and year?"
         if "target_role" in missing or "goal_direction" in missing:
@@ -608,6 +673,9 @@ class IngestionEngineV2:
         auto-recovers the profile before starting a new session.
         Returns the IngestionSession DB row.
         """
+        if journey_type in AUDIENCES:
+            save_profile(user_id, {"audience": journey_type})
+
         # If profile_data is empty, try recovering from most recently completed session
         existing_profile = load_profile(user_id)
         if not existing_profile or not existing_profile.get("onboarding_complete"):
@@ -664,6 +732,12 @@ class IngestionEngineV2:
     def _opening_message(self, user_id: str) -> str:
         """Generate opening — skip fields already in profile if resuming."""
         existing = load_profile(user_id)
+        if _is_professional(existing) and not existing.get("name"):
+            return (
+                "Hi, I am delta's learning advisor. Let's start with the basics: your name, your current job "
+                "and industry, and what you want to get better at, whether that's growing in your current role, "
+                "switching careers, or learning a new skill. If you have a resume, you can attach it anytime."
+            )
         if existing.get("name"):
             return (
                 f"Welcome back, {existing['name']}! I have some of your details. "
@@ -765,6 +839,7 @@ class IngestionEngineV2:
         profile_ctx = profile_as_context_string(user_id) or "No profile data yet."
         next_q = self._safe_generate_text(
             NEXT_QUESTION_PROMPT.format(
+                audience_rules=_audience_rules(profile),
                 profile_context=profile_ctx,
                 missing_fields=", ".join(missing_required) or "none critical",
                 conversation=conv_text[-3000:]  # last 3000 chars
@@ -897,7 +972,7 @@ Return ONLY valid JSON with as many of these fields as you can extract:
   "name": "string",
   "email": "string",
   "target_role": "string (infer from resume objective/title)",
-  "major": "string (degree major, e.g. Computer Science)",
+  "major": "string (degree major or stream, e.g. Commerce, Nursing, Mechanical Engineering)",
   "university": "string",
   "study_year": "string (what year are they studying in, e.g. 1st year, 2nd year, graduated)",
   "gpa": "string (current GPA, e.g. 3.8/4.0)",
@@ -1021,6 +1096,7 @@ Return ONLY the JSON object."""
                     profile_ctx = profile_as_context_string(user_id)
                     follow_up = self._safe_generate_text(
                         NEXT_QUESTION_PROMPT.format(
+                            audience_rules=_audience_rules(profile),
                             profile_context=profile_ctx,
                             missing_fields=", ".join(missing) or "none",
                             conversation="\n".join(

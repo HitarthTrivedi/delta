@@ -1,9 +1,11 @@
 """Brief generator service — compiles role-specific 3-phase roadmaps dynamically."""
+import datetime
 import json
 import logging
 import uuid
 import re
 from app.services.ai_service import generate_response, sanitize_llm_json_text
+from app.services.domain_packs import resolve_field
 
 logger = logging.getLogger("delta.brief_generator")
 RESUME_MODEL = "gemini-2.5-flash"
@@ -26,9 +28,10 @@ def _fetch_trend_intel(role: str) -> str:
                 logger.warning(f"[trend_intel] search failed for '{q}': {e}")
                 return []
 
-        skills_results = _search(f'"{role}" skills in demand trending 2025', 5)
-        courses_results = _search(f'best free courses "{role}" 2025 trending', 4)
-        tools_results = _search(f'"{role}" tools software frameworks trending 2025', 4)
+        year = datetime.date.today().year
+        skills_results = _search(f'"{role}" skills in demand trending {year}', 5)
+        courses_results = _search(f'best free courses "{role}" {year} trending', 4)
+        tools_results = _search(f'"{role}" tools certifications trending {year}', 4)
 
         def _fmt(results: list[dict], label: str) -> str:
             lines = [
@@ -40,7 +43,7 @@ def _fetch_trend_intel(role: str) -> str:
         blocks = [
             _fmt(skills_results, "Trending skills & hiring signals"),
             _fmt(courses_results, "Trending courses & learning resources"),
-            _fmt(tools_results, "Trending tools & frameworks"),
+            _fmt(tools_results, "Trending tools & certifications"),
         ]
         combined = "\n\n".join(b for b in blocks if b)
         return combined
@@ -61,7 +64,14 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
     recent_events = recent_events or []
     completed_task_titles = completed_task_titles or []
 
-    role = user.target_role or onboarding_profile.get("target_role") or (market_snapshot.target_role if market_snapshot else "AI Developer / Software Engineer")
+    field_profile = onboarding_profile
+    if not field_profile:
+        from app.services.profile_store import load_profile
+        field_profile = load_profile(user.id) or {}
+    pack = resolve_field({**field_profile, "target_role": field_profile.get("target_role") or user.target_role})
+    role = (user.target_role or onboarding_profile.get("target_role")
+            or (market_snapshot.target_role if market_snapshot else None)
+            or (pack["target_roles"][:1] or [f"a {pack['label']} career"])[0])
     hours = user.hours_per_week or onboarding_profile.get("hours_per_week") or 15
     style = user.learning_style or onboarding_profile.get("learning_style") or "hands-on"
 
@@ -78,12 +88,12 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
                 elif isinstance(item, str):
                     demanded.append(item)
         except Exception:
-            demanded = ["LLMs", "Docker", "System Design", "Kubernetes", "MLOps"]
+            demanded = pack["skill_taxonomy"][:5]
     else:
-        demanded = ["LLMs", "Docker", "System Design", "Kubernetes", "MLOps"]
+        demanded = pack["skill_taxonomy"][:5]
 
     if not demanded:
-        demanded = ["LLMs", "Docker", "System Design", "Kubernetes", "MLOps"]
+        demanded = pack["skill_taxonomy"][:5]
 
     # Construct user skill map
     user_skill_map = {s.name.lower(): s.proficiency for s in skills}
@@ -106,6 +116,23 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
     planning_horizon = onboarding_profile.get("planning_horizon") or onboarding_profile.get("timeline") or ""
     goals = onboarding_profile.get("goals") or onboarding_profile.get("ambitions") or ""
     projects = onboarding_profile.get("projects") or onboarding_profile.get("past_projects") or ""
+
+    # Delta for Professionals: working people learn around a full-time job.
+    # Some callers don't pass the onboarding profile, so fall back to the store.
+    audience_profile = onboarding_profile
+    if not audience_profile.get("audience"):
+        from app.services.profile_store import load_profile
+        audience_profile = load_profile(user.id) or {}
+    professional_block = ""
+    if audience_profile.get("audience") == "professional":
+        professional_block = f"""
+    LEARNER TYPE: WORKING PROFESSIONAL (Delta for Professionals). Currently: {audience_profile.get("current_role") or "working"}{", " + audience_profile["industry"] if audience_profile.get("industry") else ""}; {audience_profile.get("years_experience") or "?"} years experience; goal type: {audience_profile.get("goal_type") or "not specified"}.
+    PLANNING RULES FOR PROFESSIONALS (these override student-oriented wording elsewhere):
+    - They learn around a full-time job. Tasks must fit short weekday sessions (30-60 min) plus one longer weekend block, within {hours} hours/week in total.
+    - Career switch: build portfolio proof and relevant certifications toward the new role. Upskill/promotion: apply each new skill to a real problem from their current job.
+    - Build on their work experience. Don't treat them as a beginner in what their job already covers.
+    - No college, semester or placement framing.
+"""
 
     # Build recent activity context
     recent_activity_str = "\n".join(
@@ -159,7 +186,7 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
     - Personal constraints: {constraints or "None mentioned"}
     - Past projects / prior work: {projects or "None mentioned"}
     - Preferences noted by Agent 2: {json.dumps(preferences) if preferences else "None recorded"}
-
+{professional_block}
     USER'S CURRENT SKILLS:
     {skills_list_str}
 
@@ -181,27 +208,28 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
     1. NEVER assign a task that appears in the COMPLETED TASKS list above. Not in any form, not rephrased.
     2. Pick difficulty one step above where the user currently is — not two steps, not the same level. Push gently.
     3. At least 1 task per week must reference a currently trending tool, course, or skill from the live intel above.
-    4. Make tasks specific and timely — not generic. "Build a FastAPI endpoint with async SQLAlchemy and test it with pytest" is better than just "Learn FastAPI".
+    4. Make tasks specific and timely — not generic, and native to this field. For example "Build a FastAPI endpoint and test it with pytest" (software), "Draft a contract-review memo for a sample NDA" (law) or "Prepare a case presentation on post-operative wound care" (nursing) beat "Learn X".
     5. If a trending course was found, reference it by name and URL in the relevant node's resource_url.
     6. Every task must be concrete enough that the student knows exactly what to do and what "done" looks like.
     1. Sequenced Curriculum: Design exactly 3 chronological phases that move this student from their current baseline to job-ready capability for the target role: "{role}".
        Treat resume/current skills as prior exposure. Do not assign beginner repeat tasks for skills they already listed.
-       If a skill is already present but not mastered, convert it into a harder proof/project/debugging/deployment milestone.
-       - Phase 1: Focuses on core libraries, packages, basic analytical tools, or language syntax foundations.
-       - Phase 2: Focuses on intermediate pipelines, workflows, databases, containerization, or core frameworks.
-       - Phase 3: Focuses on advanced architectures, microservices, scaling, domain specializations, or deployment patterns.
+       If a skill is already present but not mastered, convert it into a harder, practical proof milestone suited to the field.
+       This learner's field is {pack["label"]}. Phases must follow how people actually progress in THIS field (never default to software topics unless the field is software):
+       - Phase 1 ({pack["phases"][0]}): {pack["phase_guidance"][0]}.
+       - Phase 2 ({pack["phases"][1]}): {pack["phase_guidance"][1]}.
+       - Phase 3 ({pack["phases"][2]}): {pack["phase_guidance"][2]}.
     2. Nodes per Phase: Each phase must contain exactly 2-3 logical skill nodes.
     3. Node Properties: Each node MUST be a dictionary containing:
-       - "id": a unique string ID (e.g. "node-pandas", "node-docker")
-       - "label": clear visual name (e.g. "Pandas Data Wrangling")
-       - "skill_name": the clean database skill name (e.g. "Pandas", "SQL", "Docker", "Python"). This is critical for matching database skills!
+       - "id": a unique string ID (e.g. "node-financial-statements")
+       - "label": clear visual name (e.g. "Reading Financial Statements")
+       - "skill_name": the clean database skill name (e.g. {", ".join(pack["skill_taxonomy"][:3])}). This is critical for matching database skills!
        - "description": practical description of what they will master.
-       - "tech_twist": an expert-level micro-instruction or optimization tip.
-       - "architect_warning": a security standard, debugging tip, or production pitfall to avoid.
-       - "certification": a premium industry certification mapped to this specific node (e.g. "Google Cloud Data Engineer (+15% weight)")
-       - "resource_url": a valid roadmap.sh or official documentation link.
+       - "tech_twist": an expert tip from an experienced practitioner in this field (the key name is historical).
+       - "architect_warning": a common mistake, safety/ethics standard, or pitfall to avoid in this field.
+       - "certification": a recognised certification, licence or exam relevant to this node in this field (e.g. "{(pack["certifications"] or ["a recognised short course"])[0]}"), or "" if none fits.
+       - "resource_url": a valid official link: documentation, a course (e.g. NPTEL/SWAYAM, Coursera), or a regulator / professional body site for the field.
        - "difficulty_level": one of "Beginner", "Easy", "Intermediate", "Advanced", "Expert" — reflect how challenging this node is for someone at week {cycle_count + 1} of their journey.
-       - "complexity_score": a float between 1.0 and 5.0 — the intrinsic learning difficulty of this skill FOR THIS SPECIFIC ROLE (not universal). Example: C++ for a systems engineer = 4.5, C++ for an AI developer = 3.0. Python for a data scientist = 1.5. RAG pipelines for an AI developer = 3.5. Be role-aware.
+       - "complexity_score": a float between 1.0 and 5.0 — the intrinsic learning difficulty of this skill FOR THIS SPECIFIC ROLE (not universal). Example: C++ for a systems engineer = 4.5, Python for a data scientist = 1.5, taxation for a CA aspirant = 4.0, clinical pharmacology for a nurse = 3.5. Be role-aware.
     4. Roadmap Status:
        - For each node, match its "skill_name" (case-insensitive) against the user's current skills.
        - Set its "status" to "mastered" if the user has >= 8 proficiency.
@@ -217,8 +245,8 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
     - "roadmap_updates": 2 custom calibration messages explaining why the roadmap prioritize these phases.
     - "actions": 2-3 specific checklist action items for the current weekly sprint.
       These must be based on what the user has NOT already proven.
-      For skills already in the resume, ask for an advanced extension, production proof, GitHub proof, deployment, test suite, benchmark, or written reflection.
-    - "opportunities": 3 mock or real platform contest events, sprints, hackathons, or learning challenges.
+      For skills already in the resume, ask for an advanced extension or proof that counts in this field ({", ".join(pack["proof_types"][:4])}), or a written reflection.
+    - "opportunities": 3 real competitions, case challenges, internships, fellowships or learning challenges relevant to {pack["label"]} (e.g. {", ".join(pack["competitions"][:3])}).
     - "questions_for_user": 2 deep reflection questions to help the AI resolve profile ambiguity.
 
     Output strictly as a valid, standard, parsable JSON object. Do not wrap in markdown tags like ```json or ```, do not include comments, and do not add trailing commas.
@@ -327,7 +355,7 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
         import traceback
         traceback.print_exc()
         print(f"=========================================================================")
-        return _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded, cycle_count, completed_task_titles)
+        return _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded, cycle_count, completed_task_titles, pack)
 
 def _get_node_status(skill_name: str, skill_map: dict) -> str:
     """Helper to return active visual node status."""
@@ -350,9 +378,45 @@ def _node_difficulty_level(cycle_count: int, status: str, skill_name: str = "", 
     task_type = "project" if status != "mastered" else "practice"
     return _task_difficulty_level(skill_name, proficiency, task_type, cycle_count, demanded or [], llm_complexity)
 
-def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded, cycle_count: int = 0, completed_task_titles: list | None = None) -> dict:
-    """Enterprise-grade static fallback compiler to ensure server stability."""
-    phases = [
+def _field_fallback_phases(pack: dict, user_skill_map: dict, cycle_count: int, demanded: list) -> list[dict]:
+    """Static roadmap for non-software fields, built from the field pack."""
+    tax = pack["skill_taxonomy"]
+    proofs = pack["proof_types"] or ["a project"]
+    certs = pack["certifications"]
+    phases = []
+    for i, name in enumerate(pack["phases"][:3]):
+        chunk = tax[i * 2:i * 2 + 2] or tax[-2:]
+        nodes = []
+        for j, skill in enumerate(chunk):
+            status = _get_node_status(skill.lower(), user_skill_map)
+            nodes.append({
+                "id": f"fallback-{pack['id']}-{i + 1}-{j + 1}",
+                "label": skill,
+                "skill_name": skill,
+                "status": status,
+                "difficulty_level": _node_difficulty_level(cycle_count, status, skill, user_skill_map.get(skill.lower(), 0), demanded),
+                "description": f"Build your {skill.lower()} as part of {pack['phase_guidance'][i]}.",
+                "tech_twist": f"Practise {skill.lower()} on real examples from your field and ask someone experienced for feedback.",
+                "architect_warning": f"Don't stop at theory: show {skill.lower()} through {proofs[min(i, len(proofs) - 1)]}.",
+                "certification": certs[min(i, len(certs) - 1)] if certs else "",
+                "resource_url": "",
+            })
+        phases.append({
+            "id": f"phase-{i + 1}",
+            "name": f"Phase {i + 1}: {name}",
+            "description": pack["phase_guidance"][i][:1].upper() + pack["phase_guidance"][i][1:] + ".",
+            "nodes": nodes,
+        })
+    return phases
+
+
+def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, demanded, cycle_count: int = 0, completed_task_titles: list | None = None, pack: dict | None = None) -> dict:
+    """Enterprise-grade static fallback compiler to ensure server stability.
+    Software users get the hand-written tech roadmap; every other field gets one
+    built from its field pack (never Python/Docker for a nurse or a CA)."""
+    pack = pack or resolve_field({"target_role": user.target_role})
+    tech = pack["id"] == "cs_ai"
+    phases = _field_fallback_phases(pack, user_skill_map, cycle_count, demanded) if not tech else [
         {
             "id": "phase-1",
             "name": "Phase 1: Advanced APIs & Backend Systems",
@@ -476,6 +540,10 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
         f"Recruiters looking for {user.target_role or 'engineers'} are emphasizing hands-on verification over static resumes.",
         "A surge in multi-agent orchestration demands has pushed LangChain/CrewAI knowledge into core requirements.",
         "Global remote shifts are favoring engineers with verified public proof of building backend APIs."
+    ] if tech else [
+        f"Employers hiring for {user.target_role or pack['label']} roles increasingly ask for proof of practical skills, not just qualifications.",
+        f"Skills employers in {pack['label']} keep listing: {', '.join(demanded[:4])}.",
+        "Recognised certifications and real internship or project experience are helping candidates stand out.",
     ]
 
     personal_changes = [
@@ -508,7 +576,7 @@ def _generate_static_fallback(user, skills, market_snapshot, user_skill_map, dem
         "LeetCode Weekly Contest: Compete to benchmark algorithmic speed.",
         "Unstop National Hackathon Sprint: Apply backend patterns to a real case study.",
         "Kaggle AI Agent Sandbox: Build and run agent workers for predictive tasks."
-    ]
+    ] if tech else [f"{c}: a chance to test your skills against peers and add proof to your profile." for c in pack["competitions"][:3]]
 
     questions_for_user = [
         "What specific target domain or career path do you want delta to refine next?",

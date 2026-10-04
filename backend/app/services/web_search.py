@@ -203,7 +203,7 @@ class WebSearchService:
                 f"{target_role} portfolio projects that impress recruiters"
             ),
             "industry_shifts": (
-                f"{target_role} technology trends industry changes"
+                f"{target_role} industry trends and changes"
             ),
         }
 
@@ -881,7 +881,13 @@ class WebSearchService:
 
         # If query mentions specific skill keywords, try to match a more
         # specific pool; otherwise use the role pool.
-        return _pools.get(role_key, _pools["general"])
+        if role_key in _pools and role_key != "general":
+            return _pools[role_key]
+        # The generic pool is tech content. For other fields (nursing, law, CA...)
+        # return nothing rather than invented results; callers then fall back to
+        # the field pack's own skills and projects.
+        from app.services.domain_packs import infer_domain_pack
+        return _pools["general"] if infer_domain_pack(query_lower).get("is_tech") else []
 
     # ══════════════════════════════════════════════════════════════════
     # Private — Market snapshot synthesis
@@ -923,6 +929,15 @@ class WebSearchService:
             "agile", "scrum", "jira",
         }
 
+        # The caller passes the field's core skills (nursing, CA, law...), so
+        # non-tech demand is counted too. Whole-word match: "excel" must not
+        # match "excellent".
+        canonical = {str(s).lower(): str(s) for s in user_skills if s}
+        field_patterns = {
+            low: re.compile(rf"(?<![a-z0-9]){re.escape(low)}(?![a-z0-9])")
+            for low in canonical if low not in known_skills
+        }
+
         for _category, results in raw_results.items():
             for r in results:
                 snippet_lower = r["snippet"].lower()
@@ -932,6 +947,9 @@ class WebSearchService:
                 # Count skill mentions
                 for skill in known_skills:
                     if skill in combined:
+                        skill_mentions[skill] = skill_mentions.get(skill, 0) + 1
+                for skill, pattern in field_patterns.items():
+                    if pattern.search(combined):
                         skill_mentions[skill] = skill_mentions.get(skill, 0) + 1
 
                 # Extract recruiter signals
@@ -957,7 +975,7 @@ class WebSearchService:
 
         # ── Rank skills by mention frequency ──────────────────────────
         sorted_skills = sorted(skill_mentions.items(), key=lambda x: x[1], reverse=True)
-        all_mentioned = [s for s, _ in sorted_skills]
+        all_mentioned = [canonical.get(s, s) for s, _ in sorted_skills]
 
         # Skills the user already has vs. emerging ones they don't
         user_skills_lower = {s.lower() for s in user_skills}

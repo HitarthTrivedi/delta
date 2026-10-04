@@ -67,6 +67,15 @@ def compile_weekly_dossier(user, skills: list, db) -> dict:
         overall_status = "NEEDS_FOCUS"
         status_description = "A bit quiet this week. Commit at least 1 verified code milestone to resume upward velocity."
 
+    from app.services.domain_packs import field_for_user
+    pack = field_for_user(user.id, db=db)
+    tech = pack["id"] == "cs_ai"
+    if not tech:
+        if overall_status == "ON_TRACK":
+            status_description = f"Steady progress. Keep adding proof ({pack['portfolio_hint']}) to solidify your scores."
+        elif overall_status == "NEEDS_FOCUS":
+            status_description = "A bit quiet this week. Finish at least one proof task to get moving again."
+
     # 5. Live Indian Tech Hiring Market Analysis
     is_ai_focused = any("ai" in s.name.lower() or "llm" in s.name.lower() or "ml" in s.name.lower() for s in skills)
     
@@ -78,6 +87,12 @@ def compile_weekly_dossier(user, skills: list, db) -> dict:
         live_demand_index = "HIGH ( Pune & Hyderabad Hubs )"
         bangalore_pune_demand = "Solid hiring for backend optimization roles in Pune and Gurgaon. Standard interview filters focus heavily on relational indexes and caching architectures."
         salary_trend_range = "₹6L - ₹12L LPA (Entry-Level Graduate)"
+
+    if not tech:
+        # No invented statistics for other fields: point to the live weekly brief.
+        live_demand_index = "See your weekly market brief"
+        bangalore_pune_demand = f"Delta tracks live hiring signals for {pack['label']} roles in your weekly brief."
+        salary_trend_range = "Varies by role and city; check current postings"
 
     # 6. Curator Critique (Constructive bullets based on active skills)
     user_skill_names = {s.name.lower() for s in skills}
@@ -96,17 +111,28 @@ def compile_weekly_dossier(user, skills: list, db) -> dict:
         "Startups in Bengaluru expect junior engineering recruits to check logs and diagnose container errors independently rather than relying on seniors."
     ]
 
-    # Dynamically inject specialized warnings based on gaps
-    if "docker" not in user_skill_names:
+    if not tech:
+        keep_doing = [
+            f"Building the kind of proof employers in {pack['label']} trust: {', '.join(pack['proof_types'][:3])}.",
+            f"Maintaining a regular learning pacing commitment of {target_hours} hours per week.",
+        ]
+        mistakes_to_avoid = [
+            "Collecting certificates without practical proof that you can apply the skill.",
+            "Skipping feedback: get your work reviewed by someone experienced in the field.",
+        ]
+        industry_expectations = [f"Employers in {pack['label']} look for: {', '.join(pack['rubric'][:4]).lower()}."]
+
+    # Dynamically inject specialized warnings based on gaps (software only)
+    if tech and "docker" not in user_skill_names:
         mistakes_to_avoid.append("Deploying application packages inside raw environments instead of containerizing via Docker. Outdated setups are rejected in PR runs.")
         industry_expectations.append("Containerization proficiency (Docker slimming, multi-stage builds) is now a hard filter in top tech hiring pipelines.")
         
-    if "sql" not in user_skill_names:
+    if tech and "sql" not in user_skill_names:
         mistakes_to_avoid.append("Ignoring relational database optimization. Avoid mock JSON files; integrate SQLite or PostgreSQL connection pools even in early dev.")
-    else:
+    elif tech:
         keep_doing.append("Leveraging structured relational database isolation models to support transactions.")
 
-    if "fastapi" in user_skill_names:
+    if tech and "fastapi" in user_skill_names:
         keep_doing.append("Separating your SQLAlchemy database models from FastAPI request payloads using Pydantic validation models.")
 
     memory = {
@@ -128,7 +154,7 @@ def compile_weekly_dossier(user, skills: list, db) -> dict:
     }
     market = {
         "target_role": user.target_role,
-        "top_demanded_skills": ["Python", "SQL", "Docker", "System Design", "LLMs"],
+        "top_demanded_skills": ["Python", "SQL", "Docker", "System Design", "LLMs"] if tech else pack["skill_taxonomy"][:5],
     }
     roadmap = {"phases": [], "active_phase_id": None}
     proof_projects = recommend_proof_projects(memory, roadmap, market)
