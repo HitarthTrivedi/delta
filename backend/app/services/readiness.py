@@ -20,7 +20,7 @@ WEIGHTS = {"theory": 0.35, "coding": 0.35, "interview": 0.30}
 NON_CODING_WEIGHTS = {"theory": 0.55, "interview": 0.45}
 TYPE_LABELS = {"theory": "Knowledge & aptitude tests", "coding": "Coding", "interview": "AI interview"}
 RUBRIC_LABELS = {
-    "communication": "Communication", "technical_depth": "Technical depth",
+    "communication": "Communication", "technical_depth": "Subject knowledge",
     "problem_solving": "Problem solving", "clarity": "Clarity",
 }
 # Which interview type best trains each rubric area.

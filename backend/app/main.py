@@ -1,3 +1,13 @@
+import sys
+
+# Windows consoles default to cp1252, so any print() containing emoji raised
+# UnicodeEncodeError mid-request (e.g. roadmap generation failed with a 404).
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware

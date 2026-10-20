@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import supabase from './supabaseClient';
+import { DEV_AUTH } from './devAuth';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
@@ -32,6 +33,11 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
+    if (DEV_AUTH && error.response && error.response.status === 401) {
+      // Dev mode has no Supabase session to refresh: the backend isn't in header-auth mode.
+      console.error('401 in local dev mode: start the backend with ALLOW_HEADER_AUTH=true.');
+      return Promise.reject(error);
+    }
     if (error.response && error.response.status === 401 && original && !original._retried) {
       original._retried = true;
       try {

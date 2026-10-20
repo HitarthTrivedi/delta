@@ -181,7 +181,7 @@ cd backend
 source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 pytest
-python seed_guest.py
+python scripts/seed_guest.py
 python test_keys.py
 ```
 

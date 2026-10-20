@@ -1,13 +1,16 @@
-"""Fill a Delta account with realistic demo data for a live demo.
+"""Fill a Delta account with realistic test data. LOCAL DEVELOPMENT ONLY:
+never run this against the production database.
 
 Usage (from backend/):
-    python seed_demo.py --user-id <supabase-user-uuid> --yes
-    python seed_demo.py --user-id <uuid> --with-candidates --yes      # + 7 opted-in fictional students (incl. nursing and CA) for recruiter search
-    python seed_demo.py --approve-recruiter-id <uuid> --yes           # approve a recruiter account
-    python seed_demo.py --clear --user-id <uuid> --yes                # erase the demo account's data + all fictional candidates
+    python scripts/seed_demo.py --user-id <supabase-user-uuid> --yes
+    python scripts/seed_demo.py --user-id <uuid> --with-candidates --yes      # + 7 opted-in fictional students (incl. nursing and CA) for recruiter search
+    python scripts/seed_demo.py --approve-recruiter-id <uuid> --yes           # approve a recruiter account
+    python scripts/seed_demo.py --clear --user-id <uuid> --yes                # erase the demo account's data + all fictional candidates
 
-The demo account must already exist: sign up in the app first, then copy the
-user id (Supabase dashboard → Authentication → Users). The roadmap is NOT
+The account must already exist: sign up in the app first, then copy the
+user id (Supabase dashboard → Authentication → Users). With the local dev login
+(REACT_APP_DEV_AUTH) the id is "dev-" + the email with symbols turned into
+dashes, e.g. asha@example.com -> dev-asha-example-com. The roadmap is NOT
 seeded; it is generated live, so open /roadmap once before the demo.
 
 Fictional candidates use fixed ids (demo-cand-1..7) and example.com emails.
@@ -19,7 +22,7 @@ import os
 import sys
 import uuid
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import SessionLocal, engine, Base  # noqa: E402
 import app.models  # noqa: F401,E402

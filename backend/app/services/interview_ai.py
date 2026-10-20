@@ -105,7 +105,7 @@ Interview style: ask ONE question at a time, professional but warm, like a real 
 
 
 def _clean_spoken(text: str) -> str:
-    return (text or "").strip().strip('"').replace("**", "").replace("`", "")
+    return (text or "").strip().strip('"').replace("*", "").replace("`", "")
 
 
 def generate_opening_question(user_id: str, settings: dict) -> str:
@@ -114,8 +114,8 @@ def generate_opening_question(user_id: str, settings: dict) -> str:
 This is the FIRST question. Greet the candidate in one short sentence (you are Aria), then ask an appropriate opening question for this interview type. Return ONLY what you would say, no labels, no quotes."""
     fallback = f"Hi, I'm Aria, and I'll be your interviewer today. To start, tell me about yourself and what draws you to the {settings['target_role']} role."
     try:
-        # gemma-4-31b-it spends output tokens on hidden chain-of-thought before
-        # the visible answer, so a short question still needs a generous
+        # Gemini 2.5 models spend output tokens on hidden thinking before the
+        # visible answer, so a short question still needs a generous
         # max_tokens budget — too small silently yields empty text.
         question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000))
         if not question or _is_mock_fallback(question):

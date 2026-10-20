@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { Loader2, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
 import supabase from '../lib/supabaseClient';
+import { DEV_AUTH } from '../lib/devAuth';
 
 export default function LoginPage({ variant = 'student' }) {
   const isRecruiter = variant === 'recruiter';
@@ -32,7 +33,12 @@ export default function LoginPage({ variant = 'student' }) {
     try {
       localStorage.setItem('delta_remember_me', rememberMe ? 'true' : 'false');
       if (isSignUp) {
-        await signUp(email, password, name);
+        const created = await signUp(email, password, name);
+        if (created?.devSession) {
+          toast.success('Signed in (local dev mode).');
+          navigate(isRecruiter ? '/recruiter' : nextPath || '/roadmap');
+          return;
+        }
         toast.success('Account created! Please sign in.');
         setIsSignUp(false);
         setEmail('');
@@ -85,6 +91,13 @@ export default function LoginPage({ variant = 'student' }) {
             <span className="font-display text-[26px] font-semibold text-ink tracking-tight">Delta</span>
             <span className="kicker mt-1">{isRecruiter ? 'For Recruiters' : 'Career Intelligence'}</span>
           </div>
+
+          {DEV_AUTH && (
+            <p className="mb-5 border border-oxblood px-3 py-2 text-center text-[12px] leading-relaxed text-ink">
+              <strong className="text-oxblood">Local dev mode.</strong> Any email signs you in, and the password isn't checked.
+              The same email always opens the same account. Only works on this computer.
+            </p>
+          )}
 
           {/* Heading */}
           <h2 className="font-display text-[28px] font-semibold text-oxblood mb-1.5 text-center">

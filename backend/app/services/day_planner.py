@@ -2,7 +2,7 @@
 day_planner.py — Distribute a week's Delta tasks across 7 concrete days.
 
 Used when a user picks the "day" plan style. The distribution is proposed by
-Groq (via ai_service.quality_model, which auto-falls back to gemma) and then
+Groq (via ai_service.quality_model, which auto-falls back to Gemini) and then
 passed through a deterministic repair pass so the output is ALWAYS structurally
 valid regardless of what the model returns:
 
