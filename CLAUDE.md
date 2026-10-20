@@ -4,6 +4,8 @@
 
 Before starting any work, read **[docs/DELTA_MASTER_PLAN.md](docs/DELTA_MASTER_PLAN.md)**. It covers the Delta vision (School / College / Recruiter), what is already built, the build order, and the conventions to follow. When you finish or start a feature, update its Status table.
 
+**We are in the production phase** (the demo is over): follow Master Plan Section 7 (target stack, AI cost rules, production backlog). No demo shortcuts or hardcoded values in shipped code; business documents (pricing, pitch) stay outside this repo.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.

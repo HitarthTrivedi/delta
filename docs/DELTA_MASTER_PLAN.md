@@ -68,7 +68,8 @@ This module has two sides.
 | College / sandbox | AI video interview (animated interviewer "Aria" that speaks, mic or typed answers, webcam self-view, rubric report with model answers) | Built (v2) | `routers/sandbox_interview.py`, `services/interview_ai.py`, `pages/InterviewSandbox.jsx`, `components/interview/*`, `hooks/useInterviewerVoice.js`, `hooks/useAnswerMic.js`, `hooks/useWebcam.js` |
 | College / sandbox | Technical + aptitude tests (difficulty, timed mode, topic suggestions) | Built (v2) | `routers/sandbox_theory.py`, `services/theory_test_ai.py`, `pages/TheorySandbox.jsx` |
 | College / sandbox | Test Center: readiness score, per-skill strengths/weaknesses, score trend, next steps (also shown to recruiters) | Built | `services/readiness.py`, `routers/sandbox_report.py`, `pages/PracticeHub.jsx` |
-| Demo | Demo data script (student + 5 fictional opted-in candidates) | Built | `backend/seed_demo.py` |
+| Dev tooling | Test data script (student + 7 fictional opted-in candidates), local only | Built | `backend/scripts/seed_demo.py` |
+| Dev tooling | Local dev login without Supabase (localhost + `REACT_APP_DEV_AUTH` only) | Built | `frontend/src/lib/devAuth.js` |
 | College / recruiter | Separate recruiter login + registration + admin approval | Built (v1) | `routers/recruiter.py`, `models/compliance.py`, `pages/recruiter/RecruiterPortal.jsx`, `pages/recruiter/RecruiterAdmin.jsx`, `LoginPage.jsx` (`variant="recruiter"`) |
 | College / recruiter | Preference form + ranked matching of opted-in students | Built (v1) | `routers/recruiter.py` (`/search`, `_score_candidate`) |
 | College / recruiter | Candidate scorecard (per-skill sandbox evidence) | Built (v1) | `routers/recruiter.py` (`/candidates/{id}`), `RecruiterPortal.jsx` (`CandidateDetail`) |
@@ -94,7 +95,8 @@ This module has two sides.
 
 - **Sandboxes share one table.** `SandboxSession` (`backend/app/models/sandbox_session.py`) uses `type` = `coding | interview | theory`. Type-specific payload goes in the JSON `data` column; the 0–100 `score` is set on completion. Add new assessment types the same way instead of creating new tables.
 - **Sandbox router shape:** `/api/sandbox/<type>/{user_id}/...`, with `Depends(require_owner)` and `@limiter.limit(...)` on mutating endpoints. When a session completes, call `bump_skill` (`services/sandbox_common.py`) and `log_journey_event` (`services/central_engine.py`). Copy `routers/sandbox_interview.py`.
-- **AI calls** go through `services/ai_service.py` (`generate_response` / `generate_json`). Ground prompts with `profile_store.profile_as_compact_context(user_id)`. Don't add new model configuration.
+- **AI calls** go through `services/ai_service.py` (`generate_response` / `generate_json`). Ground prompts with `profile_store.profile_as_compact_context(user_id)`. Model names come from config (`GEMINI_MODEL`, `GEMINI_BACKUP_MODEL`); don't hardcode them. Follow the AI cost rules in Section 7.
+- **Config, not constants.** Model names, URLs, sender emails, limits and keys come from `backend/app/config.py` / env vars (documented in `backend/.env.example` and `frontend/.env.example`). Defaults must be safe for local development; production sets real values in the host's settings.
 - **Grading is server-side.** Never send answer keys to the client before submission. Never let the LLM grade something that can be graded deterministically.
 - **Scores are evidence.** Store enough detail (per-question results, per-skill breakdown) that a recruiter could check why a student got that score.
 - **Honest over decorative.** If AI generation fails, return an error. Never return fake or placeholder content dressed up as real (see `PRODUCT.md`).
@@ -142,7 +144,55 @@ Delta is a **Data Fiduciary** under India's DPDP Act, 2023. These rules are buil
 - set `SUPABASE_SERVICE_ROLE_KEY`, otherwise account deletion erases the data but can't remove the Supabase login;
 - have a lawyer review `frontend/public/legal/*.md` before public launch, especially before charging recruiters money.
 
-## 7. Open questions
+## 7. Going to production (current phase)
+
+**The demo is over. We are building Delta as a commercial product.** Shipped code must have no demo shortcuts, hardcoded values or fake data. Anything that exists only for local testing must be switched off by default and impossible to turn on in production (see "Local development" below).
+
+Business documents (pricing, unit economics, pitch, funding forms) are kept **outside this repo**. Don't add them here; `.gitignore` blocks the usual file names.
+
+### Target stack
+Chosen to stay cheap while bootstrapped, with a known paid upgrade for every free tier.
+
+| Need | Now | Production target | Upgrade when |
+|---|---|---|---|
+| Frontend hosting | Vercel | Cloudflare Pages (free tier allows commercial use) | not needed early |
+| Backend (FastAPI) | Railway | Railway, Pro plan; more replicas later | traffic grows |
+| Database + auth | SQLite locally; Supabase project **deleted** | Supabase Pro, Mumbai region: Postgres, auth, daily backups (the free tier pauses when idle) | before taking payments |
+| AI | Gemini via `ai_service` | Gemini 2.5 Flash-Lite by default; Gemini 2.5 Flash only where quality matters (interview reports, tests, roadmaps); Batch API for non-urgent jobs | always pay-as-you-go |
+| Code runner | JDoodle (free tier) | self-hosted Judge0 on a small VPS | more than 200 runs a day |
+| Email | Gmail API / Brevo | Brevo, then Resend | more than 300 emails a day |
+| Cache | in-process (Redis optional) | Upstash Redis | more than one backend replica |
+| Monitoring | none | Sentry (errors) + UptimeRobot (uptime) | — |
+| Backups | none | Supabase backups + weekly off-site dump to Cloudflare R2 | — |
+| Payments | none | Razorpay | — |
+
+### AI cost rules (follow these in every AI feature)
+- **Route by task:** use the lite model by default and the stronger model only where accuracy shows (scored reports, test generation, roadmaps).
+- **Generate once, reuse many times:** test question bank, School lessons, coding problems and market snapshots are shared across users, not regenerated per user.
+- **No AI where rules work:** grading, readiness scores and recruiter ranking use deterministic code.
+- **Browser does voice and video:** speech recognition, text-to-speech and the webcam run on the user's device. Never stream audio or video to a paid API.
+- **Short prompts:** send the compact profile (`profile_as_compact_context`), not full histories.
+- **Hard caps:** every expensive endpoint is rate-limited, and each plan will get monthly usage caps plus a spend alarm.
+
+### Production backlog (in order)
+1. **New Supabase project** (Mumbai). Keys go in the host's encrypted settings and teammates' local `.env` files, never in git.
+2. **Postgres + migrations:** move from SQLite to Supabase Postgres and adopt Alembic (today schema changes go through `add_missing_columns.py`).
+3. **Model routing in `ai_service`:** lite vs full model chosen per call site, with names from config.
+4. **Background job queue** for roadmap generation and other long AI work, so pages never wait on the model.
+5. **Per-plan usage caps** and a monthly AI budget alarm.
+6. **Monitoring:** Sentry error alerts and uptime checks.
+7. **Staging environment + load test** (at least 500 concurrent users) before any big college onboarding.
+8. **Backups:** weekly off-site database dump, with a restore tested monthly.
+9. **Anti-cheating** for sandbox scores recruiters rely on.
+10. **Legal:** lawyer review of `frontend/public/legal/*.md`; update the Data Fiduciary name once the company is registered.
+
+### Local development
+- **Env files:** copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` → `frontend/.env.development.local`. Both real files are gitignored. Ask a teammate for keys privately; never paste them into code, docs or commits.
+- **Dev login (no Supabase needed):** set `REACT_APP_DEV_AUTH=true` (frontend) and `ALLOW_HEADER_AUTH=true` (backend). Any email signs you in with no password; the same email always opens the same account. It only works when the app is served from localhost, and production builds never have the flag. Never set either flag on a deployed environment.
+- **Test data:** `python scripts/seed_demo.py --user-id <id> --with-candidates --yes` from `backend/` fills an account and adds fictional opted-in candidates. Local databases only.
+- **Tests:** `pytest tests -q` from `backend/` (the `tests/` folder is gitignored for now).
+
+## 8. Open questions
 
 - **Recruiter verification:** what evidence do we accept before approving (company email domain, LinkedIn, a call)?
 - **Parental verification:** today a parent is "verified" by being a signed-in adult who confirmed their age and relationship. DPDP Rules accept stronger checks (e.g. DigiLocker age tokens). Ask a lawyer whether that's needed before scaling School.
