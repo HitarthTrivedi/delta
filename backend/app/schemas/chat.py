@@ -16,7 +16,7 @@ class ChatResponse(BaseModel):
 
 class OnboardingStartRequest(BaseModel):
     raw_input: str
-    target_role: Optional[str] = "AI Developer / Software Engineer"
+    target_role: Optional[str] = None
 
 class OnboardingStartResponse(BaseModel):
     ambition_summary: str

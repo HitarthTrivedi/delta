@@ -49,11 +49,21 @@ const Opportunities = lazy(() => import("./pages/Opportunities"));
 const PracticeHub = lazy(() => import("./pages/PracticeHub"));
 const CodingSandbox = lazy(() => import("./pages/CodingSandbox"));
 const InterviewSandbox = lazy(() => import("./pages/InterviewSandbox"));
+const TheorySandbox = lazy(() => import("./pages/TheorySandbox"));
+const InterviewReportPage = lazy(() => import("./pages/InterviewReportPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
+const PrivacySettings = lazy(() => import("./pages/PrivacySettings"));
+const RecruiterPortal = lazy(() => import("./pages/recruiter/RecruiterPortal"));
+const RecruiterAdmin = lazy(() => import("./pages/recruiter/RecruiterAdmin"));
+const SchoolParent = lazy(() => import("./pages/school/SchoolParent"));
+const SchoolLearn = lazy(() => import("./pages/school/SchoolLearn"));
+const SchoolReview = lazy(() => import("./pages/school/SchoolReview"));
 
 // Core connection hooks
 import { useUserWithSkills } from "./hooks/useUser";
 import { useAuthStore } from "./store/authStore";
+import ConsentGate from "./components/ConsentGate";
+import { getChildMode } from "./lib/childMode";
 
 // Initialize Query Client for caching.
 // Global staleTime keeps data fresh across remounts/navigation so pages don't
@@ -87,10 +97,20 @@ const LandingPage = () => {
 function LayoutWrapper({ children }) {
   const location = useLocation();
   const userId = useAuthStore((state) => state.userId);
-  const { data: user } = useUserWithSkills(userId);
+  // Recruiter pages have their own header and must not auto-create a student profile.
+  const isRecruiterArea = location.pathname.startsWith("/recruiter");
+  const { data: user } = useUserWithSkills(isRecruiterArea ? null : userId);
+
+  // Delta for School child mode: the whole app is locked to the child's learning
+  // page until the parent's PIN is entered there.
+  const childModeId = getChildMode(userId);
+  const childPath = `/school/learn/${childModeId}`;
+  if (childModeId && !location.pathname.startsWith(childPath)) {
+    return <Navigate to={childPath} replace />;
+  }
 
   const isLanding = location.pathname === "/";
-  const isLogin = location.pathname === "/login";
+  const isLogin = location.pathname === "/login" || isRecruiterArea || location.pathname.startsWith("/school/learn");
   const isPublicPage = ["/about", "/careers", "/contact", "/partners", "/investors", "/early-access"].includes(location.pathname);
 
   return (
@@ -132,6 +152,15 @@ function RequireAuth({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  // Student app: nothing is usable until the current Terms/Privacy are accepted.
+  return <ConsentGate>{children}</ConsentGate>;
+}
+
+// Recruiter portal: signed in only. No consent gate / onboarding — recruiters
+// accept their own terms during registration.
+function RequireSignedIn({ children, loginPath }) {
+  const userId = useAuthStore((state) => state.userId);
+  if (!userId) return <Navigate to={loginPath} replace />;
   return children;
 }
 
@@ -198,6 +227,13 @@ function AppContent() {
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/recruiter/login" element={<LoginPage variant="recruiter" />} />
+        <Route path="/recruiter" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterPortal /></RequireSignedIn>} />
+        <Route path="/recruiter/admin" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterAdmin /></RequireSignedIn>} />
+        <Route path="/settings/privacy" element={<RequireAuth><PrivacySettings /></RequireAuth>} />
+        <Route path="/school" element={<RequireAuth><SchoolParent /></RequireAuth>} />
+        <Route path="/school/learn/:childId" element={<RequireAuth><SchoolLearn /></RequireAuth>} />
+        <Route path="/school/review" element={<RequireAuth><SchoolReview /></RequireAuth>} />
         
         {/* Onboarding & Intake are protected by auth but do not require completed onboarding */}
         <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
@@ -213,6 +249,8 @@ function AppContent() {
         <Route path="/practice" element={<RequireAuth><ProtectedRoute><PracticeHub /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/coding" element={<RequireAuth><ProtectedRoute><CodingSandbox /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/interview" element={<RequireAuth><ProtectedRoute><InterviewSandbox /></ProtectedRoute></RequireAuth>} />
+        <Route path="/practice/theory" element={<RequireAuth><ProtectedRoute><TheorySandbox /></ProtectedRoute></RequireAuth>} />
+        <Route path="/practice/interview/report/:sessionId" element={<RequireAuth><ProtectedRoute><InterviewReportPage /></ProtectedRoute></RequireAuth>} />
         <Route path="/dashboard" element={<RequireAuth><ProtectedRoute><Dashboard /></ProtectedRoute></RequireAuth>} />
         <Route path="/chat" element={<Navigate to="/roadmap" replace />} />
         <Route path="/ledger" element={<RequireAuth><ProtectedRoute><Ledger /></ProtectedRoute></RequireAuth>} />

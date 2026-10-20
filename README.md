@@ -4,6 +4,7 @@ Delta 2.0 is a career intelligence web app with a FastAPI backend and a React fr
 
 ## Documentation
 
+- **[docs/DELTA_MASTER_PLAN.md](docs/DELTA_MASTER_PLAN.md)** — the master plan: vision (School / College / Recruiter), build status, build order, and conventions. Read this first.
 - **[docs/SYSTEM_DOCUMENTATION.md](docs/SYSTEM_DOCUMENTATION.md)** — the complete end-to-end system reference: what Delta is, every feature (what it does + how), architecture, data model, API, security, deployment, and the personal-data map. Read this first for the full picture.
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — condensed technical reference: layers, data model, API tables, request lifecycle, frontend structure, and the performance/caching design.
 - **[docs/DELTA_CAREER_OS_BLUEPRINT.md](docs/DELTA_CAREER_OS_BLUEPRINT.md)** — the product vision and the ten system pillars.
@@ -180,7 +181,7 @@ cd backend
 source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 pytest
-python seed_guest.py
+python scripts/seed_guest.py
 python test_keys.py
 ```
 

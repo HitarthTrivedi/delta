@@ -1222,7 +1222,7 @@ export default function WeeklyPlan() {
               <textarea
                 value={feedbackText}
                 onChange={e => setFeedbackText(e.target.value)}
-                placeholder="e.g. The LeetCode task is too hard, I'd prefer easier problems. The FastAPI task has no clear goal."
+                placeholder="e.g. This week's practice set is too hard, I'd prefer easier problems. The project task has no clear goal."
                 rows={3}
                 style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '10px 12px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
               />
@@ -1421,7 +1421,7 @@ export default function WeeklyPlan() {
                   value={newNextWeek}
                   onChange={e => setNewNextWeek(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addNextWeek()}
-                  placeholder="e.g. Include a REST API project"
+                  placeholder="e.g. Include a case study, a mock test, or a small project"
                   style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

@@ -161,6 +161,13 @@ def submit_session_code(
     total = len(results)
     all_passed = passed_count == total
 
+    # Track every graded attempt so readiness counts tried-but-unsolved problems
+    # too (a completed problem alone would always read as 100).
+    data["submissions"] = int(data.get("submissions") or 0) + 1
+    data["best_pass_pct"] = max(int(data.get("best_pass_pct") or 0), round(100 * passed_count / total))
+    session.data = json.dumps(data)
+    db.commit()
+
     if all_passed and session.status != "completed":
         session.status = "completed"
         session.score = 100

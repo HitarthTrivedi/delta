@@ -64,9 +64,22 @@ def _next_client():
 # and org-level (extra keys do NOT stack), so we round-robin the two "quality"
 # models to combine their independent daily buckets. On ANY Groq failure — rate
 # limit, drained bucket, missing key or package — the caller transparently falls
-# back to gemma via the Google path below, so chat never hard-fails.
+# back to Gemini via the Google path below, so chat never hard-fails.
 _groq_client = None
 _groq_initialised = False
+
+
+def _gemini_model() -> str:
+    """The configured Gemini model (GEMINI_MODEL): used when no model is given or Groq fails."""
+    from app.config import settings
+    return settings.GEMINI_MODEL
+
+
+def _backup_model() -> str:
+    """Fallback Gemini model when the main one is overloaded (GEMINI_BACKUP_MODEL)."""
+    from app.config import settings
+    return settings.GEMINI_BACKUP_MODEL
+
 
 GROQ_MODELS = {
     "openai/gpt-oss-120b",
@@ -116,15 +129,15 @@ def _get_groq():
             _groq_client = Groq(api_key=key, timeout=60.0)
             logger.info("Groq client initialised")
         else:
-            logger.warning("No GROQ_API_KEY set — Groq models fall back to gemma")
+            logger.warning("No GROQ_API_KEY set — Groq models fall back to Gemini")
     except Exception as e:
-        logger.warning(f"Failed to init Groq client (falling back to gemma): {e}")
+        logger.warning(f"Failed to init Groq client (falling back to Gemini): {e}")
     return _groq_client
 
 
 def _groq_generate(prompt: str, temperature: float, max_tokens: int, model: str) -> str | None:
     """One-shot Groq completion. Returns text, None if Groq is unconfigured, or
-    raises on an API error so the caller can fall back to gemma."""
+    raises on an API error so the caller can fall back to Gemini."""
     client = _get_groq()
     if client is None:
         return None
@@ -139,7 +152,7 @@ def _groq_generate(prompt: str, temperature: float, max_tokens: int, model: str)
 
 def _groq_stream(prompt: str, temperature: float, max_tokens: int, model: str):
     """Stream a Groq completion as text chunks. Raises if Groq is unconfigured or
-    errors before output, so the caller can fall back to gemma streaming."""
+    errors before output, so the caller can fall back to Gemini streaming."""
     client = _get_groq()
     if client is None:
         raise RuntimeError("Groq client unavailable")
@@ -166,15 +179,11 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
     """
     _build_clients()
     if not model:
-        try:
-            from app.config import settings
-            model = settings.GEMINI_MODEL or "gemma-4-31b-it"
-        except Exception:
-            model = "gemma-4-31b-it"
+        model = _gemini_model()
 
     logger.info(f"[LLM] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
 
-    # Groq path — fast LPU inference. On any failure, fall back to gemma below.
+    # Groq path — fast LPU inference. On any failure, fall back to Gemini below.
     # When Groq is simply unconfigured, fall through quietly (it warns once at init).
     if model in GROQ_MODELS:
         if _get_groq() is not None:
@@ -183,10 +192,10 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
                 if text:
                     logger.info(f"[LLM] groq success | {model} | response_len={len(text)}")
                     return text
-                logger.warning(f"[LLM] groq {model} returned empty — falling back to gemma")
+                logger.warning(f"[LLM] groq {model} returned empty — falling back to Gemini")
             except Exception as e:
-                logger.warning(f"[LLM] groq {model} failed ({type(e).__name__}: {str(e)[:120]}) — falling back to gemma")
-        model = "gemma-4-31b-it"
+                logger.warning(f"[LLM] groq {model} failed ({type(e).__name__}: {str(e)[:120]}) — falling back to Gemini")
+        model = _gemini_model()
 
     if not _clients:
         logger.warning("No API clients available — using mock fallback")
@@ -222,6 +231,12 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
             raise ValueError("The tasks are not being loaded right now. Can you please try again some time later?")
 
     if last_error:
+        # One retry on a backup model when the primary is overloaded (503) or
+        # rate-limited — with a single key there's no other way to recover.
+        backup = _backup_model()
+        if backup and model != backup:
+            logger.warning(f"[LLM] {model} unavailable ({str(last_error)[:80]}) — retrying once on {backup}")
+            return generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=backup)
         logger.error(f"[LLM] All {len(_clients)} keys exhausted. Last error: {last_error}")
         raise ValueError("All API quota limits reached. Please try again in a few minutes.")
 
@@ -237,15 +252,11 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
     """
     _build_clients()
     if not model:
-        try:
-            from app.config import settings
-            model = settings.GEMINI_MODEL or "gemma-4-31b-it"
-        except Exception:
-            model = "gemma-4-31b-it"
+        model = _gemini_model()
 
     logger.info(f"[LLM stream] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
 
-    # Groq streaming path. On failure before any output, fall back to gemma below.
+    # Groq streaming path. On failure before any output, fall back to Gemini below.
     # When Groq is simply unconfigured, fall through quietly (it warns once at init).
     if model in GROQ_MODELS:
         if _get_groq() is not None:
@@ -256,13 +267,13 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
                     yield piece
                 if got:
                     return
-                logger.warning(f"[LLM stream] groq {model} empty — falling back to gemma")
+                logger.warning(f"[LLM stream] groq {model} empty — falling back to Gemini")
             except Exception as e:
                 if got:
                     logger.error(f"[LLM stream] groq error after partial output: {e}")
                     return
-                logger.warning(f"[LLM stream] groq {model} failed ({type(e).__name__}) — falling back to gemma")
-        model = "gemma-4-31b-it"
+                logger.warning(f"[LLM stream] groq {model} failed ({type(e).__name__}) — falling back to Gemini")
+        model = _gemini_model()
 
     if not _clients:
         yield _mock_structured_response(prompt)

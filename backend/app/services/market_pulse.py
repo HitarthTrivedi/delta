@@ -36,22 +36,25 @@ SKILL_ALIASES = {
 }
 
 
-def _market_snapshot_key(target_role: str = "AI Developer / Software Engineer") -> str:
-    return str(target_role).strip().lower()
+def _market_snapshot_key(target_role: str | None = None) -> str:
+    return str(target_role or "entry-level professional").strip().lower()
 
 
 @cached("market_snapshot", ttl=43200, key_fn=_market_snapshot_key)  # 12h — role-scoped, not per-user
-def get_market_snapshot(target_role: str = "AI Developer / Software Engineer") -> dict:
-    """Return current market demand signals for a target role from public sources."""
+def get_market_snapshot(target_role: str | None = None) -> dict:
+    """Return current market demand signals for a target role from public sources.
+    GitHub / StackOverflow signals are only used for tech fields."""
+    target_role = target_role or "Entry-level professional"
     domain_pack = infer_domain_pack(target_role)
     taxonomy = domain_pack["skill_taxonomy"]
+    tech = domain_pack.get("is_tech", False)
 
     # These five sources are independent — fan them out concurrently instead of
     # blocking on each in turn (was ~30-50s sequential, now ~max single source).
     fetched = run_parallel(
         {
-            "github": lambda: _fetch_github_signals(target_role, taxonomy),
-            "stackexchange": lambda: _fetch_stackexchange_signals(taxonomy),
+            "github": lambda: _fetch_github_signals(target_role, taxonomy) if tech else [],
+            "stackexchange": lambda: _fetch_stackexchange_signals(taxonomy) if tech else [],
             "jobs": lambda: _fetch_job_signals(target_role),
             "search": lambda: _fetch_search_market_snapshot(target_role, taxonomy),
             "opportunities": lambda: collect_opportunities(taxonomy[:5], target_role),
@@ -74,7 +77,7 @@ def get_market_snapshot(target_role: str = "AI Developer / Software Engineer") -
     emerging = _derive_emerging_skills(source_documents, top_demanded, domain_pack["skill_taxonomy"])
     emerging = _merge_unique(emerging, search_snapshot.get("emerging_skills", []))[:6]
     recruiter_language = _merge_unique(_extract_recruiter_phrases(source_documents), search_snapshot.get("recruiter_signals", []))[:6]
-    project_patterns = _merge_unique(_derive_project_patterns(target_role, top_demanded), search_snapshot.get("project_patterns", []))[:6]
+    project_patterns = _merge_unique(_derive_project_patterns(target_role, top_demanded, domain_pack), search_snapshot.get("project_patterns", []))[:6]
     certifications = _merge_unique(_derive_certifications(top_demanded, domain_pack["certifications"]), search_snapshot.get("certification_signals", []))[:5]
     market_warnings = _merge_unique(_derive_market_warnings(source_documents, top_demanded), search_snapshot.get("market_warnings", []))[:5]
 
@@ -254,11 +257,13 @@ def _extract_recruiter_phrases(documents: list[dict]) -> list[str]:
             cleaned = match.strip(" .,:;").lower()
             if 8 <= len(cleaned) <= 80 and cleaned not in phrases:
                 phrases.append(cleaned)
-    return phrases[:6] or ["hands-on proof", "deployment-ready projects", "clear technical ownership"]
+    return phrases[:6] or ["hands-on proof", "practical, real-world experience", "clear ownership of your work"]
 
 
-def _derive_project_patterns(target_role: str, skills: list[str]) -> list[str]:
+def _derive_project_patterns(target_role: str, skills: list[str], pack: dict | None = None) -> list[str]:
     primary = skills[:4]
+    if pack and not pack.get("is_tech"):
+        return [*pack["starter_projects"][:3], "One real-world problem write-up explaining trade-offs and what you learned"]
     if any(skill in primary for skill in ["LLMs", "RAG Pipelines", "Vector Databases", "AI Agents"]):
         return [
             "RAG assistant with citations, evaluation set, and deployment logs",

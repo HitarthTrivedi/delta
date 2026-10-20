@@ -1,3 +1,13 @@
+import sys
+
+# Windows consoles default to cp1252, so any print() containing emoji raised
+# UnicodeEncodeError mid-request (e.g. roadmap generation failed with a 404).
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -11,7 +21,7 @@ from app.limiter import limiter
 from app.config import settings
 from app.database import engine, Base
 from app.models import *  # noqa: F401,F403 — ensures all models register with Base
-from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders, achievements, opportunities, sandbox_coding, sandbox_interview
+from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders, achievements, opportunities, sandbox_coding, sandbox_interview, sandbox_theory, privacy, recruiter, school, sandbox_report
 
 # Global rate limiter imported from app.limiter (avoids circular imports)
 
@@ -99,6 +109,11 @@ app.include_router(achievements.router)
 app.include_router(opportunities.router)
 app.include_router(sandbox_coding.router)
 app.include_router(sandbox_interview.router)
+app.include_router(sandbox_theory.router)
+app.include_router(privacy.router)
+app.include_router(recruiter.router)
+app.include_router(school.router)
+app.include_router(sandbox_report.router)
 
 
 @app.on_event("startup")

@@ -1,6 +1,6 @@
-"""Seed the guest user with sample data for development."""
+"""Seed the guest user with sample data. LOCAL DEVELOPMENT ONLY."""
 import uuid, json, datetime, sys, os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.database import SessionLocal, engine, Base
 from app.models import User, SkillNode, DeltaScore, WeeklyBrief, Recommendation, MarketSnapshot

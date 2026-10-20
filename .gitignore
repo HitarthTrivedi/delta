@@ -46,3 +46,10 @@ data/
 # npm lockfile (project uses yarn)
 package-lock.json
 
+
+# Business documents (pricing, pitch, funding) live outside the repo
+*pitch*.md
+*INVESTOR*
+pitch-deck*
+*.docx
+business/

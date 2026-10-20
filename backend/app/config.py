@@ -46,7 +46,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY_3: str = os.getenv("GEMINI_API_KEY_3", "")
     GEMINI_API_KEY_4: str = os.getenv("GEMINI_API_KEY_4", "")
     GEMINI_API_KEY_5: str = os.getenv("GEMINI_API_KEY_5", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # Used once when GEMINI_MODEL is overloaded or rate-limited. Empty = no retry.
+    GEMINI_BACKUP_MODEL: str = os.getenv("GEMINI_BACKUP_MODEL", "gemini-2.5-flash-lite")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     # JDoodle — code execution for the Coding Sandbox (free tier: 200 runs/day).
@@ -59,6 +61,10 @@ class Settings(BaseSettings):
     # MUST stay false in production — a verified Supabase JWT is then required.
     ALLOW_HEADER_AUTH: bool = parse_bool_env("ALLOW_HEADER_AUTH", False)
     ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
+    # Comma-separated emails allowed to approve/reject recruiter accounts.
+    ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
+    # Comma-separated emails (e.g. teachers) allowed to review/approve School lessons. Admins can too.
+    CONTENT_REVIEWER_EMAILS: str = os.getenv("CONTENT_REVIEWER_EMAILS", "")
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "5") or "5")
     MAX_TEXT_CHARS: int = int(os.getenv("MAX_TEXT_CHARS", "60000") or "60000")
     ENABLE_DOCS: bool = parse_bool_env("ENABLE_DOCS", False)
@@ -76,7 +82,6 @@ class Settings(BaseSettings):
         return parse_csv_env("CORS_ORIGINS", [
             "http://localhost:3000",
             "http://127.0.0.1:3000",
-            "https://delta-kappa-pink.vercel.app",
         ])
     OPPORTUNITY_SOURCE_MODE: str = os.getenv("OPPORTUNITY_SOURCE_MODE", "mock")
     LEETCODE_SOURCE_MODE: str = os.getenv("LEETCODE_SOURCE_MODE", "")
@@ -96,7 +101,7 @@ class Settings(BaseSettings):
     GMAIL_FROM_EMAIL: str = os.getenv("GMAIL_FROM_EMAIL", "")
     GMAIL_FROM_NAME: str = os.getenv("GMAIL_FROM_NAME", "Delta by Alpha.Kore")
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
-    BREVO_FROM_EMAIL: str = os.getenv("BREVO_FROM_EMAIL", "alpha.kore25@gmail.com")
+    BREVO_FROM_EMAIL: str = os.getenv("BREVO_FROM_EMAIL", "")
     BREVO_FROM_NAME: str = os.getenv("BREVO_FROM_NAME", "Delta by Alpha.Kore")
     REMINDER_SECRET: str = os.getenv("REMINDER_SECRET", "")
     # Daily reminders. On a host that sleeps when idle, the sweep is triggered by
@@ -106,7 +111,7 @@ class Settings(BaseSettings):
     REMINDER_TIMEZONE: str = os.getenv("REMINDER_TIMEZONE", "Asia/Kolkata")
     REMINDER_HOUR_LOCAL: int = int(os.getenv("REMINDER_HOUR_LOCAL", "9"))
     REMINDER_CHECK_INTERVAL_SECONDS: int = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "900"))
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://delta-ai.vercel.app")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     class Config:
         env_file = ".env"
