@@ -49,7 +49,25 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     # Used once when GEMINI_MODEL is overloaded or rate-limited. Empty = no retry.
     GEMINI_BACKUP_MODEL: str = os.getenv("GEMINI_BACKUP_MODEL", "gemini-2.5-flash-lite")
+    # Cheap, fast model for chatty, latency-sensitive calls (e.g. interview turns).
+    # GEMINI_MODEL stays the default for work where quality shows (reports, tests).
+    GEMINI_LITE_MODEL: str = os.getenv("GEMINI_LITE_MODEL", "gemini-2.5-flash-lite")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    # Google Cloud Text-to-Speech: the 3D interviewer's voice + lip-sync timings.
+    # Without a key the interview uses the browser voice and the 2D avatar.
+    GOOGLE_TTS_API_KEY: str = os.getenv("GOOGLE_TTS_API_KEY", "")
+    # Allowed interviewer voices (comma-separated); the first is the default.
+    # Must support SSML <mark> (Standard, WaveNet or Neural2) for lip-sync timing.
+    INTERVIEW_TTS_VOICES: str = os.getenv("INTERVIEW_TTS_VOICES", "en-IN-Neural2-A,en-IN-Neural2-D")
+    # Local testing only: turns off weekly pacing guards and allows the offline
+    # mock AI replies when no Gemini key is set. Never set on a deployed host.
+    DEV_MODE: bool = parse_bool_env("DEV_MODE", False)
+    # Error reporting (Sentry). Empty = disabled. No personal data is sent.
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    # Postgres connection pool per process (Supabase limits total connections).
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5") or "5")
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "5") or "5")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     # JDoodle — code execution for the Coding Sandbox (free tier: 200 runs/day).
     # Get credentials at jdoodle.com/compiler-api. Without them, the sandbox's

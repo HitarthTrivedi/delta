@@ -245,7 +245,10 @@ export const sandboxInterviewAPI = {
   // opts: { role_type, target_role, difficulty, num_questions }
   start: (userId, opts) => api.post(`/sandbox/interview/${userId}/start`, opts, { timeout: 60000 }).then(r => r.data),
   respond: (userId, sessionId, answer) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/respond`, { answer }, { timeout: 60000 }).then(r => r.data),
-  finish: (userId, sessionId) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/finish`, {}, { timeout: 60000 }).then(r => r.data),
+  // The report is one long LLM call on the backend (up to 120s + one retry): don't give up first.
+  finish: (userId, sessionId) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/finish`, {}, { timeout: 150000 }).then(r => r.data),
+  avatar: (userId) => api.get(`/sandbox/interview/${userId}/avatar`).then(r => r.data),
+  tts: (userId, text, voice) => api.post(`/sandbox/interview/${userId}/tts`, { text, voice }, { timeout: 20000 }).then(r => r.data),
   getSessions: (userId) => api.get(`/sandbox/interview/${userId}/sessions`).then(r => r.data),
   getSession: (userId, sessionId) => api.get(`/sandbox/interview/${userId}/sessions/${sessionId}`).then(r => r.data),
 };

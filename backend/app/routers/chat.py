@@ -40,7 +40,7 @@ from app.services.agent2_memory import (
     upsert_upcoming_event,
 )
 from app.limiter import limiter
-from app.dependencies.auth import require_owner, verify_resource_owner
+from app.dependencies.auth import current_identity, require_owner, verify_resource_owner
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -1568,7 +1568,8 @@ def chat_history(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
 
 
 @router.post("/onboarding/start", response_model=OnboardingStartResponse)
-def onboarding_start(data: OnboardingStartRequest):
+@limiter.limit("10/minute")
+def onboarding_start(request: Request, data: OnboardingStartRequest, _=Depends(current_identity)):
     res = start_onboarding(data.raw_input, data.target_role)
     return OnboardingStartResponse(
         ambition_summary=res.get("ambition_summary", "Aspirations loaded."),
@@ -1579,7 +1580,15 @@ def onboarding_start(data: OnboardingStartRequest):
 
 
 @router.post("/onboarding/finalize", response_model=OnboardingFinalizeResponse)
-def onboarding_finalize(data: OnboardingFinalizeRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def onboarding_finalize(
+    request: Request,
+    data: OnboardingFinalizeRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
+    verify_resource_owner(data.user_id, x_user_id=x_user_id, authorization=authorization)
     user = db.query(User).filter(User.id == data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

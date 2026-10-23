@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from app.config import settings as config
 from app.services.ai_service import generate_response, generate_json
 from app.services.profile_store import profile_as_compact_context, load_profile
 from app.services.domain_packs import resolve_field, get_domain_pack
@@ -66,8 +67,11 @@ def normalize_settings(role_type: str, target_role: str | None, difficulty: str 
         n = DEFAULT_QUESTIONS
     target = (target_role or "").strip()[:120] or profile.get("target_role") or profile.get("goal_direction") or ""
     pack = resolve_field({**profile, "target_role": target or profile.get("target_role")})
+    if role_type not in ROLE_TYPE_LABELS or (role_type == "system_design" and not pack["is_tech"]):
+        # System design is a software/data round; other fields get role knowledge.
+        role_type = "technical"
     return {
-        "role_type": role_type if role_type in ROLE_TYPE_LABELS else "technical",
+        "role_type": role_type,
         "target_role": target or "their target role",
         "difficulty": difficulty if difficulty in DIFFICULTY_LABELS else "entry",
         "num_questions": max(MIN_QUESTIONS, min(MAX_QUESTIONS, n)),
@@ -114,10 +118,10 @@ def generate_opening_question(user_id: str, settings: dict) -> str:
 This is the FIRST question. Greet the candidate in one short sentence (you are Aria), then ask an appropriate opening question for this interview type. Return ONLY what you would say, no labels, no quotes."""
     fallback = f"Hi, I'm Aria, and I'll be your interviewer today. To start, tell me about yourself and what draws you to the {settings['target_role']} role."
     try:
-        # Gemini 2.5 models spend output tokens on hidden thinking before the
-        # visible answer, so a short question still needs a generous
-        # max_tokens budget — too small silently yields empty text.
-        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000))
+        # Turns use the lite model: the candidate waits on every one, and a short
+        # spoken question doesn't need the bigger model. max_tokens stays generous
+        # in case GEMINI_LITE_MODEL is set to a model that thinks before answering.
+        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000, model=config.GEMINI_LITE_MODEL))
         if not question or _is_mock_fallback(question):
             return fallback
         return question
@@ -142,7 +146,7 @@ def generate_next_question(user_id: str, settings: dict, transcript: list[dict],
 This is question {question_count + 1} of {total}{" (the LAST one)" if last else ""}. React to the candidate's last answer in at most one short sentence (genuine, not gushing), then ask the next question: either a natural follow-up probing deeper, or a new relevant area if the topic is exhausted. Return ONLY what you would say, no labels, no quotes."""
     fallback = "Can you walk me through your reasoning on that, with a concrete example?"
     try:
-        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000))
+        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000, model=config.GEMINI_LITE_MODEL))
         if not question or _is_mock_fallback(question):
             return {"question": fallback, "done": False}
         return {"question": question, "done": False}

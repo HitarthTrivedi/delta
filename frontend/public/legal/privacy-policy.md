@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated:** 4 October 2026 · **Policy version:** 2026-10-04
+**Last updated:** 23 October 2026 · **Policy version:** 2026-10-23
 
 This Privacy Policy explains how Delta collects, uses, shares and protects your personal data. It is written to comply with India's **Digital Personal Data Protection Act, 2023** (the "DPDP Act") and the rules made under it, and, where applicable, the Information Technology Act, 2000.
 
@@ -92,6 +92,8 @@ We process your data **only with your consent**, for these specific purposes:
 
 To answer you, Delta sends the relevant parts of your profile, messages, test answers or résumé text to an AI model hosted by **Google (Gemini API)** or **Groq**, and shows you the result. Code you run in the coding sandbox is sent to **JDoodle** to execute.
 
+**AI mock interview.** The interviewer's questions are spoken aloud. To give the interviewer its voice and lip movement, the question text (never your answers, voice or video) is sent to **Google Cloud Text-to-Speech**. Your camera view is shown only to you, on your own screen: we never record, upload or receive your video. Your spoken answers are turned into text by **your browser's** speech recognition. In Chrome and Edge, the browser maker (Google or Microsoft) processes that audio to produce the text, under its own terms; Delta receives only the text. If you prefer, you can type your answers instead.
+
 AI output can be wrong. Check anything important (deadlines, eligibility, salaries) against official sources. Practice scores are an indicator for your own preparation, **not a certification**.
 
 ---
@@ -122,14 +124,17 @@ We share data only with the providers needed to run Delta. They may use it only 
 
 | Provider | Purpose | Data involved |
 |---|---|---|
-| **Supabase** | Sign-in and database | Account and all stored app data |
+| **Supabase** (Mumbai, India) | Sign-in and database | Account and all stored app data |
 | **Google (Gemini API)** | AI generation | Profile context, messages, test/interview content, résumé text |
 | **Groq** | AI generation | Same as above, for requests routed to Groq-hosted models |
+| **Google (Cloud Text-to-Speech)** | The AI interviewer's voice | The interviewer's question text only |
 | **JDoodle** | Running code in the coding sandbox | The code you submit and its input |
 | **Google (Gmail API)** / **Brevo** | Sending reminder emails | Your email address and task titles |
 | **Tavily / Serper** | Web search for market and role information | Search terms about roles and skills (no account data) |
-| **Vercel** | Website hosting | Standard web request logs |
+| **Cloudflare** / **Vercel** | Website hosting | Standard web request logs |
 | **Railway** | Backend hosting | Data passing through our API; server logs |
+| **Cloudflare (R2)** | Encrypted off-site database backups | All stored app data, encrypted before upload so Cloudflare cannot read it |
+| **Sentry** | Error reports, so we can fix crashes | Technical details of the error and the page or API address involved (which can include your account ID); no names, emails, passwords or answers |
 
 **Children's data is never sent to any AI provider.** School lessons are written in advance and reviewed by a person, so nothing about a child is needed to show them.
 
@@ -168,6 +173,7 @@ Under the DPDP Act, anyone **under 18** is a child.
 
 - We keep your data **while your account is active**.
 - When you **delete your account** (which also withdraws your consent), we erase your personal data **immediately** from our database. Copies in our providers' backups expire on their normal cycles.
+- **Backups.** We take an encrypted backup of the database every night and keep each one for **30 days**, after which it is deleted automatically. So data you delete disappears from every backup within 30 days. Backups are used only to recover from data loss.
 - We keep a **minimal consent record** (account ID, what was consented to or withdrawn, policy version, date) after deletion. It contains no name or email, and is kept as proof of consent as the law requires.
 - Security and access logs are kept for as long as applicable law requires.
 - Aggregated or de-identified data that can no longer identify you may be kept.
@@ -180,6 +186,7 @@ Under the DPDP Act, anyone **under 18** is a child.
 - Ownership checks so no user can read another's data.
 - Manual verification before any recruiter gets access.
 - Encryption in transit (HTTPS).
+- Nightly backups, encrypted before they leave our systems.
 - Rate limiting.
 - Access to production data limited to the Operator.
 

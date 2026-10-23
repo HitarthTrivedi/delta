@@ -14,6 +14,7 @@ const panelStyle = {
 };
 const muted = 'rgba(255,255,255,0.5)';
 
+const LAST_TEST_KEY = 'delta_theory_last';
 const QUESTION_COUNTS = [5, 10, 15];
 const DIFFICULTIES = [{ key: 'easy', label: 'Easy' }, { key: 'medium', label: 'Medium' }, { key: 'hard', label: 'Hard' }];
 const APTITUDE_AREAS = [
@@ -110,13 +111,15 @@ export default function TheorySandbox() {
     return () => clearInterval(t);
   }, [stage]);
 
-  const startTest = async () => {
+  const startTest = async (override) => {
+    const opts = override || {
+      topic: category === 'technical' ? topic.trim() || null : null,
+      num_questions: numQuestions, difficulty, category, area: category === 'aptitude' ? area : null, timed,
+    };
     setStarting(true);
     try {
-      const data = await sandboxTheoryAPI.start(userId, {
-        topic: category === 'technical' ? topic.trim() || null : null,
-        num_questions: numQuestions, difficulty, category, area: category === 'aptitude' ? area : null, timed,
-      });
+      const data = await sandboxTheoryAPI.start(userId, opts);
+      try { localStorage.setItem(LAST_TEST_KEY, JSON.stringify(opts)); } catch { /* ignore */ }
       setSessionId(data.session_id);
       setTestTopic(data.topic);
       setQuestions(data.questions || []);
@@ -131,6 +134,20 @@ export default function TheorySandbox() {
       setStarting(false);
     }
   };
+
+  // One-click start from the Test Center (?quick=1): last settings, or a
+  // 10-question test on the user's target role.
+  const startRef = useRef(startTest);
+  startRef.current = startTest;
+  const quickStartedRef = useRef(false);
+  useEffect(() => {
+    if (!userId || params.get('quick') !== '1' || quickStartedRef.current) return;
+    quickStartedRef.current = true;
+    setParams({}, { replace: true });
+    let last = null;
+    try { last = JSON.parse(localStorage.getItem(LAST_TEST_KEY)); } catch { /* ignore */ }
+    startRef.current(last || { topic: null, num_questions: 10, difficulty: 'medium', category: 'technical', area: null, timed: true });
+  }, [userId, params, setParams]);
 
   const openPast = async (id) => {
     try {
@@ -248,7 +265,7 @@ export default function TheorySandbox() {
               </label>
 
               <button
-                onClick={startTest}
+                onClick={() => startTest()}
                 disabled={starting}
                 style={{
                   width: '100%', background: '#fff', color: '#000', border: 'none', borderRadius: 8,

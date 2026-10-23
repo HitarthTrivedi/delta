@@ -63,6 +63,8 @@ const Showcase = () => {
                     <img
                       src={feature.image}
                       alt={feature.label}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-auto block"
                     />
                   </div>

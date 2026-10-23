@@ -276,7 +276,7 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
         model = _gemini_model()
 
     if not _clients:
-        yield _mock_structured_response(prompt)
+        yield _stream_fallback(prompt)
         return
 
     last_error = None
@@ -317,7 +317,16 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
     try:
         yield generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=model)
     except Exception:
-        yield _mock_structured_response(prompt)
+        yield _stream_fallback(prompt)
+
+
+def _stream_fallback(prompt: str) -> str:
+    """Last resort for the stream, which must never raise: the dev mock locally,
+    otherwise an honest 'unavailable' message shown as the reply."""
+    try:
+        return _mock_structured_response(prompt)
+    except ValueError as exc:
+        return str(exc)
 
 
 _LATEX_ARROWS = {
@@ -363,9 +372,14 @@ def generate_json(prompt: str, temperature: float = 0.3, model: str | None = Non
         return {}
 
 
-# ─── Mock fallback (used when all keys are missing or exhausted) ──────────────
+# ─── Mock fallback (local development only) ──────────────────────────────────
 
 def _mock_structured_response(prompt: str) -> str:
+    # Canned replies are for offline local testing. Anywhere else, fail honestly
+    # instead of showing users made-up content dressed up as AI output.
+    from app.config import settings
+    if not settings.DEV_MODE:
+        raise ValueError("AI is not available right now. Please try again in a few minutes.")
     prompt_lower = prompt.lower()
 
     if "agent 2 weekly plan discussion" in prompt_lower or "you are agent 2 inside delta career os" in prompt_lower:

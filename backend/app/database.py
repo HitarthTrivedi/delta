@@ -7,18 +7,21 @@ if database_url.startswith("sqlite+aiosqlite://"):
     database_url = database_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
 
 is_sqlite = database_url.startswith("sqlite")
-connect_args = {"check_same_thread": False} if is_sqlite else {}
+# Postgres (psycopg 3): no server-side prepared statements, which break behind
+# Supabase's transaction-mode pooler (port 6543). Harmless on direct/session connections.
+connect_args = {"check_same_thread": False} if is_sqlite else {"prepare_threshold": None}
 
-# pool_pre_ping drops dead connections before use. For server databases
-# (Postgres on Render) size the pool so concurrent requests don't queue;
-# SQLite ignores pool sizing (single file connection).
+# pool_pre_ping drops dead connections before use. For Postgres the pool size
+# comes from config: Supabase caps total connections per project, so keep
+# (pool_size + max_overflow) x processes under that cap. SQLite ignores pool
+# sizing (single file connection).
 engine_kwargs = {
     "connect_args": connect_args,
     "echo": settings.SQL_ECHO,
     "pool_pre_ping": True,
 }
 if not is_sqlite:
-    engine_kwargs.update(pool_size=10, max_overflow=20, pool_recycle=1800)
+    engine_kwargs.update(pool_size=settings.DB_POOL_SIZE, max_overflow=settings.DB_MAX_OVERFLOW, pool_recycle=1800)
 
 engine = create_engine(database_url, **engine_kwargs)
 

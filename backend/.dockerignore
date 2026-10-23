@@ -1,0 +1,18 @@
+# Keep secrets, local data and dev-only files out of the production image.
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+data/
+scratch_test_models.py
+test_keys.py
+cleanup_db.py
+add_missing_columns.py
+requirements-dev.txt
