@@ -1,2 +1,4 @@
 # Shell scripts must keep LF endings or bash on Linux fails to run them.
 *.sh text eol=lf
+# 3D models are binary: never convert line endings.
+*.glb binary
