@@ -21,6 +21,14 @@ function readPref() {
   try { return localStorage.getItem(PREF_KEY); } catch { return null; }
 }
 
+/** The voice the user picked for the interviewer (or the best available one). */
+export function preferredVoice() {
+  if (!SUPPORTED) return null;
+  const list = window.speechSynthesis.getVoices().filter((v) => rankVoice(v) >= 0);
+  list.sort((a, b) => rankVoice(b) - rankVoice(a));
+  return list.find((v) => v.voiceURI === readPref()) || list[0] || null;
+}
+
 // Chrome stops long utterances after ~15 s, so speak sentence by sentence.
 function splitSentences(text) {
   const parts = (text || '').match(/[^.!?]+[.!?]*\s*/g) || [];

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ThumbsUp, TrendingUp, Volume2, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
+import { preferredVoice } from '../../hooks/useInterviewerVoice';
 
 const panel = { background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
 const muted = 'rgba(255,255,255,0.55)';
@@ -16,7 +17,10 @@ const DIFFICULTY = { entry: 'Entry level', intermediate: 'Intermediate', advance
 function speakOnce(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  const u = new SpeechSynthesisUtterance(text);
+  const voice = preferredVoice(); // same voice the user chose for the interviewer
+  if (voice) { u.voice = voice; u.lang = voice.lang; }
+  window.speechSynthesis.speak(u);
 }
 
 /** Pair each interviewer question with the candidate's next answer. */

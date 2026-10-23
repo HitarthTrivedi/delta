@@ -4,7 +4,6 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-route
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { ThemeProvider, useTheme } from "next-themes";
-import { Loader2 } from "lucide-react";
 
 // Landing components
 import Header from "./components/Header";
@@ -63,6 +62,7 @@ const SchoolReview = lazy(() => import("./pages/school/SchoolReview"));
 import { useUserWithSkills } from "./hooks/useUser";
 import { useAuthStore } from "./store/authStore";
 import ConsentGate from "./components/ConsentGate";
+import PageLoader from "./components/PageLoader";
 import { getChildMode } from "./lib/childMode";
 
 // Initialize Query Client for caching.
@@ -129,23 +129,7 @@ function RequireAuth({ children }) {
   const loading = useAuthStore((state) => state.loading);
 
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'var(--bone)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#fff',
-        fontFamily: "'Inter', sans-serif"
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Loader2 style={{ animation: 'spin 1s linear infinite', color: '#fff' }} size={24} />
-          <span style={{ color: 'var(--ink-soft)', fontSize: '0.85rem' }}>Authenticating session...</span>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!userId) {
@@ -170,23 +154,7 @@ function ProtectedRoute({ children }) {
   const { data: user, isLoading } = useUserWithSkills(userId);
 
   if (isLoading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'var(--bone)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#fff',
-        fontFamily: "'Inter', sans-serif"
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Loader2 style={{ animation: 'spin 1s linear infinite', color: '#fff' }} size={24} />
-          <span style={{ color: 'var(--ink-soft)', fontSize: '0.85rem' }}>Loading profile status...</span>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   const isComplete = user?.onboarding_complete || (user?.onboarding_percentage && user.onboarding_percentage >= 100);
@@ -202,20 +170,12 @@ function AppContent() {
   const loading = useAuthStore((state) => state.loading);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-bone flex flex-col items-center justify-center text-ink">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (
     <LayoutWrapper>
-      <Suspense fallback={
-        <div className="min-h-screen bg-bone flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-        </div>
-      }>
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<AboutPage />} />

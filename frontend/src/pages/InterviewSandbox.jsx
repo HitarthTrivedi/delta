@@ -1,18 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Mic, MicOff, Video, VideoOff, Volume2, VolumeX, Captions, CaptionsOff, Send, Loader2,
   PhoneOff, ArrowRight, RotateCcw, LayoutDashboard, Keyboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { sandboxInterviewAPI, sandboxReportAPI } from '../lib/api';
+import { sandboxInterviewAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { useUserWithSkills } from '../hooks/useUser';
+import { useSandboxReport } from '../hooks/useSandboxReport';
 import useInterviewerVoice from '../hooks/useInterviewerVoice';
 import useAnswerMic from '../hooks/useAnswerMic';
 import useWebcam from '../hooks/useWebcam';
 import InterviewerAvatar from '../components/interview/InterviewerAvatar';
 import InterviewReport from '../components/interview/InterviewReport';
+
+// three.js + the 3D model only load when the 3D interviewer is actually used.
+const Avatar3D = lazy(() => import('../components/interview/Avatar3D'));
 
 const panel = { background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 };
 const muted = 'rgba(255,255,255,0.5)';
@@ -40,7 +44,35 @@ const DIFFICULTIES = [
 ];
 const QUESTION_COUNTS = [3, 5, 8];
 const ACKS = ['Thanks.', 'Got it.', 'Okay, thank you.', 'Alright.', 'Thanks for that.'];
-const STATE_LABEL = { speaking: 'Speaking…', listening: 'Listening…', thinking: 'Thinking…', finishing: 'Preparing your report…', idle: 'Ready' };
+const STATE_LABEL = { joining: 'Joining…', speaking: 'Speaking…', listening: 'Listening…', thinking: 'Thinking…', finishing: 'Preparing your report…', idle: 'Ready' };
+
+const LAST_SETTINGS_KEY = 'delta_interview_last';
+
+function hasWebGL2() {
+  try {
+    return !!(window.WebGL2RenderingContext && document.createElement('canvas').getContext('webgl2'));
+  } catch {
+    return false;
+  }
+}
+
+// One AudioContext for every 3D avatar instance. Browsers only let audio play
+// after a click, so the page resumes it from click handlers ("Join", "Hear Aria").
+let sharedAudioCtx;
+function audioContext() {
+  if (sharedAudioCtx === undefined) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    sharedAudioCtx = AC ? new AC() : null;
+  }
+  return sharedAudioCtx;
+}
+function unlockAudio() {
+  audioContext()?.resume?.().catch(() => {});
+}
+
+function readLastSettings() {
+  try { return JSON.parse(localStorage.getItem(LAST_SETTINGS_KEY)) || null; } catch { return null; }
+}
 
 function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -73,15 +105,27 @@ export default function InterviewSandbox() {
   const userId = useAuthStore((state) => state.userId);
   const { data: user } = useUserWithSkills(userId);
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
 
   const voice = useInterviewerVoice();
   const cam = useWebcam();
 
+  // ── interviewer engine: 3D lip-synced avatar when the backend has a TTS key
+  // and the browser has WebGL2; otherwise (or after any 3D failure) the 2D Aria
+  // with the browser's own voice.
+  const avatarRef = useRef(null);
+  const [avatarCfg, setAvatarCfg] = useState(null);
+  const [avatar3d, setAvatar3d] = useState('off'); // off | on | failed
+  const [speaking3d, setSpeaking3d] = useState(false);
+  const use3d = avatar3d === 'on';
+  const use3dRef = useRef(false);
+  use3dRef.current = use3d;
+
   // ── setup
   const [stage, setStage] = useState('setup'); // setup | call | report
   const [roleType, setRoleType] = useState(ROLE_TYPE_KEYS.includes(params.get('type')) ? params.get('type') : 'technical');
-  const [field, setField] = useState(null);
+  const { data: sandboxReport } = useSandboxReport(userId);
+  const field = useMemo(() => (sandboxReport ? { id: sandboxReport.field, label: sandboxReport.field_label } : null), [sandboxReport]);
   const roleTypes = useMemo(() => buildRoleTypes(field), [field]);
   const [targetRole, setTargetRole] = useState('');
   const [difficulty, setDifficulty] = useState('entry');
@@ -107,6 +151,8 @@ export default function InterviewSandbox() {
 
   const submitRef = useRef(null);
   const activeRef = useRef(false);
+  const submittingRef = useRef(false); // blocks a second send while one is in flight
+  const quickStartedRef = useRef(false);
   const mic = useAnswerMic({
     silenceMs: 3000,
     onSilence: autoSend ? (text) => submitRef.current?.(text) : undefined,
@@ -119,7 +165,10 @@ export default function InterviewSandbox() {
 
   useEffect(() => {
     if (!userId) return;
-    sandboxReportAPI.get(userId).then((r) => setField({ id: r.field, label: r.field_label })).catch(() => {});
+    sandboxInterviewAPI.avatar(userId).then((cfg) => {
+      setAvatarCfg(cfg);
+      if (cfg?.tts && hasWebGL2()) setAvatar3d((s) => (s === 'off' ? 'on' : s));
+    }).catch(() => {});
   }, [userId]);
 
   // Live transcript flows into the answer box while the mic is on.
@@ -137,48 +186,99 @@ export default function InterviewSandbox() {
   // Leaving the page ends speech, mic and camera.
   useEffect(() => () => { activeRef.current = false; }, []);
 
+  /** Speak as the interviewer (3D voice when available, else the browser's). */
+  const say = useCallback(async (text) => {
+    if (use3dRef.current && avatarRef.current) {
+      setSpeaking3d(true);
+      try {
+        await avatarRef.current.whenReady(6000);
+        await avatarRef.current.speak(text);
+        return;
+      } catch {
+        setAvatar3d('failed'); // the rest of this visit uses the 2D interviewer
+      } finally {
+        setSpeaking3d(false);
+      }
+    }
+    await voice.speak(text);
+  }, [voice]);
+
+  const hush = useCallback(() => {
+    avatarRef.current?.stop();
+    voice.cancel();
+  }, [voice]);
+
   const askQuestion = useCallback(async (text) => {
     setQuestion(text);
     setAnswer('');
     setPhase('speaking');
-    if (!mutedVoice) await voice.speak(text);
+    if (!mutedVoice) await say(text);
     else await new Promise((r) => setTimeout(r, 400));
     if (!activeRef.current) return;
+    submittingRef.current = false;
     setPhase('listening');
     if (voiceMode) mic.start('');
-  }, [mutedVoice, voice, voiceMode, mic]);
+  }, [mutedVoice, say, voiceMode, mic]);
 
-  const startInterview = async () => {
+  const startInterview = useCallback(async (override) => {
+    const opts = override || { role_type: roleType, target_role: targetRole, difficulty, num_questions: numQuestions };
+    unlockAudio();
     setStarting(true);
+    // Join the call right away: the 3D interviewer loads while the first question is written.
+    activeRef.current = true;
+    submittingRef.current = false;
+    setStage('call');
+    setPhase('joining');
+    setQuestion('');
+    setAnswer('');
+    setTotal(opts.num_questions || numQuestions);
+    setQNum(1);
+    setAnswered(0);
+    setElapsed(0);
+    setReport(null);
+    if (wantCamera) cam.start();
     try {
-      const data = await sandboxInterviewAPI.start(userId, {
-        role_type: roleType, target_role: targetRole, difficulty, num_questions: numQuestions,
-      });
-      activeRef.current = true;
+      const data = await sandboxInterviewAPI.start(userId, opts);
+      if (!activeRef.current) return; // left while joining
+      try { localStorage.setItem(LAST_SETTINGS_KEY, JSON.stringify(opts)); } catch { /* ignore */ }
       setSessionId(data.session_id);
       setQNum(data.question_number || 1);
-      setTotal(data.total_questions || numQuestions);
-      setAnswered(0);
-      setElapsed(0);
-      setReport(null);
-      setStage('call');
-      if (wantCamera) cam.start();
+      setTotal(data.total_questions || opts.num_questions || numQuestions);
       askQuestion(data.question);
     } catch (err) {
+      activeRef.current = false;
+      cam.stop();
+      setStage('setup');
       toast.error(err?.response?.data?.detail || 'Could not start the interview. Try again.');
     } finally {
       setStarting(false);
     }
-  };
+  }, [roleType, targetRole, difficulty, numQuestions, wantCamera, cam, userId, askQuestion]);
+
+  // One-click start from the Test Center (?quick=1): last settings, or sensible defaults.
+  useEffect(() => {
+    if (!userId || params.get('quick') !== '1' || quickStartedRef.current) return;
+    quickStartedRef.current = true;
+    setParams({}, { replace: true });
+    const last = readLastSettings();
+    const type = ROLE_TYPE_KEYS.includes(params.get('type')) ? params.get('type') : null;
+    const opts = last || { role_type: 'technical', target_role: '', difficulty: 'entry', num_questions: 5 };
+    if (type) opts.role_type = type;
+    setRoleType(opts.role_type);
+    if (opts.target_role) setTargetRole(opts.target_role);
+    setDifficulty(opts.difficulty || 'entry');
+    setNumQuestions(opts.num_questions || 5);
+    startInterview(opts);
+  }, [userId, params, setParams, startInterview]);
 
   const finish = useCallback(async () => {
     mic.stop();
     setPhase('finishing');
-    if (!mutedVoice) voice.speak("Thank you, that's the end of our interview. Give me a moment to put together your feedback.");
+    if (!mutedVoice) say("Thank you, that's the end of our interview. Give me a moment to put together your feedback.");
     try {
       const data = await sandboxInterviewAPI.finish(userId, sessionId);
       activeRef.current = false;
-      voice.cancel();
+      hush();
       cam.stop();
       setReport({ feedback: data.feedback, transcript: data.transcript, settings: data.settings });
       setStage('report');
@@ -186,15 +286,17 @@ export default function InterviewSandbox() {
       setPhase('finish_error');
       toast.error(err?.response?.data?.detail || 'Could not generate your report. Try again.');
     }
-  }, [mic, mutedVoice, voice, userId, sessionId, cam]);
+  }, [mic, mutedVoice, say, hush, userId, sessionId, cam]);
 
   const submitAnswer = useCallback(async (raw) => {
     const text = (raw ?? answer).trim();
-    if (!text || phase !== 'listening') return;
+    // The auto-send timer and the Send button can fire together; only the first counts.
+    if (!text || phase !== 'listening' || submittingRef.current) return;
+    submittingRef.current = true;
     mic.stop();
     setPhase('thinking');
     setAnswer(text);
-    if (!mutedVoice) voice.speak(ACKS[Math.floor(Math.random() * ACKS.length)]);
+    if (!mutedVoice) say(ACKS[Math.floor(Math.random() * ACKS.length)]);
     try {
       const data = await sandboxInterviewAPI.respond(userId, sessionId, text);
       setAnswered((n) => n + 1);
@@ -207,9 +309,10 @@ export default function InterviewSandbox() {
       }
     } catch (err) {
       toast.error('Could not send your answer. Try again.');
+      submittingRef.current = false;
       setPhase('listening');
     }
-  }, [answer, phase, mic, mutedVoice, voice, userId, sessionId, finish, askQuestion]);
+  }, [answer, phase, mic, mutedVoice, say, userId, sessionId, finish, askQuestion]);
   submitRef.current = submitAnswer;
 
   const endCall = () => {
@@ -220,7 +323,7 @@ export default function InterviewSandbox() {
       return;
     }
     activeRef.current = false;
-    voice.cancel();
+    hush();
     mic.stop();
     cam.stop();
     setStage('setup');
@@ -233,9 +336,26 @@ export default function InterviewSandbox() {
 
   const toggleCamera = () => (cam.on ? cam.stop() : cam.start());
 
-  const avatarState = phase === 'speaking' || voice.speaking ? 'speaking'
+  const avatarState = phase === 'speaking' || voice.speaking || speaking3d ? 'speaking'
     : phase === 'listening' ? 'listening'
       : phase === 'thinking' || phase === 'finishing' ? 'thinking' : 'idle';
+
+  useEffect(() => { avatarRef.current?.setState(avatarState); }, [avatarState]);
+
+  // The interviewer's face: 3D when available, with the 2D Aria shown while it
+  // loads and used instead if it fails.
+  const renderInterviewer = (svg) => (use3d ? (
+    <Suspense fallback={svg}>
+      <Avatar3D
+        ref={avatarRef}
+        userId={userId}
+        voice={avatarCfg?.voice}
+        audioCtx={audioContext()}
+        fallback={svg}
+        onError={() => setAvatar3d('failed')}
+      />
+    </Suspense>
+  ) : svg);
 
   // ─────────────────────────────── Setup ───────────────────────────────
   if (stage === 'setup') {
@@ -249,18 +369,18 @@ export default function InterviewSandbox() {
               Aria, your AI interviewer, asks questions out loud on a video call, follows up on what you say, and scores you like a hiring panel would.
               Answer by speaking or typing.
             </p>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <InterviewerAvatar state={voice.speaking ? 'speaking' : 'idle'} getLevel={voice.getLevel} size={220} />
+            <div style={{ position: 'relative', height: 280, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: use3d ? 'radial-gradient(circle at 50% 40%, #191726 0%, #050505 75%)' : 'transparent' }}>
+              {renderInterviewer(<InterviewerAvatar state={voice.speaking ? 'speaking' : 'idle'} getLevel={voice.getLevel} size={220} />)}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
               <button
-                onClick={() => voice.speak(`Hi${user?.name ? ` ${user.name.split(' ')[0]}` : ''}, I'm Aria. I'll be interviewing you today. Ready when you are.`)}
-                disabled={!voice.supported}
+                onClick={() => { unlockAudio(); say(`Hi${user?.name ? ` ${user.name.split(' ')[0]}` : ''}, I'm Aria. I'll be interviewing you today. Ready when you are.`); }}
+                disabled={!use3d && !voice.supported}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 14px', color: '#fff', fontSize: 13, cursor: 'pointer' }}
               >
                 <Volume2 size={14} /> Hear Aria
               </button>
-              {voice.voices.length > 1 && (
+              {!use3d && voice.voices.length > 1 && (
                 <select
                   value={voice.voice?.voiceURI || ''}
                   onChange={(e) => voice.setVoiceURI(e.target.value)}
@@ -336,7 +456,7 @@ export default function InterviewSandbox() {
             </div>
 
             <button
-              onClick={startInterview}
+              onClick={() => startInterview()}
               disabled={starting}
               style={{
                 width: '100%', background: '#fff', color: '#000', border: 'none', borderRadius: 8, padding: 14,
@@ -396,7 +516,7 @@ export default function InterviewSandbox() {
         {/* video tiles */}
         <div className="iv-tiles">
           <section style={{ ...panel, minHeight: 380, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 40%, #191726 0%, #050505 75%)' }}>
-            <InterviewerAvatar state={avatarState} getLevel={voice.getLevel} size={250} />
+            {renderInterviewer(<InterviewerAvatar state={avatarState} getLevel={voice.getLevel} size={250} />)}
             <span style={{ position: 'absolute', top: 14, left: 14, fontSize: 12, fontWeight: 700, background: 'rgba(0,0,0,0.55)', padding: '5px 10px', borderRadius: 6 }}>
               Aria · AI Interviewer
             </span>
@@ -442,7 +562,7 @@ export default function InterviewSandbox() {
             <>
               <label htmlFor="iv-answer" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: muted, marginBottom: 8, gap: 10, flexWrap: 'wrap' }}>
                 <span>
-                  {phase === 'speaking' ? 'Aria is asking…' : phase === 'thinking' ? 'Aria is thinking about your answer…'
+                  {phase === 'joining' ? 'Aria is joining the call…' : phase === 'speaking' ? 'Aria is asking…' : phase === 'thinking' ? 'Aria is thinking about your answer…'
                     : mic.listening ? 'Listening. Speak your answer (you can also edit the text).' : 'Type your answer, or press the mic to speak.'}
                 </span>
                 {mic.silenceLeft != null && autoSend && <span style={{ color: '#4ade80' }}>Sending in {mic.silenceLeft}s… keep talking to continue</span>}
@@ -475,7 +595,7 @@ export default function InterviewSandbox() {
                 )}
                 {!voiceMode && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: muted, fontSize: 12.5 }}><Keyboard size={14} /> Typing mode</span>}
                 <IconToggle on={captions} onClick={() => setCaptions((v) => !v)} onIcon={Captions} offIcon={CaptionsOff} label="Captions" />
-                <IconToggle on={!mutedVoice} onClick={() => { if (!mutedVoice) voice.cancel(); setMutedVoice((v) => !v); }} onIcon={Volume2} offIcon={VolumeX} label="Interviewer voice" />
+                <IconToggle on={!mutedVoice} onClick={() => { if (!mutedVoice) hush(); setMutedVoice((v) => !v); }} onIcon={Volume2} offIcon={VolumeX} label="Interviewer voice" />
                 <IconToggle on={cam.on} onClick={toggleCamera} onIcon={Video} offIcon={VideoOff} label="Camera" />
                 <div style={{ flex: 1 }} />
                 <button

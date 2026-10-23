@@ -414,9 +414,10 @@ export default function Onboarding() {
       if (reviewMode) {
         await ingestionAPI.forceComplete(userId);
         setReviewMode(false);
-        queryClient.invalidateQueries({ queryKey: ['user', userId] });
-        queryClient.invalidateQueries({ queryKey: ['user-with-skills', userId] });
       }
+      // Wait for the fresh "onboarding complete" flag before leaving: the route
+      // guard reads the cached user and would otherwise bounce back here.
+      await queryClient.refetchQueries({ queryKey: ['user', userId] });
       navigate('/roadmap?from=intake');
     } catch (e) {
       console.error(e);
@@ -711,7 +712,6 @@ export default function Onboarding() {
                       try {
                         await ingestionAPI.resetProfile(userId);
                         queryClient.invalidateQueries({ queryKey: ['user', userId] });
-                        queryClient.invalidateQueries({ queryKey: ['user-with-skills', userId] });
                         window.location.reload();
                       } catch (e) {
                         console.error('Reset error:', e);
