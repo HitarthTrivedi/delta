@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -24,9 +24,8 @@ from app.services.resume_service import (
     serialize_resume,
     suggestions_are_due,
 )
-from typing import Optional
-from fastapi import Header
 from app.dependencies.auth import require_owner, verify_resource_owner
+from app.limiter import limiter
 
 logger = logging.getLogger("delta.resume")
 router = APIRouter(prefix="/api/resume", tags=["resume"])
@@ -74,15 +73,20 @@ def generate_resume(user_id: str, db: Session = Depends(get_db), _: str = Depend
 # ── POST /api/resume/{user_id}/upload ────────────────────────────────────────
 
 @router.post("/{user_id}/upload")
-async def upload_resume(
+@limiter.limit("10/minute")
+def upload_resume(
+    request: Request,
     user_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _: str = Depends(require_owner),
 ):
-    """Upload an existing PDF or DOCX resume; parse, structure and store it."""
+    """Upload an existing PDF or DOCX resume; parse, structure and store it.
+
+    A plain `def` on purpose: parsing calls the LLM synchronously, and FastAPI runs
+    sync handlers in its threadpool so one upload can't block the event loop."""
     max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
-    content = await file.read(max_bytes + 1)
+    content = file.file.read(max_bytes + 1)
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_MB} MB.")
     filename = file.filename or "resume.pdf"
@@ -243,30 +247,3 @@ def ats_optimize(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
     except Exception as exc:
         logger.error("ats_optimize failed for %s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"ATS optimization failed: {exc}") from exc
-
-
-# ── Legacy upload endpoint (keep for backward compat) ────────────────────────
-
-@router.post("/upload")
-async def upload_resume_legacy(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    x_user_id: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None),
-):
-    if not x_user_id and not authorization:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-    max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
-    content = await file.read(max_bytes + 1)
-    if len(content) > max_bytes:
-        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_MB} MB.")
-    filename = file.filename or "resume.pdf"
-    parsed = parse_resume(content, filename)
-    return {
-        "filename": filename,
-        "size": len(content),
-        "parsed_skills": parsed["parsed_skills"],
-        "parsed_experience": f"{parsed['experience_years']} years",
-        "education": parsed["education"],
-        "status": parsed["status"],
-    }

@@ -57,15 +57,13 @@ def update_skill(
     data: SkillUpdate,
     db: Session = Depends(get_db),
     x_user_id: Annotated[str | None, Header()] = None,
+    authorization: Annotated[str | None, Header()] = None,
 ):
     skill = db.query(SkillNode).filter(SkillNode.id == skill_id).first()
     if not skill:
         raise HTTPException(status_code=404, detail="Skill not found")
-    # Ownership check — caller must own the skill
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="Missing X-User-Id header. Authentication required.")
-    if skill.user_id != x_user_id:
-        raise HTTPException(status_code=403, detail="Forbidden: you can only update your own skills.")
+    # Ownership check — caller must own the skill (verified JWT)
+    verify_resource_owner(skill.user_id, x_user_id=x_user_id, authorization=authorization)
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(skill, key, value)
     if data.evidence_type:
@@ -82,15 +80,13 @@ def verify_skill(
     data: SkillVerify,
     db: Session = Depends(get_db),
     x_user_id: Annotated[str | None, Header()] = None,
+    authorization: Annotated[str | None, Header()] = None,
 ):
     skill = db.query(SkillNode).filter(SkillNode.id == skill_id).first()
     if not skill:
         raise HTTPException(status_code=404, detail="Skill not found")
-    # Ownership check
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="Missing X-User-Id header. Authentication required.")
-    if skill.user_id != x_user_id:
-        raise HTTPException(status_code=403, detail="Forbidden: you can only verify your own skills.")
+    # Ownership check — caller must own the skill (verified JWT)
+    verify_resource_owner(skill.user_id, x_user_id=x_user_id, authorization=authorization)
     skill.evidence_type = data.evidence_type
     skill.evidence_url = data.evidence_url
     skill.evidence_weight = EVIDENCE_WEIGHTS.get(data.evidence_type, 0.4)

@@ -1,28 +1,179 @@
-fastapi==0.110.1
-uvicorn==0.25.0
-sqlalchemy>=2.0.0
-alembic>=1.13.0
-python-dotenv>=1.0.1
-pydantic>=2.6.4
-email-validator>=2.2.0
-python-multipart>=0.0.9
-requests>=2.31.0
-google-genai>=0.1.1
-groq>=0.11.0  # fast LPU inference for latency-sensitive chat/intake paths
-pytest>=8.0.0
-aiofiles>=23.2.0
-networkx>=3.2.0
-numpy>=1.26.0
-tavily-python>=0.5.0
-pydantic-settings>=2.2.0
-python-docx>=1.1.0
-pypdf>=4.0.0
-slowapi>=0.1.9
-PyJWT>=2.8.0
-cryptography>=42.0.0  # required by PyJWT to verify Supabase ES256 (asymmetric) JWTs
-psycopg2-binary>=2.9.0  # PostgreSQL driver for production (Render)
-redis>=5.0.0  # shared cache for market/search/embedding results
-cachetools>=5.3.0  # in-process TTL fallback when Redis is unavailable
-resend>=2.0.0     # transactional email via HTTPS (replaces SMTP which Railway blocks)
-tzdata>=2024.1    # IANA tz db for zoneinfo — python:3.11-slim ships without it,
-                  # so reminder "9am local" would silently fall back to UTC
+alembic==1.20.0
+    # via -r requirements.in
+annotated-doc==0.0.5
+    # via fastapi
+annotated-types==0.8.0
+    # via pydantic
+anyio==4.15.1
+    # via
+    #   google-genai
+    #   groq
+    #   httpx
+    #   starlette
+async-timeout==5.0.1
+    # via redis
+cachetools==7.2.1
+    # via -r requirements.in
+certifi==2026.7.22
+    # via
+    #   httpcore
+    #   httpx
+    #   requests
+    #   sentry-sdk
+cffi==2.1.1
+    # via cryptography
+charset-normalizer==3.5.2
+    # via requests
+click==8.5.0
+    # via uvicorn
+cryptography==50.0.2
+    # via
+    #   google-auth
+    #   pyjwt
+deprecated==1.3.1
+    # via limits
+distro==1.9.0
+    # via
+    #   google-genai
+    #   groq
+dnspython==2.9.0
+    # via email-validator
+email-validator==2.3.0
+    # via -r requirements.in
+fastapi==0.143.0
+    # via
+    #   -r requirements.in
+    #   sentry-sdk
+google-auth==2.61.0
+    # via google-genai
+google-genai==2.29.0
+    # via -r requirements.in
+groq==1.7.0
+    # via -r requirements.in
+h11==0.16.0
+    # via
+    #   httpcore
+    #   uvicorn
+httpcore==1.0.9
+    # via httpx
+httpx==0.28.1
+    # via
+    #   google-genai
+    #   groq
+    #   tavily-python
+idna==3.20
+    # via
+    #   anyio
+    #   email-validator
+    #   httpx
+    #   requests
+limits==5.8.0
+    # via slowapi
+lxml==6.1.3
+    # via python-docx
+mako==1.4.3
+    # via alembic
+markupsafe==3.0.4
+    # via mako
+networkx==3.6.1
+    # via -r requirements.in
+numpy==2.4.6
+    # via -r requirements.in
+opentelemetry-api==1.45.1
+    # via fastapi
+packaging==26.3
+    # via limits
+psycopg2-binary==2.9.13
+    # via -r requirements.in
+pyasn1==0.6.4
+    # via pyasn1-modules
+pyasn1-modules==0.4.2
+    # via google-auth
+pycparser==3.11
+    # via cffi
+pydantic==2.14.0
+    # via
+    #   -r requirements.in
+    #   fastapi
+    #   google-genai
+    #   groq
+    #   pydantic-settings
+pydantic-core==2.50.0
+    # via pydantic
+pydantic-settings==2.15.0
+    # via -r requirements.in
+pyjwt==2.15.1
+    # via -r requirements.in
+pypdf==6.20.0
+    # via -r requirements.in
+python-docx==1.2.0
+    # via -r requirements.in
+python-dotenv==1.2.4
+    # via
+    #   -r requirements.in
+    #   pydantic-settings
+python-multipart==0.0.32
+    # via -r requirements.in
+redis==8.1.0
+    # via -r requirements.in
+regex==2026.9.29
+    # via tiktoken
+requests==2.34.2
+    # via
+    #   -r requirements.in
+    #   google-auth
+    #   google-genai
+    #   tavily-python
+    #   tiktoken
+sentry-sdk==2.71.0
+    # via -r requirements.in
+slowapi==0.1.10
+    # via -r requirements.in
+sniffio==1.3.1
+    # via
+    #   google-genai
+    #   groq
+sqlalchemy==2.1.4
+    # via
+    #   -r requirements.in
+    #   alembic
+starlette==1.7.0
+    # via fastapi
+tavily-python==0.8.5
+    # via -r requirements.in
+tenacity==9.1.4
+    # via google-genai
+tiktoken==0.14.0
+    # via tavily-python
+typing-extensions==4.16.0
+    # via
+    #   alembic
+    #   anyio
+    #   fastapi
+    #   google-genai
+    #   groq
+    #   limits
+    #   opentelemetry-api
+    #   pydantic
+    #   pydantic-core
+    #   python-docx
+    #   sqlalchemy
+    #   starlette
+    #   typing-inspection
+typing-inspection==0.4.4
+    # via
+    #   fastapi
+    #   pydantic
+    #   pydantic-settings
+tzdata==2026.5
+    # via -r requirements.in
+urllib3==2.8.0
+    # via
+    #   requests
+    #   sentry-sdk
+uvicorn==0.54.0
+    # via -r requirements.in
+websockets==16.1.1
+    # via google-genai
+wrapt==2.5.0
+    # via deprecated
