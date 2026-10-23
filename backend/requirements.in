@@ -1,6 +1,9 @@
 # Top-level runtime dependencies. requirements.txt is generated from this file:
 #   uv pip compile requirements.in -o requirements.txt --exclude-newer <date ~2 weeks ago>
 # Pin by regenerating, never by hand-editing requirements.txt.
+# Security fixes may be newer than the cutoff: bump only that package with
+#   uv pip compile requirements.in -o requirements.txt --upgrade-package <name>
+# and check with `pip-audit -r requirements.txt` (CI runs it too).
 fastapi
 uvicorn
 sqlalchemy>=2.0
