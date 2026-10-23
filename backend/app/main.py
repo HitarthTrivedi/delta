@@ -25,6 +25,18 @@ from app.routers import users, skills, briefs, chat, resume, calendar, dossier, 
 
 # Global rate limiter imported from app.limiter (avoids circular imports)
 
+# Without this, every delta.* INFO log is dropped and only warnings reach the host's logs.
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    # Errors only (no performance tracing), and no request bodies, cookies,
+    # headers or IPs: user data stays out of the error tracker.
+    sentry_sdk.init(dsn=settings.SENTRY_DSN, send_default_pii=False, traces_sample_rate=0)
+
 app = FastAPI(
     title="delta 2.0 API",
     description="Career Intelligence Platform — AI-driven skill tracking & market alignment",
@@ -80,6 +92,13 @@ async def _http_exception_handler(request: Request, exc: StarletteHTTPException)
         logging.getLogger("delta").error("5xx at %s: %s", request.url.path, exc.detail)
         return JSONResponse(status_code=exc.status_code, content={"detail": "Internal server error. Please try again."})
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=getattr(exc, "headers", None))
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    # Anything not already turned into an HTTP error: log the full traceback
+    # (Sentry picks it up too) and give the client a plain, leak-free 500.
+    logging.getLogger("delta").error("Unhandled error at %s", request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error. Please try again."})
 
 # Compress large JSON payloads (career context, market snapshots) over the wire.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -205,4 +224,13 @@ def root():
 
 @app.api_route("/health", methods=["GET", "HEAD"])
 def health():
+    # Uptime monitors hit this, so it checks the database too: an API that
+    # can't reach its DB is down for users even if the process is alive.
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        logging.getLogger("delta").error("health check: database unreachable: %s", exc)
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "database": "unreachable"})
     return {"status": "healthy"}

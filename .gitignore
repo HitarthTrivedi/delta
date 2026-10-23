@@ -37,7 +37,7 @@ Thumbs.db
 .emergent/
 memory/
 test_reports/
-tests/
+/tests/
 test_result.md
 
 # Local User Data
@@ -53,3 +53,6 @@ package-lock.json
 pitch-deck*
 *.docx
 business/
+
+# Claude Code worktrees
+.claude/worktrees/
