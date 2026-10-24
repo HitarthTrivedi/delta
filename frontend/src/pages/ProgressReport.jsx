@@ -268,7 +268,7 @@ export default function ProgressReport() {
                 </div>
               ) : (
                 <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55 }}>
-                  No tasks saved for this week yet. Ask Agent 2 for your weekly plan and they will show up here.
+                  No tasks saved for this week yet. Ask Aria for your weekly plan and the tasks will show up here.
                 </p>
               )}
             </section>

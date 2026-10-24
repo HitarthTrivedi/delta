@@ -73,7 +73,7 @@ export default function PracticeHub() {
   if (error || !report) {
     return (
       <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
         <header style={{ marginBottom: 8 }}>
           <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>Test Center</p>
           <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, margin: 0 }}>Practice, at your own pace.</h1>
@@ -99,7 +99,7 @@ export default function PracticeHub() {
 
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
         <header style={{ marginBottom: 8 }}>
           <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>Test Center</p>
           <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, margin: 0 }}>Practice, at your own pace.</h1>
@@ -269,7 +269,7 @@ export default function PracticeHub() {
         {report.recent.length > 0 && (
           <section style={{ ...panelStyle, padding: 20 }}>
             <h2 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>Recent sessions</h2>
-            <div style={{ display: 'grid' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)' }}>
               {report.recent.map((s) => {
                 const link = s.type === 'interview' ? `/practice/interview/report/${s.id}` : null;
                 return (

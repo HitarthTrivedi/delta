@@ -182,7 +182,7 @@ export default function Today() {
 
   return (
     <main className="min-h-screen bg-bone px-4 pb-16 pt-20 sm:pt-24">
-      <div className="mx-auto grid max-w-3xl gap-4">
+      <div className="mx-auto grid max-w-3xl grid-cols-1 gap-4">
         {/* Aria + greeting */}
         <section className="flex items-center gap-4">
           <div className="shrink-0"><InterviewerAvatar state="idle" size={76} getLevel={() => 0} /></div>

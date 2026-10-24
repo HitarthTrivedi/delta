@@ -194,7 +194,7 @@ export default function TheorySandbox() {
                 Check what you actually know.
               </h1>
               <p style={{ margin: '14px 0 0', color: muted, fontSize: 15, lineHeight: 1.55 }}>
-                Timed, placement-style tests with a per-skill breakdown and an explanation for every answer.
+                Placement-style tests at your own pace, with a per-skill breakdown and an explanation for every answer.
               </p>
             </header>
 

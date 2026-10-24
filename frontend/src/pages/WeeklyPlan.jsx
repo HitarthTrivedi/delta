@@ -1705,7 +1705,7 @@ export default function WeeklyPlan() {
           grid-template-areas: "aside center bside";
         }
         .wp-center { grid-area: center; display: grid; gap: 20px; min-width: 0; }
-        .wp-aside { grid-area: aside; display: grid; gap: 20px; min-width: 0; align-content: start; }
+        .wp-aside { grid-area: aside; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; align-content: start; }
         .wp-bside { grid-area: bside; display: grid; gap: 20px; min-width: 0; align-content: start; }
         @media (max-width: 1180px) {
           .wp-main {
