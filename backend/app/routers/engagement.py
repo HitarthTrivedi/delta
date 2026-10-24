@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.auth import require_owner
+from app.dependencies.auth import current_identity, require_owner
 from app.limiter import limiter
-from app.services import engagement
+from app.services import compliance, engagement
 
 router = APIRouter(prefix="/api/engagement", tags=["engagement"])
 
@@ -22,6 +22,15 @@ class SettingsPayload(BaseModel):
 
 class BreakPayload(BaseModel):
     days: int = Field(ge=1, le=engagement.BREAK_DAYS_PER_MONTH)
+
+
+@router.get("/admin/metrics")
+def admin_metrics(db: Session = Depends(get_db), identity=Depends(current_identity)):
+    """Retention dashboard numbers (aggregates only), for ADMIN_EMAILS."""
+    if not compliance.is_admin(identity[1]):
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    from app.services.engagement_metrics import retention_metrics
+    return retention_metrics(db)
 
 
 @router.get("/{user_id}")

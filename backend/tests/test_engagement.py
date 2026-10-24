@@ -196,6 +196,30 @@ def test_levels_and_settings_api(monkeypatch):
     assert client.get("/api/engagement/s10", headers={"X-User-Id": "someone-else"}).status_code == 403
 
 
+def test_retention_metrics_are_aggregate_and_admin_only(monkeypatch):
+    from app.models import DailyActivity
+    from app.services.engagement_metrics import retention_metrics
+    db = SessionLocal()
+    signup = datetime.datetime(2026, 9, 7, 10, 0)  # a Monday
+    plan = (("m1", [1, 8]), ("m2", [1]), ("m3", []))
+    for uid, _ in plan:
+        db.add(User(id=uid, name=uid, created_at=signup))
+    db.commit()  # users first: Postgres enforces the daily_activity -> users foreign key
+    for uid, active_days in plan:
+        for k in active_days:
+            db.add(DailyActivity(user_id=uid, local_date=signup.date() + datetime.timedelta(days=k), xp=10, actions=1,
+                                 goal_met=False, freeze_used=False, on_break=False))
+    db.commit()
+    m = retention_metrics(db, today=datetime.date(2026, 10, 20), weeks=8)
+    db.close()
+    week = next(c for c in m["cohorts"] if c["week_of"] == "2026-09-07")
+    assert week["signups"] == 3 and week["day_1"] == 66.7 and week["week_2"] == 33.3 and week["month_1"] == 0.0
+    assert "m1" not in json.dumps(m)  # aggregates only
+    h = _user("not-admin")
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "boss@delta.test")
+    assert client.get("/api/engagement/admin/metrics", headers=h).status_code == 403
+
+
 def test_account_erasure_removes_habit_data(monkeypatch):
     import app.services.compliance as comp
     from app.models import DailyActivity, UserEngagement

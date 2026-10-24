@@ -22,7 +22,7 @@ from app.services.reminder_service import _supabase_base_url
 
 logger = logging.getLogger("delta.compliance")
 
-POLICY_VERSION = "2026-10-23"
+POLICY_VERSION = "2026-10-24"
 
 TERMS = "terms_privacy"
 RECRUITER_VISIBILITY = "recruiter_visibility"

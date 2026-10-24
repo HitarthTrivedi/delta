@@ -56,7 +56,12 @@ Do these in order. Each step lists the values to copy into the next.
 4. GitHub repo → **Settings → Secrets and variables → Actions**, add: `BACKUP_DATABASE_URL`, `AGE_RECIPIENT` (the `age1…` public key), `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
 5. **Actions → Database backup → Run workflow**. Check the run is green and the file appears in the bucket. Then do one restore drill (section 5.3).
 
-### 2.6 Monitoring
+### 2.6 Study reminders (email + browser push)
+1. Email reminders use the Gmail/Brevo settings you already have. Set `EMAIL_LINK_SECRET` (a long random string) so every reminder carries a one-click unsubscribe link.
+2. Browser push: run `python -m app.services.push_service` once (from `backend/`) and copy the printed `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` into Railway, plus `VAPID_SUBJECT=mailto:<a monitored inbox>`. Keep the private key secret; changing it later invalidates every browser subscription.
+3. Reminders are opt-in: learners switch them on from Today or Privacy settings. Each learner gets at most one a day, at their own study time (default `REMINDER_HOUR_LOCAL`, 19:00), only if they haven't studied that day, with automatic backoff when ignored.
+
+### 2.7 Monitoring
 1. Sentry: create a project (platform: FastAPI) and copy its DSN into `SENTRY_DSN` on Railway. Turn on email alerts for new issues.
 2. UptimeRobot: an HTTP monitor on `https://<api>/health` every 5 minutes, alerting your email. `/health` checks the database, so it also catches a paused or unreachable Supabase.
 
@@ -74,7 +79,8 @@ Full list with comments: `backend/.env.example`. The production essentials:
 | `GOOGLE_TTS_API_KEY`, `INTERVIEW_TTS_VOICES` | Interviewer voice (optional) |
 | `ADMIN_EMAILS`, `CONTENT_REVIEWER_EMAILS` | Comma-separated |
 | `JDOODLE_CLIENT_ID`, `JDOODLE_CLIENT_SECRET` | Coding sandbox |
-| `GMAIL_*` or `BREVO_*`, `REMINDER_SECRET` | Reminders |
+| `GMAIL_*` or `BREVO_*`, `REMINDER_SECRET`, `EMAIL_LINK_SECRET` | Reminder emails + unsubscribe links |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Browser push reminders (optional) |
 | `SENTRY_DSN` | Error reports |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 5 / 5 (fine for one replica) |
 | **Must be unset or false** | `ALLOW_HEADER_AUTH`, `DEV_MODE`, `ENABLE_DOCS` |
@@ -119,7 +125,18 @@ Restore the latest backup into a scratch Postgres (a free Supabase project or a 
 | A migration failed on deploy | The old version keeps running. Fix the migration in a new commit; never edit a migration that already ran in production |
 | Suspected data breach | Follow Privacy Policy section 12: contain it, record what happened, and inform affected users and the Data Protection Board without delay (DPDP Rules: within 72 hours). Rotate every key in section 3 |
 
-## 7. Limits to watch
+## 7. Retention numbers
+
+`GET /api/engagement/admin/metrics` (signed in with an `ADMIN_EMAILS` address) returns aggregates from our own tables:
+- return rates by signup week (day 1, week 2, month 1);
+- DAU, WAU, MAU and DAU/WAU;
+- the share of weekly-active learners on a 7+ day streak;
+- Quick 5 completions;
+- reminder opt-ins, opt-outs, and how often a nudge is followed by studying within a day.
+
+Watch opt-outs: a rising opt-out rate means reminders are too frequent or too pushy.
+
+## 8. Limits to watch
 
 - JDoodle free tier: 200 code runs/day. Above that, self-host Judge0 (Master Plan section 7).
 - Gemini: per-key rate limits; rotation across up to 5 keys.
