@@ -9,7 +9,8 @@ import { sandboxInterviewAPI } from '../../lib/api';
 // assets in a business suit (see tools/avatar/), Meshopt-compressed to ~2.3 MB.
 // Voice + word timings come from our backend (Google Cloud TTS); TalkingHead turns
 // the words into mouth shapes (visemes) in time with the audio.
-const AVATAR_URL = '/avatars/interviewer.glb';
+// Browsers cache /avatars/* for 30 days: bump ?v= whenever the model file changes.
+const AVATAR_URL = '/avatars/interviewer.glb?v=2';
 
 function b64ToArrayBuffer(b64) {
   const bin = atob(b64);
