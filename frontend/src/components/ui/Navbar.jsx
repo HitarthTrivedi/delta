@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, Dumbbell, LogOut, Menu, X, Shield, School } from 'lucide-react';
+import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, Dumbbell, LogOut, Menu, X, Shield, School, Sun, ChevronDown } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { useEngagement } from '../../hooks/useEngagement';
+import { StreakFlame } from '../engage/EngageWidgets';
 import ThemeToggle from './ThemeToggle';
 
-const navItems = [
+// Four everyday destinations up front; the rest under "More".
+const primaryItems = [
   { label: 'Intake', path: '/intake', icon: ClipboardList },
-  { label: 'Roadmap', path: '/roadmap', icon: Map },
-  { label: 'Progress', path: '/progress-report', icon: BarChart3 },
-  { label: 'Opportunities', path: '/opportunities', icon: Briefcase },
+  { label: 'Today', path: '/today', icon: Sun },
   { label: 'Practice', path: '/practice', icon: Dumbbell },
-  { label: 'Trophies', path: '/achievements', icon: Trophy },
+  { label: 'My plan', path: '/roadmap', icon: Map },
+  { label: 'Progress', path: '/progress-report', icon: BarChart3 },
+];
+const moreItems = [
+  { label: 'Opportunities', path: '/opportunities', icon: Briefcase },
   { label: 'Resume', path: '/resume', icon: FileText },
-  { label: 'School', path: '/school', icon: School },
+  { label: 'Achievements', path: '/achievements', icon: Trophy },
+  { label: 'School (for parents)', path: '/school', icon: School },
 ];
 
 export default function Navbar({ user }) {
@@ -20,9 +26,13 @@ export default function Navbar({ user }) {
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const userId = useAuthStore((state) => state.userId);
   // Intake is a one-time step: once it's done, keep it out of the way.
   const onboarded = user?.onboarding_complete || (user?.onboarding_percentage && user.onboarding_percentage >= 100);
-  const items = onboarded ? navItems.filter((item) => item.path !== '/intake') : navItems;
+  const items = onboarded ? primaryItems.filter((item) => item.path !== '/intake') : primaryItems;
+  const allItems = [...items, ...moreItems];
+  const { data: habit } = useEngagement(onboarded ? userId : null);
 
   const handleLogout = async () => {
     try {
@@ -38,6 +48,7 @@ export default function Navbar({ user }) {
     (path === '/intake' && location.pathname === '/onboarding') ||
     (path === '/roadmap' && location.pathname === '/weekly-plan') ||
     (path === '/practice' && location.pathname.startsWith('/practice/')) ||
+    (path === '/today' && location.pathname.startsWith('/today/')) ||
     (path === '/school' && location.pathname.startsWith('/school/'));
 
   return (
@@ -46,7 +57,7 @@ export default function Navbar({ user }) {
         <div className="max-w-[1180px] mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
 
           {/* Logo */}
-          <Link to={user ? '/roadmap' : '/'} className="flex items-center gap-2 text-ink shrink-0 no-underline">
+          <Link to={user ? '/today' : '/'} className="flex items-center gap-2 text-ink shrink-0 no-underline">
             <span className="w-7 h-7 bg-paper border border-rule overflow-hidden flex items-center justify-center">
               <img src="/delta-bg.jpeg" alt="Delta" className="w-full h-full object-cover" />
             </span>
@@ -59,20 +70,44 @@ export default function Navbar({ user }) {
               <Link
                 key={path}
                 to={path}
-                className={`relative px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] flex items-center gap-1.5 transition-all duration-200 whitespace-nowrap border-b-2 no-underline ${
+                className={`relative px-3 py-2 text-sm font-medium flex items-center gap-1.5 transition-all duration-200 whitespace-nowrap border-b-2 no-underline ${
                   isActive(path)
-                    ? 'text-oxblood border-oxblood'
+                    ? 'text-ink border-ink'
                     : 'text-ink-soft hover:text-ink border-transparent'
                 }`}
               >
-                <Icon size={12} />
+                <Icon size={15} />
                 {label}
               </Link>
             ))}
+            <div className="relative" onMouseLeave={() => setMoreOpen(false)}>
+              <button
+                onClick={() => setMoreOpen((o) => !o)}
+                aria-expanded={moreOpen}
+                className={`px-3 py-2 text-sm font-medium flex items-center gap-1 border-b-2 ${moreItems.some((m) => isActive(m.path)) ? 'text-ink border-ink' : 'text-ink-soft hover:text-ink border-transparent'}`}
+              >
+                More <ChevronDown size={14} />
+              </button>
+              {moreOpen && (
+                <div className="absolute left-0 top-full z-50 min-w-[210px] rounded-xl border border-rule bg-paper py-1.5 shadow-lg">
+                  {moreItems.map(({ label, path, icon: Icon }) => (
+                    <Link key={path} to={path} onClick={() => setMoreOpen(false)}
+                      className={`flex items-center gap-2.5 px-4 py-2.5 text-sm no-underline ${isActive(path) ? 'text-ink bg-accent-surface' : 'text-ink-soft hover:text-ink hover:bg-accent-surface'}`}>
+                      <Icon size={15} /> {label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {habit && (
+              <Link to="/today" className="no-underline" aria-label={`${habit.streak}-day streak. Open Today`}>
+                <StreakFlame streak={habit.streak} done={habit.done_today} compact />
+              </Link>
+            )}
             {/* User info — hidden on very small screens */}
             <div className="hidden sm:block text-right">
               <p className="text-xs font-semibold text-ink truncate max-w-[120px]">
@@ -137,12 +172,12 @@ export default function Navbar({ user }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-3 flex flex-col gap-1">
-              {items.map(({ label, path, icon: Icon }) => (
+              {allItems.map(({ label, path, icon: Icon }) => (
                 <Link
                   key={path}
                   to={path}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3.5 font-mono text-xs uppercase tracking-[0.12em] transition-all no-underline ${
+                  className={`flex items-center gap-3 px-4 py-3.5 text-sm font-medium transition-all no-underline ${
                     isActive(path)
                       ? 'text-oxblood bg-accent-surface'
                       : 'text-ink-soft hover:text-ink hover:bg-accent-surface'

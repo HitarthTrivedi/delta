@@ -41,6 +41,9 @@ const Profile = lazy(() => import("./pages/FeaturePages").then((m) => ({ default
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const WeeklyPlan = lazy(() => import("./pages/WeeklyPlan"));
+const Today = lazy(() => import("./pages/Today"));
+const QuickPractice = lazy(() => import("./pages/QuickPractice"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const ProgressReport = lazy(() => import("./pages/ProgressReport"));
 const ResumePage = lazy(() => import("./pages/ResumePage"));
 const TrophyCabinet = lazy(() => import("./pages/TrophyCabinet"));
@@ -63,6 +66,7 @@ import { useUserWithSkills } from "./hooks/useUser";
 import { useAuthStore } from "./store/authStore";
 import ConsentGate from "./components/ConsentGate";
 import PageLoader from "./components/PageLoader";
+import Celebration from "./components/engage/Celebration";
 import { getChildMode } from "./lib/childMode";
 
 // Initialize Query Client for caching.
@@ -110,7 +114,7 @@ function LayoutWrapper({ children }) {
   }
 
   const isLanding = location.pathname === "/";
-  const isLogin = location.pathname === "/login" || isRecruiterArea || location.pathname.startsWith("/school/learn");
+  const isLogin = location.pathname === "/login" || location.pathname === "/unsubscribe" || isRecruiterArea || location.pathname.startsWith("/school/learn");
   const isPublicPage = ["/about", "/careers", "/contact", "/partners", "/investors", "/early-access"].includes(location.pathname);
 
   return (
@@ -187,6 +191,7 @@ function AppContent() {
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/recruiter/login" element={<LoginPage variant="recruiter" />} />
         <Route path="/recruiter" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterPortal /></RequireSignedIn>} />
         <Route path="/recruiter/admin" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterAdmin /></RequireSignedIn>} />
@@ -200,6 +205,8 @@ function AppContent() {
         <Route path="/intake" element={<RequireAuth><Onboarding /></RequireAuth>} />
         
         {/* All other core app pages require both auth AND completed onboarding */}
+        <Route path="/today" element={<RequireAuth><ProtectedRoute><Today /></ProtectedRoute></RequireAuth>} />
+        <Route path="/today/quick" element={<RequireAuth><ProtectedRoute><QuickPractice /></ProtectedRoute></RequireAuth>} />
         <Route path="/weekly-plan" element={<RequireAuth><ProtectedRoute><WeeklyPlan /></ProtectedRoute></RequireAuth>} />
         <Route path="/roadmap" element={<RequireAuth><ProtectedRoute><WeeklyPlan /></ProtectedRoute></RequireAuth>} />
         <Route path="/progress-report" element={<RequireAuth><ProtectedRoute><ProgressReport /></ProtectedRoute></RequireAuth>} />
@@ -252,6 +259,7 @@ function App() {
             <AppContent />
           </BrowserRouter>
           <ThemedToaster />
+          <Celebration />
         </div>
       </ThemeProvider>
     </QueryClientProvider>

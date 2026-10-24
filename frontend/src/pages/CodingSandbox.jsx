@@ -4,7 +4,9 @@ import {
   Code2, Play, Send, Loader2, ChevronLeft, Check, X, ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { sandboxCodingAPI } from '../lib/api';
+import { refreshEngagement } from '../hooks/useEngagement';
 import { useAuthStore } from '../store/authStore';
 
 const panelStyle = {
@@ -23,6 +25,7 @@ const DIFFICULTY_COLOR = {
 
 export default function CodingSandbox() {
   const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
   const [topics, setTopics] = useState([]);
   const [languages, setLanguages] = useState(['python']);
   const [loading, setLoading] = useState(true);
@@ -113,7 +116,10 @@ export default function CodingSandbox() {
     try {
       const result = await sandboxCodingAPI.submit(userId, session.session_id, language, code);
       setSubmitResult(result);
-      if (result.all_passed) toast.success('All test cases passed!');
+      if (result.all_passed) {
+        toast.success('All test cases passed!');
+        refreshEngagement(queryClient, userId);
+      }
       else if (!result.error) toast.message(`${result.passed}/${result.total} test cases passed.`);
     } catch (err) {
       console.error(err);

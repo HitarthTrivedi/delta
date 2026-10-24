@@ -14,6 +14,7 @@ import { useReminder, requestNotificationPermission } from '../lib/useReminder';
 import { useAuthStore } from '../store/authStore';
 import { useAgent2Chat } from '../store/agent2ChatStore';
 import { careerContextKey, seedCareerContext } from '../hooks/useCareerOS';
+import { refreshEngagement } from '../hooks/useEngagement';
 
 const panelStyle = {
   background: 'var(--paper)',
@@ -576,8 +577,9 @@ export default function WeeklyPlan() {
         evidence: actions[idx],
         impact: { weekly_plan_adjustment_needed: true },
       });
+      refreshEngagement(queryClient, userId, { size: shouldCheck ? 'small' : 'none' });
     } catch { /* saved locally; sync will retry on reload */ }
-  }, [actions, checked, userId]);
+  }, [actions, checked, userId, queryClient]);
 
   const toggleDaySlice = useCallback(async (dIdx, sIdx) => {
     if (advancing || !dayPlan?.days) return;
@@ -693,6 +695,7 @@ export default function WeeklyPlan() {
         evidence: action,
         impact: { weekly_plan_adjustment_needed: true },
       });
+      refreshEngagement(queryClient, userId, { size: nextValue ? 'small' : 'none' });
     } catch (err) {
       console.error(err);
       setChecked(prev => ({ ...prev, [index]: !nextValue }));

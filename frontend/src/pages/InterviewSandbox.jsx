@@ -5,7 +5,9 @@ import {
   PhoneOff, ArrowRight, RotateCcw, LayoutDashboard, Keyboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { sandboxInterviewAPI } from '../lib/api';
+import { refreshEngagement } from '../hooks/useEngagement';
 import { useAuthStore } from '../store/authStore';
 import { useUserWithSkills } from '../hooks/useUser';
 import { useSandboxReport } from '../hooks/useSandboxReport';
@@ -103,6 +105,7 @@ function Segmented({ options, value, onChange, label }) {
 
 export default function InterviewSandbox() {
   const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
   const { data: user } = useUserWithSkills(userId);
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -282,11 +285,12 @@ export default function InterviewSandbox() {
       cam.stop();
       setReport({ feedback: data.feedback, transcript: data.transcript, settings: data.settings });
       setStage('report');
+      refreshEngagement(queryClient, userId);
     } catch (err) {
       setPhase('finish_error');
       toast.error(err?.response?.data?.detail || 'Could not generate your report. Try again.');
     }
-  }, [mic, mutedVoice, say, hush, userId, sessionId, cam]);
+  }, [mic, mutedVoice, say, hush, userId, sessionId, cam, queryClient]);
 
   const submitAnswer = useCallback(async (raw) => {
     const text = (raw ?? answer).trim();

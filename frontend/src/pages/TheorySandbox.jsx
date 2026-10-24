@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sandboxTheoryAPI } from '../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { refreshEngagement } from '../hooks/useEngagement';
 import { useAuthStore } from '../store/authStore';
 
 const panelStyle = {
@@ -48,6 +50,7 @@ function Choice({ active, onClick, children, style }) {
 export default function TheorySandbox() {
   const userId = useAuthStore((state) => state.userId);
   const [params, setParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
   const [stage, setStage] = useState('setup'); // setup | test | result
   const [category, setCategory] = useState('technical');
@@ -83,6 +86,7 @@ export default function TheorySandbox() {
     setSubmitting(true);
     try {
       const data = await sandboxTheoryAPI.submit(userId, sessionId, answers);
+      refreshEngagement(queryClient, userId);
       deadlineRef.current = null;
       setTimeLeft(null);
       setResult(data.result);
@@ -93,7 +97,7 @@ export default function TheorySandbox() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, userId, sessionId, answers]);
+  }, [submitting, userId, sessionId, answers, queryClient]);
 
   // Countdown for timed tests; auto-submits at zero.
   const submitRef = useRef(submitTest);

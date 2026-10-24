@@ -36,7 +36,7 @@ export default function LoginPage({ variant = 'student' }) {
         const created = await signUp(email, password, name);
         if (created?.devSession) {
           toast.success('Signed in (local dev mode).');
-          navigate(isRecruiter ? '/recruiter' : nextPath || '/roadmap');
+          navigate(isRecruiter ? '/recruiter' : nextPath || '/today');
           return;
         }
         toast.success('Account created! Please sign in.');
@@ -47,10 +47,10 @@ export default function LoginPage({ variant = 'student' }) {
       } else {
         await login(email, password);
         toast.success('Welcome back!');
-        // Send returning users to their roadmap. The /roadmap route's
+        // Send returning users to Today. The route's
         // ProtectedRoute redirects to /onboarding automatically if the profile
         // isn't complete, so incomplete users still land in intake.
-        navigate(isRecruiter ? '/recruiter' : nextPath || '/roadmap');
+        navigate(isRecruiter ? '/recruiter' : nextPath || '/today');
       }
     } catch (err) {
       toast.error(err.message || 'Authentication failed');
@@ -65,7 +65,7 @@ export default function LoginPage({ variant = 'student' }) {
       // on return, customStorage reads this flag to pick localStorage vs
       // sessionStorage. Without it Google users were never remembered.
       localStorage.setItem('delta_remember_me', rememberMe ? 'true' : 'false');
-      await loginWithGoogle(nextPath || '/roadmap');
+      await loginWithGoogle(nextPath || '/today');
     } catch (err) {
       toast.error(err.message || 'Google Sign-In failed');
     }

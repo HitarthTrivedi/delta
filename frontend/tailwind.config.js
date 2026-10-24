@@ -28,6 +28,7 @@ module.exports = {
   				soft: 'rgb(var(--ink-soft-rgb) / <alpha-value>)'
   			},
   			oxblood: 'rgb(var(--oxblood-rgb) / <alpha-value>)',
+  			reward: 'rgb(var(--reward-rgb) / <alpha-value>)',
   			rule: 'rgb(var(--rule-rgb) / <alpha-value>)',
   			'accent-surface': 'rgb(var(--accent-surface-rgb) / <alpha-value>)',
   			card: {

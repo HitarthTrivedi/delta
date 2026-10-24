@@ -32,6 +32,8 @@ code {
         --oxblood: #7d252b;
         --rule: #e6e4df;
         --accent-surface: #f0ede5;
+        /* Rewards only (streaks, XP, celebrations): warm gold, never for scores or errors */
+        --reward: #b7791f;
 
         /* RGB channels so Tailwind opacity modifiers (bg-bone/90 etc.) work */
         --bone-rgb: 247 245 240;
@@ -41,6 +43,7 @@ code {
         --oxblood-rgb: 125 37 43;
         --rule-rgb: 230 228 223;
         --accent-surface-rgb: 240 237 229;
+        --reward-rgb: 183 121 31;
 
         --background: 43 30% 95%;
         --foreground: 30 4% 10%;
@@ -77,6 +80,7 @@ code {
         --oxblood: #c05a60;
         --rule: #2e2c29;
         --accent-surface: #262421;
+        --reward: #e0a84a;
 
         --bone-rgb: 22 21 20;
         --paper-rgb: 30 29 27;
@@ -85,6 +89,7 @@ code {
         --oxblood-rgb: 192 90 96;
         --rule-rgb: 46 44 41;
         --accent-surface-rgb: 38 36 33;
+        --reward-rgb: 224 168 74;
 
         --background: 30 4% 8%;
         --foreground: 43 19% 93%;

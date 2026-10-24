@@ -344,6 +344,8 @@ def summary(db: Session, user_id: str, timezone: str | None = None) -> dict:
             "protected": bool(row and (row.freeze_used or row.on_break)),
         })
     on_break = bool(eng.break_until and today <= eng.break_until)
+    quick_done = db.query(XpEvent).filter_by(user_id=user_id, source_type="quick_review",
+                                             source_id=today.isoformat()).first() is not None
     month = today.strftime("%Y-%m")
     break_left = BREAK_DAYS_PER_MONTH - (eng.break_days_used if eng.break_month == month else 0)
     return {
@@ -352,6 +354,7 @@ def summary(db: Session, user_id: str, timezone: str | None = None) -> dict:
         "streak": eng.current_streak,
         "longest_streak": eng.longest_streak,
         "done_today": done_today,
+        "quick_done_today": quick_done,
         # Streak alive through yesterday but nothing yet today: the day still counts if you study.
         "at_risk": eng.current_streak > 0 and not done_today and not on_break,
         "freezes": eng.streak_freezes,
