@@ -61,6 +61,11 @@ export default function useAnswerMic({ silenceMs = 3000, onSilence } = {}) {
         } else if (e.error === 'audio-capture') {
           wantRef.current = false;
           setError('No microphone found. You can type your answer instead.');
+        } else if (e.error === 'network' || e.error === 'language-not-supported') {
+          // The browser's speech service is unreachable (e.g. Brave, offline):
+          // restarting would just loop, so stop and let the user type.
+          wantRef.current = false;
+          setError("Voice input isn't available in this browser right now. Type your answer instead.");
         }
       };
       rec.onend = () => {

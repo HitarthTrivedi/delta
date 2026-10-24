@@ -20,6 +20,9 @@ export default function Navbar({ user }) {
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Intake is a one-time step: once it's done, keep it out of the way.
+  const onboarded = user?.onboarding_complete || (user?.onboarding_percentage && user.onboarding_percentage >= 100);
+  const items = onboarded ? navItems.filter((item) => item.path !== '/intake') : navItems;
 
   const handleLogout = async () => {
     try {
@@ -43,7 +46,7 @@ export default function Navbar({ user }) {
         <div className="max-w-[1180px] mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 text-ink shrink-0 no-underline">
+          <Link to={user ? '/roadmap' : '/'} className="flex items-center gap-2 text-ink shrink-0 no-underline">
             <span className="w-7 h-7 bg-paper border border-rule overflow-hidden flex items-center justify-center">
               <img src="/delta-bg.jpeg" alt="Delta" className="w-full h-full object-cover" />
             </span>
@@ -52,7 +55,7 @@ export default function Navbar({ user }) {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1">
-            {navItems.map(({ label, path, icon: Icon }) => (
+            {items.map(({ label, path, icon: Icon }) => (
               <Link
                 key={path}
                 to={path}
@@ -134,7 +137,7 @@ export default function Navbar({ user }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-3 flex flex-col gap-1">
-              {navItems.map(({ label, path, icon: Icon }) => (
+              {items.map(({ label, path, icon: Icon }) => (
                 <Link
                   key={path}
                   to={path}

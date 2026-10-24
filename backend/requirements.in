@@ -1,0 +1,31 @@
+# Top-level runtime dependencies. requirements.txt is generated from this file:
+#   uv pip compile requirements.in -o requirements.txt --exclude-newer <date ~2 weeks ago>
+# Pin by regenerating, never by hand-editing requirements.txt.
+# Security fixes may be newer than the cutoff: bump only that package with
+#   uv pip compile requirements.in -o requirements.txt --upgrade-package <name>
+# and check with `pip-audit -r requirements.txt` (CI runs it too).
+fastapi
+uvicorn
+sqlalchemy>=2.0
+alembic
+psycopg[binary]   # PostgreSQL driver (psycopg 3; SQLAlchemy 2.1 default for postgresql:// URLs)
+python-dotenv
+pydantic
+pydantic-settings
+email-validator   # pydantic EmailStr
+python-multipart  # file uploads
+requests
+google-genai
+groq              # fast LPU inference for latency-sensitive chat/intake paths
+networkx
+numpy
+tavily-python
+python-docx
+pypdf
+slowapi
+PyJWT[crypto]>=2.10   # crypto extra verifies Supabase ES256 (asymmetric) JWTs
+redis             # optional shared cache
+cachetools        # in-process TTL fallback when Redis is unavailable
+sentry-sdk[fastapi]  # error reporting; no-op unless SENTRY_DSN is set
+tzdata            # IANA tz db for zoneinfo — python:3.11-slim ships without it,
+                  # so reminder "9am local" would silently fall back to UTC

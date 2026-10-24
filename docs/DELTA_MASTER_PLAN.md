@@ -65,7 +65,7 @@ This module has two sides.
 | College / student | Progress report / achievements / resume | Built | `pages/ProgressReport.jsx`, `pages/TrophyCabinet.jsx`, `pages/ResumePage.jsx` |
 | College / student | Opportunities board | Built | `routers/opportunities.py`, `services/opportunity_*.py`, `pages/Opportunities.jsx` |
 | College / sandbox | Coding sandbox | Built | `routers/sandbox_coding.py`, `services/code_runner.py`, `services/sandbox_problems.py`, `pages/CodingSandbox.jsx` |
-| College / sandbox | AI video interview (animated interviewer "Aria" that speaks, mic or typed answers, webcam self-view, rubric report with model answers) | Built (v2) | `routers/sandbox_interview.py`, `services/interview_ai.py`, `pages/InterviewSandbox.jsx`, `components/interview/*`, `hooks/useInterviewerVoice.js`, `hooks/useAnswerMic.js`, `hooks/useWebcam.js` |
+| College / sandbox | AI video interview: 3D lip-synced interviewer "Aria" (TalkingHead + a custom CC0 avatar in a business suit, built with MPFB from `tools/avatar/`; voice from Google Cloud TTS via `/tts`), falling back to the 2D Aria + browser voice; mic or typed answers, webcam self-view, rubric report with model answers, one-click start | Built (v3) | `routers/sandbox_interview.py`, `services/interview_ai.py`, `pages/InterviewSandbox.jsx`, `components/interview/Avatar3D.jsx`, `components/interview/*`, `public/avatars/interviewer.glb`, `tools/avatar/*`, `hooks/useInterviewerVoice.js`, `hooks/useAnswerMic.js`, `hooks/useWebcam.js` |
 | College / sandbox | Technical + aptitude tests (difficulty, timed mode, topic suggestions) | Built (v2) | `routers/sandbox_theory.py`, `services/theory_test_ai.py`, `pages/TheorySandbox.jsx` |
 | College / sandbox | Test Center: readiness score, per-skill strengths/weaknesses, score trend, next steps (also shown to recruiters) | Built | `services/readiness.py`, `routers/sandbox_report.py`, `pages/PracticeHub.jsx` |
 | Dev tooling | Test data script (student + 7 fictional opted-in candidates), local only | Built | `backend/scripts/seed_demo.py` |
@@ -82,6 +82,11 @@ This module has two sides.
 | School | CBSE 6–10 Maths + Science curriculum (data) | Built, **class 6–8 lists need checking** | `services/school_curriculum.py` |
 | School | Lesson drafting + human review/approval | Built (v1) | `services/school_content_ai.py`, `routers/school.py` (`/review/*`), `pages/school/SchoolReview.jsx` |
 | School | Child mode: lessons, quizzes, progress, PIN exit | Built (v1) | `pages/school/SchoolLearn.jsx`, `lib/childMode.js`, `App.js` (`LayoutWrapper` lock) |
+| Production | Schema migrations (Alembic baseline; `alembic upgrade head` on container start) | Built | `backend/alembic.ini`, `backend/migrations/` |
+| Production | Nightly encrypted off-site backups (pg_dump → age → Cloudflare R2, 30 days) + restore script | Built, **needs secrets set** | `.github/workflows/db-backup.yml`, `backend/scripts/restore_backup.sh` |
+| Production | CI (tests on SQLite + Postgres, migration check, pip-audit, frontend build) | Built | `.github/workflows/ci.yml` |
+| Production | Monitoring: Sentry (optional `SENTRY_DSN`), `/health` checks the DB | Built, **needs DSN + UptimeRobot** | `backend/app/main.py` |
+| Production | Ops runbook (setup, deploy, migrations, backups, incidents) | Built | `docs/OPERATIONS.md` |
 
 ## 4. Build order
 
@@ -155,42 +160,54 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 
 | Need | Now | Production target | Upgrade when |
 |---|---|---|---|
-| Frontend hosting | Vercel | Cloudflare Pages (free tier allows commercial use) | not needed early |
+| Frontend hosting | Vercel | Cloudflare Pages (free tier allows commercial use); `frontend/public/_headers` ready | not needed early |
 | Backend (FastAPI) | Railway | Railway, Pro plan; more replicas later | traffic grows |
-| Database + auth | SQLite locally; Supabase project **deleted** | Supabase Pro, Mumbai region: Postgres, auth, daily backups (the free tier pauses when idle) | before taking payments |
-| AI | Gemini via `ai_service` | Gemini 2.5 Flash-Lite by default; Gemini 2.5 Flash only where quality matters (interview reports, tests, roadmaps); Batch API for non-urgent jobs | always pay-as-you-go |
+| Database + auth | SQLite locally; Postgres-ready code (psycopg 3, Alembic); Supabase project **not created yet** | Supabase Pro, Mumbai region: Postgres, auth, daily backups (the free tier pauses when idle) | before taking payments |
+| AI | Gemini via `ai_service`; interview turns on `GEMINI_LITE_MODEL` | Gemini 2.5 Flash-Lite by default; Gemini 2.5 Flash only where quality matters (interview reports, tests, roadmaps); Batch API for non-urgent jobs | always pay-as-you-go |
+| Interviewer voice | Google Cloud TTS (Neural2, SSML marks for lip-sync), optional | same; free monthly quota then pay per character | budget alert on the billing account |
 | Code runner | JDoodle (free tier) | self-hosted Judge0 on a small VPS | more than 200 runs a day |
 | Email | Gmail API / Brevo | Brevo, then Resend | more than 300 emails a day |
 | Cache | in-process (Redis optional) | Upstash Redis | more than one backend replica |
-| Monitoring | none | Sentry (errors) + UptimeRobot (uptime) | — |
-| Backups | none | Supabase backups + weekly off-site dump to Cloudflare R2 | — |
+| Monitoring | Sentry wired (needs DSN); `/health` checks the DB | Sentry (errors) + UptimeRobot (uptime) | — |
+| Backups | nightly encrypted dump to Cloudflare R2 (GitHub Actions; needs secrets) | + Supabase Pro daily backups / point-in-time restore | before taking payments |
 | Payments | none | Razorpay | — |
 
 ### AI cost rules (follow these in every AI feature)
 - **Route by task:** use the lite model by default and the stronger model only where accuracy shows (scored reports, test generation, roadmaps).
 - **Generate once, reuse many times:** test question bank, School lessons, coding problems and market snapshots are shared across users, not regenerated per user.
 - **No AI where rules work:** grading, readiness scores and recruiter ranking use deterministic code.
-- **Browser does voice and video:** speech recognition, text-to-speech and the webcam run on the user's device. Never stream audio or video to a paid API.
+- **The user's voice and video stay on their device:** speech recognition and the webcam run in the browser; never stream the user's audio or video to a paid API. The only voice we pay for is the interviewer's own (Google Cloud TTS of the question text, cached nowhere, free quota first); without a key the browser's voice is used.
 - **Short prompts:** send the compact profile (`profile_as_compact_context`), not full histories.
 - **Hard caps:** every expensive endpoint is rate-limited, and each plan will get monthly usage caps plus a spend alarm.
 
 ### Production backlog (in order)
 1. **New Supabase project** (Mumbai). Keys go in the host's encrypted settings and teammates' local `.env` files, never in git.
-2. **Postgres + migrations:** move from SQLite to Supabase Postgres and adopt Alembic (today schema changes go through `add_missing_columns.py`).
-3. **Model routing in `ai_service`:** lite vs full model chosen per call site, with names from config.
+2. ✅ **Postgres + migrations:** code is Postgres-ready (psycopg 3, tested on Postgres), Alembic adopted with a baseline. Remaining: point `DATABASE_URL` at the new Supabase project.
+3. **Model routing in `ai_service`:** lite vs full model chosen per call site, with names from config. `GEMINI_LITE_MODEL` exists and the interview uses it; move other chatty call sites to it.
 4. **Background job queue** for roadmap generation and other long AI work, so pages never wait on the model.
 5. **Per-plan usage caps** and a monthly AI budget alarm.
-6. **Monitoring:** Sentry error alerts and uptime checks.
+6. ✅ **Monitoring:** Sentry wired (set `SENTRY_DSN`), `/health` checks the database; add the UptimeRobot monitor.
 7. **Staging environment + load test** (at least 500 concurrent users) before any big college onboarding.
-8. **Backups:** weekly off-site database dump, with a restore tested monthly.
+8. ✅ **Backups:** nightly encrypted off-site dump (`db-backup.yml`) + `restore_backup.sh`; set the secrets and run the monthly restore drill (`docs/OPERATIONS.md`).
 9. **Anti-cheating** for sandbox scores recruiters rely on.
 10. **Legal:** lawyer review of `frontend/public/legal/*.md`; update the Data Fiduciary name once the company is registered.
+
+**Week 1 after the v1 beta launch** (deliberately not done before it):
+- Frontend: move from Create React App (deprecated; its build tooling carries most `npm audit` findings) to Vite; remove unused dependencies (all `@radix-ui/*`, `cmdk`, `vaul`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `react-hook-form`, `zod`, `date-fns`, `motion`, `cra-template`) and the unused `components/ui/*`, `CareerChat.jsx`, `mockData.js`, `plugins/health-check`; self-host Monaco (today loaded from jsdelivr).
+- Postgres-backed job queue (`jobs` table + `SKIP LOCKED`) for roadmap / weekly-cycle generation; delete the Celery stub.
+- Before a 2nd API replica: advisory lock around the reminder scheduler, shared rate-limit storage.
+- Interview: stream replies sentence by sentence; resume abandoned sessions; a male interviewer variant (same `tools/avatar/` pipeline, e.g. `toigo_male_suit_tie_and_jacket`) and a male/female choice.
+- React Query + skeletons on the remaining pages; frontend Sentry; k6 load test (500 concurrent) on staging.
+- Decide on the unlinked `/dashboard` page (link it or remove it).
 
 ### Local development
 - **Env files:** copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` → `frontend/.env.development.local`. Both real files are gitignored. Ask a teammate for keys privately; never paste them into code, docs or commits.
 - **Dev login (no Supabase needed):** set `REACT_APP_DEV_AUTH=true` (frontend) and `ALLOW_HEADER_AUTH=true` (backend). Any email signs you in with no password; the same email always opens the same account. It only works when the app is served from localhost, and production builds never have the flag. Never set either flag on a deployed environment.
 - **Test data:** `python scripts/seed_demo.py --user-id <id> --with-candidates --yes` from `backend/` fills an account and adds fictional opted-in candidates. Local databases only.
-- **Tests:** `pytest tests -q` from `backend/` (the `tests/` folder is gitignored for now).
+- **Tests:** `pytest tests -q` from `backend/` (install `requirements-dev.txt`). Set `TEST_DATABASE_URL=postgresql://…` to run them against Postgres. CI runs both.
+- **Schema changes:** edit the model, then `alembic revision --autogenerate -m "…"`, review, `alembic upgrade head` (see `docs/OPERATIONS.md`). Don't add new hand-written `ALTER`s.
+- **Dependencies:** backend pins come from `requirements.in` (instructions at its top); frontend uses npm with a committed `package-lock.json`.
+- **Production setup, deploys, backups, incidents:** `docs/OPERATIONS.md`.
 
 ## 8. Open questions
 

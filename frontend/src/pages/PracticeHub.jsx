@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Code2, Briefcase, ListChecks, ArrowRight, Loader2, Target, Table2, LineChart as LineIcon } from 'lucide-react';
+import { Code2, Briefcase, ListChecks, ArrowRight, Loader2, Target, Table2, LineChart as LineIcon, Zap } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { sandboxReportAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import { useSandboxReport } from '../hooks/useSandboxReport';
 
 const panelStyle = { background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 };
 const muted = 'rgba(255,255,255,0.5)';
@@ -43,28 +43,52 @@ function ChartTooltip({ active, payload }) {
   );
 }
 
+// One click into practice: last-used settings, or sensible defaults for the field.
+function QuickStart({ navigate }) {
+  const btn = { display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 8, padding: '12px 18px', fontWeight: 800, fontSize: 14, cursor: 'pointer' };
+  return (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
+      <button onClick={() => navigate('/practice/interview?quick=1')} style={{ ...btn, background: '#fff', color: '#000', border: 'none' }}>
+        <Zap size={15} /> Start an interview now
+      </button>
+      <button onClick={() => navigate('/practice/theory?quick=1')} style={{ ...btn, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.18)' }}>
+        <ListChecks size={15} /> Take a quick test
+      </button>
+    </div>
+  );
+}
+
 export default function PracticeHub() {
   const userId = useAuthStore((state) => state.userId);
   const navigate = useNavigate();
-  const [report, setReport] = useState(null);
-  const [error, setError] = useState(false);
+  const { data: report, isError: error } = useSandboxReport(userId);
   const [asTable, setAsTable] = useState(false);
-
-  useEffect(() => {
-    if (!userId) return;
-    sandboxReportAPI.get(userId).then(setReport).catch(() => setError(true));
-  }, [userId]);
 
   // One row per graded session; each type is its own series (nulls bridged).
   const chartRows = useMemo(() => (report?.timeline || []).map((t, i) => ({
     ...t, idx: i, [t.type]: t.score,
   })), [report]);
 
-  if (error) {
-    return <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '6rem 1.5rem' }}><p style={{ textAlign: 'center', color: muted }}>Couldn't load your Test Center. Refresh to try again.</p></main>;
-  }
-  if (!report) {
-    return <main style={{ minHeight: '100vh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={22} style={{ color: '#fff', animation: 'spin 1s linear infinite' }} /><style>{'@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'}</style></main>;
+  // The header and quick-start buttons don't need the report: show them right away.
+  if (error || !report) {
+    return (
+      <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1.5rem 3rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
+        <header style={{ marginBottom: 8 }}>
+          <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>Test Center</p>
+          <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, margin: 0 }}>How ready are you for the real interview?</h1>
+          <p style={{ margin: '12px 0 0', color: muted, fontSize: 15, lineHeight: 1.55, maxWidth: 680 }}>
+            Every test, practice session and mock interview feeds one readiness score, broken down by skill. It's the same picture recruiters see if you opt in.
+          </p>
+          <QuickStart navigate={navigate} />
+        </header>
+          <section style={{ ...panelStyle, padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: muted, fontSize: 14 }}>
+            {error ? "Couldn't load your scores. Refresh to try again." : <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading your scores…</>}
+          </section>
+        </div>
+        <style>{'@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'}</style>
+      </main>
+    );
   }
 
   const score = report.readiness;
@@ -82,6 +106,7 @@ export default function PracticeHub() {
           <p style={{ margin: '12px 0 0', color: muted, fontSize: 15, lineHeight: 1.55, maxWidth: 680 }}>
             Every test, practice session and mock interview feeds one readiness score, broken down by skill. It's the same picture recruiters see if you opt in.
           </p>
+          <QuickStart navigate={navigate} />
         </header>
 
         {/* Readiness + next steps */}

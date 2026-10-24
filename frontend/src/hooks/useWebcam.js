@@ -36,8 +36,8 @@ export default function useWebcam() {
     }
   }, [supported, attach]);
 
-  // Re-attach when the <video> element mounts after the stream started.
-  useEffect(() => { if (on) attach(); });
+  // Attach once the camera is on (the <video> element mounts in that same render).
+  useEffect(() => { if (on) attach(); }, [on, attach]);
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
 

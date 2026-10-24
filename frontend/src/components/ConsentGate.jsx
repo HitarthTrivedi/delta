@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { privacyAPI } from '../lib/api';
+import PageLoader from './PageLoader';
 import { useAuthStore } from '../store/authStore';
 
 const GRIEVANCE_EMAIL = 'hitartht318@gmail.com';
@@ -24,11 +25,7 @@ export default function ConsentGate({ children }) {
   });
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-bone flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-ink-soft" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (isError || !data) {

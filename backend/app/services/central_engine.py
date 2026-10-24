@@ -258,8 +258,8 @@ def _monthly_progress_counts(db: Session, user_id: str) -> dict:
 
 def _should_assign_break_week(db: Session, user: User, profile: dict, roadmap: "RoadmapState | None" = None) -> bool:
     # In DEV_MODE the pacing guards are off so the plan can be iterated freely while testing.
-    import os as _os
-    if _os.getenv("DEV_MODE", "false").lower() in {"true", "1", "yes"}:
+    from app.config import settings
+    if settings.DEV_MODE:
         return False
     # Never stack break weeks. If the current week is already a break week, or one was
     # assigned in the last 21 days, do not assign another — otherwise the monthly counter
@@ -1319,8 +1319,8 @@ def run_weekly_career_cycle(
     def _normalize(s) -> str:
         return str(s).strip().lower()
 
-    import os as _os
-    dev_mode = _os.getenv("DEV_MODE", "false").lower() in {"true", "1", "yes"}
+    from app.config import settings
+    dev_mode = settings.DEV_MODE
 
     # Completion + min-time gates are skipped when bypass_gate is set — used when
     # the 7-day window has already lapsed with tasks unfinished (an expired week

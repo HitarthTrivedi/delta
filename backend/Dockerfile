@@ -3,5 +3,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
+# Run as an unprivileged user, not root.
+RUN useradd --create-home --uid 10001 delta && chown -R delta /app
+USER delta
 EXPOSE ${PORT:-8000}
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# --proxy-headers (trusting FORWARDED_ALLOW_IPS) makes the client scheme/IP
+# come from Railway's proxy headers instead of the proxy itself.
+ENV FORWARDED_ALLOW_IPS=*
+# Apply pending database migrations, then serve.
+CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers
