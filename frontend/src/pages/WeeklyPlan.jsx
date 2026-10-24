@@ -13,7 +13,7 @@ import { getTaskProgress } from '../lib/taskProgress';
 import { useReminder, requestNotificationPermission } from '../lib/useReminder';
 import { useAuthStore } from '../store/authStore';
 import { useAgent2Chat } from '../store/agent2ChatStore';
-import { seedCareerContext } from '../hooks/useCareerOS';
+import { careerContextKey, seedCareerContext } from '../hooks/useCareerOS';
 
 const panelStyle = {
   background: 'var(--paper)',
@@ -417,36 +417,50 @@ export default function WeeklyPlan() {
 
   const bottomRef = useRef(null);
 
+  const applyContext = useCallback((data) => {
+    setContext(data);
+    const progress = getTaskProgress(data, fallbackActions);
+    setChecked(progress.checkedByIndex);
+    setSkipped(progress.skippedByIndex);
+    setPlanStyle(data?.plan_style || 'week');
+    if (data?.week_expired && (data?.expired_incomplete_tasks || []).length) {
+      const sel = {};
+      (data.expired_incomplete_tasks || []).forEach(t => { sel[t.id || t.title] = true; });
+      setCarrySel(sel);
+      setExpiredOpen(true);
+    }
+  }, []);
+
+  // Any local change to the plan (ticks, skips, edits, chat updates) makes the
+  // shared cached copy outdated: drop it so a revisit never paints stale ticks.
+  const dropCachedContext = useCallback(() => {
+    queryClient.removeQueries({ queryKey: careerContextKey(userId) });
+  }, [queryClient, userId]);
+
   const loadContext = useCallback(async (regenerate = false) => {
+    // Paint instantly from the shared cache when there is one, then refresh it
+    // in the background: returning to the home page shouldn't wait on the engine.
+    const cached = !regenerate && queryClient.getQueryData(careerContextKey(userId));
+    if (cached) applyContext(cached);
     setLoading(true);
     try {
       const data = await careerOSAPI.getContext(userId);
-      setContext(data);
+      applyContext(data);
       seedCareerContext(queryClient, userId, data);
-      const progress = getTaskProgress(data, fallbackActions);
-      setChecked(progress.checkedByIndex);
-      setSkipped(progress.skippedByIndex);
-      setPlanStyle(data?.plan_style || 'week');
-      if (data?.week_expired && (data?.expired_incomplete_tasks || []).length) {
-        const sel = {};
-        (data.expired_incomplete_tasks || []).forEach(t => { sel[t.id || t.title] = true; });
-        setCarrySel(sel);
-        setExpiredOpen(true);
-      }
       if (regenerate) toast.success('Agent 2 loaded your first weekly plan.');
     } catch (err) {
       console.error(err);
       // Only show the error toast for real failures, not timeouts/slow generation
       const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout');
       if (!isTimeout) {
-        toast.error('Unable to load Agent 2 plan. Using a safe starter week.');
+        toast.error('Unable to load your plan right now.');
       } else {
         toast.error('Taking longer than usual — refresh in a moment.');
       }
     } finally {
       setLoading(false);
     }
-  }, [userId, queryClient]);
+  }, [userId, queryClient, applyContext]);
 
   // Bind the shared Agent 2 thread to the current user (resets only when the
   // user changes). Past conversation is loaded lazily via a button, not here —
@@ -600,6 +614,7 @@ export default function WeeklyPlan() {
     try {
       const r = await careerOSAPI.setPlanStyle(userId, style, style === 'day' ? context?.day_schedule : undefined);
       if (style === 'day') setDayPlan(r?.day_plan || null);
+      dropCachedContext();
       setContext(prev => ({ ...prev, plan_style: style }));
     } catch {
       toast.error('Could not switch plan style.');
@@ -614,6 +629,7 @@ export default function WeeklyPlan() {
     try {
       const r = await careerOSAPI.setPlanStyle(userId, 'day', schedule);
       setDayPlan(r?.day_plan || null);
+      dropCachedContext();
       setContext(prev => ({ ...prev, plan_style: 'day', day_schedule: schedule }));
       toast.success('Day-wise plan created.');
     } catch {
@@ -667,6 +683,7 @@ export default function WeeklyPlan() {
   const toggleTask = async (action, index) => {
     if (advancing) return;
     const nextValue = !checked[index];
+    dropCachedContext();
     setChecked(prev => ({ ...prev, [index]: nextValue }));
     setSkipped(prev => ({ ...prev, [index]: false }));
     try {
@@ -693,6 +710,7 @@ export default function WeeklyPlan() {
     if (!skipDialog) return;
     const { action, index } = skipDialog;
     setSkipDialog(null);
+    dropCachedContext();
     setChecked(prev => ({ ...prev, [index]: false }));
     setSkipped(prev => ({ ...prev, [index]: true }));
     try {
@@ -735,6 +753,7 @@ export default function WeeklyPlan() {
     const prompt = `Agent 2 weekly plan discussion. Current weekly actions: ${actions.map(a => a.title).join('; ')}. User update: ${text}`;
     const response = await sendAgent2(userId, text, prompt);
     if (response && Array.isArray(response.updated_actions)) {
+      dropCachedContext();
       setContext(prev => ({
         ...(prev || {}),
         roadmap: {
@@ -822,6 +841,7 @@ export default function WeeklyPlan() {
     setSavingTasks(true);
     try {
       await careerOSAPI.updateWeeklyTasks(userId, editableTasks);
+      dropCachedContext();
       setContext(prev => ({
         ...(prev || {}),
         roadmap: {
@@ -1043,8 +1063,29 @@ export default function WeeklyPlan() {
             </div>
           )}
 
+          {/* First load: say what's happening instead of showing placeholder tasks */}
+          {!context && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 0', flexWrap: 'wrap' }}>
+              {loading ? (
+                <>
+                  <Loader2 size={16} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: 14, color: 'var(--ink)' }}>
+                    {new URLSearchParams(location.search).get('from') === 'intake'
+                      ? 'Agent 2 is building your first week from your profile. This can take up to a minute the first time.'
+                      : 'Loading your week…'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: 14, color: 'var(--ink-soft)' }}>Your plan couldn't be loaded.</span>
+                  <button className="wp-btn" onClick={() => loadContext()} style={{ fontSize: 13 }}>Try again</button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Task list — one ruled ledger, not a stack of boxed cards */}
-          <div style={{ display: advancing ? 'none' : 'block' }}>
+          <div style={{ display: advancing || !context ? 'none' : 'block' }}>
             {actions.map((action, index) => {
               const isDone = !!checked[index];
               const isSkipped = !!skipped[index];
@@ -1222,7 +1263,7 @@ export default function WeeklyPlan() {
               <textarea
                 value={feedbackText}
                 onChange={e => setFeedbackText(e.target.value)}
-                placeholder="e.g. The LeetCode task is too hard, I'd prefer easier problems. The FastAPI task has no clear goal."
+                placeholder="e.g. This week's practice set is too hard, I'd prefer easier problems. The project task has no clear goal."
                 rows={3}
                 style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '10px 12px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
               />
@@ -1421,7 +1462,7 @@ export default function WeeklyPlan() {
                   value={newNextWeek}
                   onChange={e => setNewNextWeek(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addNextWeek()}
-                  placeholder="e.g. Include a REST API project"
+                  placeholder="e.g. Include a case study, a mock test, or a small project"
                   style={{ flex: 1, background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '7px 10px', color: 'var(--ink)', fontSize: 12, outline: 'none' }}
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

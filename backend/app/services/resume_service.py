@@ -62,7 +62,7 @@ def build_resume_from_profile(user_id: str, db: Session) -> dict:
 
     name = identity.get("name") or user.name or "Candidate"
     email = identity.get("email") or user.email or ""
-    target_role = ambitions.get("target_role") or user.target_role or "Software Engineer"
+    target_role = ambitions.get("target_role") or user.target_role or "your target role"
     education_stage = identity.get("education_stage") or user.current_role or ""
     background_summary = identity.get("background_summary") or ""
 

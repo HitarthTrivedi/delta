@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, Dumbbell, LogOut, Menu, X } from 'lucide-react';
+import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, Dumbbell, LogOut, Menu, X, Shield, School } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import ThemeToggle from './ThemeToggle';
 
@@ -12,6 +12,7 @@ const navItems = [
   { label: 'Practice', path: '/practice', icon: Dumbbell },
   { label: 'Trophies', path: '/achievements', icon: Trophy },
   { label: 'Resume', path: '/resume', icon: FileText },
+  { label: 'School', path: '/school', icon: School },
 ];
 
 export default function Navbar({ user }) {
@@ -19,6 +20,9 @@ export default function Navbar({ user }) {
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Intake is a one-time step: once it's done, keep it out of the way.
+  const onboarded = user?.onboarding_complete || (user?.onboarding_percentage && user.onboarding_percentage >= 100);
+  const items = onboarded ? navItems.filter((item) => item.path !== '/intake') : navItems;
 
   const handleLogout = async () => {
     try {
@@ -33,7 +37,8 @@ export default function Navbar({ user }) {
     location.pathname === path ||
     (path === '/intake' && location.pathname === '/onboarding') ||
     (path === '/roadmap' && location.pathname === '/weekly-plan') ||
-    (path === '/practice' && location.pathname.startsWith('/practice/'));
+    (path === '/practice' && location.pathname.startsWith('/practice/')) ||
+    (path === '/school' && location.pathname.startsWith('/school/'));
 
   return (
     <>
@@ -41,7 +46,7 @@ export default function Navbar({ user }) {
         <div className="max-w-[1180px] mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 text-ink shrink-0 no-underline">
+          <Link to={user ? '/roadmap' : '/'} className="flex items-center gap-2 text-ink shrink-0 no-underline">
             <span className="w-7 h-7 bg-paper border border-rule overflow-hidden flex items-center justify-center">
               <img src="/delta-bg.jpeg" alt="Delta" className="w-full h-full object-cover" />
             </span>
@@ -50,7 +55,7 @@ export default function Navbar({ user }) {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1">
-            {navItems.map(({ label, path, icon: Icon }) => (
+            {items.map(({ label, path, icon: Icon }) => (
               <Link
                 key={path}
                 to={path}
@@ -86,6 +91,18 @@ export default function Navbar({ user }) {
             {/* Theme toggle */}
             <ThemeToggle className="w-11 h-11" />
 
+            {/* Privacy settings — desktop only */}
+            <Link
+              to="/settings/privacy"
+              title="Privacy settings"
+              aria-label="Privacy settings"
+              className={`hidden sm:flex items-center justify-center w-11 h-11 bg-transparent border transition-all ${
+                location.pathname === '/settings/privacy' ? 'border-oxblood text-oxblood' : 'border-rule text-ink-soft hover:text-oxblood hover:border-oxblood'
+              }`}
+            >
+              <Shield size={14} />
+            </Link>
+
             {/* Logout — desktop only */}
             <button
               onClick={handleLogout}
@@ -120,7 +137,7 @@ export default function Navbar({ user }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-3 flex flex-col gap-1">
-              {navItems.map(({ label, path, icon: Icon }) => (
+              {items.map(({ label, path, icon: Icon }) => (
                 <Link
                   key={path}
                   to={path}
@@ -135,6 +152,14 @@ export default function Navbar({ user }) {
                   {label}
                 </Link>
               ))}
+              <Link
+                to="/settings/privacy"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-3 px-4 py-3.5 font-mono text-xs uppercase tracking-[0.12em] transition-all no-underline text-ink-soft hover:text-ink hover:bg-accent-surface"
+              >
+                <Shield size={16} />
+                Privacy
+              </Link>
               <div className="border-t border-rule mt-2 pt-3 flex items-center justify-between px-4 pb-2">
                 <div>
                   <p className="text-sm font-semibold text-ink">{user?.name || 'Guest'}</p>

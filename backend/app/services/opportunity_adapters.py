@@ -15,6 +15,7 @@ ALLOW_MOCKS = os.getenv("DELTA_ALLOW_MOCKS", "").lower() in {"1", "true", "yes",
 
 class OpportunityAdapter:
     source = "generic"
+    fields: tuple | None = None  # field-pack ids this source suits; None = every field
     default_mode = "api"
     supports = ("api",)
     live_notes = "Uses public live sources where available."
@@ -59,6 +60,7 @@ class OpportunityAdapter:
 
 
 class LeetCodeAdapter(OpportunityAdapter):
+    fields = ("cs_ai",)
     source = "LeetCode"
     default_mode = "api"
     supports = ("api",)
@@ -123,6 +125,7 @@ class LeetCodeAdapter(OpportunityAdapter):
 
 
 class CodeforcesAdapter(OpportunityAdapter):
+    fields = ("cs_ai",)
     source = "Codeforces"
     default_mode = "api"
     supports = ("api",)
@@ -177,6 +180,7 @@ class CodeforcesAdapter(OpportunityAdapter):
 
 class KaggleAdapter(OpportunityAdapter):
     source = "Kaggle"
+    fields = ("cs_ai", "data")
     default_mode = "scrape"
     supports = ("scrape",)
     live_notes = "Scrapes Kaggle competition listing links when public HTML is available."
@@ -203,11 +207,12 @@ class UnstopAdapter(OpportunityAdapter):
 
     def fetch(self, user_skills, target_role, days_ahead):
         domain = infer_domain_pack(target_role)
+        tech = domain.get("is_tech", False)
         return _scrape_listing_events(
             source=self.source,
-            listing_url="https://unstop.com/hackathons",
+            listing_url="https://unstop.com/hackathons" if tech else "https://unstop.com/competitions",
             link_pattern=r'href="(https://unstop\.com/[^"#?]+|/[^"#?]+)"',
-            opportunity_type="hackathon",
+            opportunity_type="hackathon" if tech else "case_competition",
             skills=domain["skill_taxonomy"][:5],
             reward="Leaderboard, prize, and public participation proof",
             description=f"Live Unstop opportunity aligned to {domain['label']}.",
@@ -217,6 +222,7 @@ class UnstopAdapter(OpportunityAdapter):
 
 class HackathonAdapter(OpportunityAdapter):
     source = "Hackathon"
+    fields = ("cs_ai", "data")
     default_mode = "scrape"
     supports = ("scrape",)
     live_notes = "Can aggregate Devpost, MLH, and curated hackathon feeds."
@@ -243,7 +249,7 @@ class JobPostSignalAdapter(OpportunityAdapter):
 
     def fetch(self, user_skills, target_role, days_ahead):
         try:
-            role = target_role or "software engineer"
+            role = target_role or "graduate"
             response = get_session().get(
                 "https://www.arbeitnow.com/api/job-board-api",
                 params={"search": role},
@@ -281,6 +287,60 @@ class JobPostSignalAdapter(OpportunityAdapter):
         return events
 
 
+class FieldOpportunityAdapter(OpportunityAdapter):
+    """Opportunities for every field: live web-search results for the field's
+    competitions / internships / fellowships (when a real search provider is
+    configured), plus browse links that always work."""
+    source = "FieldSearch"
+    default_mode = "api"
+    supports = ("api",)
+    live_notes = "Web search for field-specific competitions, internships and fellowships, plus browse links."
+
+    def fetch(self, user_skills, target_role, days_ahead):
+        from urllib.parse import quote_plus
+        domain = infer_domain_pack(target_role)
+        role = target_role or (domain["target_roles"][:1] or [domain["label"]])[0]
+        skills = domain["skill_taxonomy"][:5]
+        events = []
+
+        try:
+            from app.services.web_search import get_web_search_service
+            svc = get_web_search_service()
+            if getattr(svc, "_provider", "mock") in ("serper", "tavily"):
+                year = datetime.date.today().year
+                for query in domain["opportunity_queries"][:2]:
+                    for r in (svc.search(f"{query} {year} India students", max_results=3) or [])[:3]:
+                        if not r.get("url"):
+                            continue
+                        q = query.lower()
+                        kind = "internship" if "internship" in q else "fellowship" if "fellowship" in q else "case_competition"
+                        events.append(_event(
+                            source=self.source, title=r.get("title") or query.title(), opportunity_type=kind,
+                            start_date=self._future_date(3), end_date=self._future_date(days_ahead or 30),
+                            url=r["url"], skills=skills, reward="Real-world proof for your profile",
+                            description=(r.get("snippet") or "")[:240], difficulty="Medium",
+                            source_status=f"live_{svc._provider}_search", external_id=r["url"],
+                        ))
+        except Exception:
+            pass
+
+        events.append(_event(
+            source=self.source, title=f"Browse {role} internships on LinkedIn", opportunity_type="internship",
+            start_date=self._future_date(1), end_date=self._future_date(days_ahead or 30),
+            url=f"https://www.linkedin.com/jobs/search/?keywords={quote_plus(role + ' internship')}",
+            skills=skills, reward="Real work experience and a reference", description="Live search for internships matching your target role.",
+            difficulty="Easy", source_status="browse_link", external_id=f"linkedin-{role}",
+        ))
+        events.append(_event(
+            source=self.source, title="Student competitions on Unstop (case, quiz, essay, pitch)", opportunity_type="case_competition",
+            start_date=self._future_date(1), end_date=self._future_date(days_ahead or 30),
+            url="https://unstop.com/competitions", skills=skills, reward="Competition result and certificate for your profile",
+            description=f"Look for competitions in {domain['label']} (e.g. {', '.join(domain['competitions'][:2])}).",
+            difficulty="Medium", source_status="browse_link", external_id="unstop-competitions",
+        ))
+        return events
+
+
 def _opportunities_cache_key(user_skills, target_role=None, days_ahead=30, sources=None):
     return json.dumps([
         sorted({str(s).lower() for s in user_skills}),
@@ -302,7 +362,8 @@ def collect_opportunities(
     days_ahead: int = 30,
     sources: list[str] | None = None,
 ) -> list[dict]:
-    adapters = get_opportunity_adapters()
+    field_id = infer_domain_pack(target_role)["id"]
+    adapters = [a for a in get_opportunity_adapters() if a.fields is None or field_id in a.fields]
     if sources:
         wanted = {source.lower() for source in sources}
         adapters = [adapter for adapter in adapters if adapter.source.lower() in wanted]
@@ -341,6 +402,7 @@ def get_opportunity_adapters() -> list[OpportunityAdapter]:
         UnstopAdapter(),
         HackathonAdapter(),
         JobPostSignalAdapter(),
+        FieldOpportunityAdapter(),
     ]
 
 
@@ -406,7 +468,7 @@ def _score_event(event: dict, user_skill_set: set[str]) -> dict:
     matches = [skill for skill in required if skill.lower() in user_skill_set]
     event["matching_skills"] = matches
     event["match_percentage"] = int((len(matches) / max(len(required), 1)) * 100)
-    event["recommended"] = event["match_percentage"] >= 40 or event["type"] in ("market_research", "hackathon")
+    event["recommended"] = event["match_percentage"] >= 40 or event["type"] in ("market_research", "hackathon", "case_competition", "internship")
     event["proof_value"] = _proof_value(event)
     return event
 
@@ -420,6 +482,10 @@ def _proof_value(event: dict) -> str:
         return "Roadmap calibration and resume keyword signal"
     if event["type"] == "case_competition":
         return "Structured thinking and presentation proof"
+    if event["type"] == "internship":
+        return "Real work experience and a reference"
+    if event["type"] == "fellowship":
+        return "A selective programme on your profile"
     return "Build artifact, demo, and team execution proof"
 
 

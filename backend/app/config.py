@@ -46,8 +46,28 @@ class Settings(BaseSettings):
     GEMINI_API_KEY_3: str = os.getenv("GEMINI_API_KEY_3", "")
     GEMINI_API_KEY_4: str = os.getenv("GEMINI_API_KEY_4", "")
     GEMINI_API_KEY_5: str = os.getenv("GEMINI_API_KEY_5", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemma-4-31b-it")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # Used once when GEMINI_MODEL is overloaded or rate-limited. Empty = no retry.
+    GEMINI_BACKUP_MODEL: str = os.getenv("GEMINI_BACKUP_MODEL", "gemini-2.5-flash-lite")
+    # Cheap, fast model for chatty, latency-sensitive calls (e.g. interview turns).
+    # GEMINI_MODEL stays the default for work where quality shows (reports, tests).
+    GEMINI_LITE_MODEL: str = os.getenv("GEMINI_LITE_MODEL", "gemini-2.5-flash-lite")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    # Google Cloud Text-to-Speech: the 3D interviewer's voice + lip-sync timings.
+    # Without a key the interview uses the browser voice and the 2D avatar.
+    GOOGLE_TTS_API_KEY: str = os.getenv("GOOGLE_TTS_API_KEY", "")
+    # Allowed interviewer voices (comma-separated); the first is the default.
+    # Must support SSML <mark> (Standard, WaveNet or Neural2) for lip-sync timing.
+    INTERVIEW_TTS_VOICES: str = os.getenv("INTERVIEW_TTS_VOICES", "en-IN-Neural2-A,en-IN-Neural2-D")
+    # Local testing only: turns off weekly pacing guards and allows the offline
+    # mock AI replies when no Gemini key is set. Never set on a deployed host.
+    DEV_MODE: bool = parse_bool_env("DEV_MODE", False)
+    # Error reporting (Sentry). Empty = disabled. No personal data is sent.
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    # Postgres connection pool per process (Supabase limits total connections).
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5") or "5")
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "5") or "5")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     # JDoodle — code execution for the Coding Sandbox (free tier: 200 runs/day).
     # Get credentials at jdoodle.com/compiler-api. Without them, the sandbox's
@@ -59,6 +79,10 @@ class Settings(BaseSettings):
     # MUST stay false in production — a verified Supabase JWT is then required.
     ALLOW_HEADER_AUTH: bool = parse_bool_env("ALLOW_HEADER_AUTH", False)
     ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
+    # Comma-separated emails allowed to approve/reject recruiter accounts.
+    ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")
+    # Comma-separated emails (e.g. teachers) allowed to review/approve School lessons. Admins can too.
+    CONTENT_REVIEWER_EMAILS: str = os.getenv("CONTENT_REVIEWER_EMAILS", "")
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "5") or "5")
     MAX_TEXT_CHARS: int = int(os.getenv("MAX_TEXT_CHARS", "60000") or "60000")
     ENABLE_DOCS: bool = parse_bool_env("ENABLE_DOCS", False)
@@ -76,7 +100,6 @@ class Settings(BaseSettings):
         return parse_csv_env("CORS_ORIGINS", [
             "http://localhost:3000",
             "http://127.0.0.1:3000",
-            "https://delta-kappa-pink.vercel.app",
         ])
     OPPORTUNITY_SOURCE_MODE: str = os.getenv("OPPORTUNITY_SOURCE_MODE", "mock")
     LEETCODE_SOURCE_MODE: str = os.getenv("LEETCODE_SOURCE_MODE", "")
@@ -96,7 +119,7 @@ class Settings(BaseSettings):
     GMAIL_FROM_EMAIL: str = os.getenv("GMAIL_FROM_EMAIL", "")
     GMAIL_FROM_NAME: str = os.getenv("GMAIL_FROM_NAME", "Delta by Alpha.Kore")
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
-    BREVO_FROM_EMAIL: str = os.getenv("BREVO_FROM_EMAIL", "alpha.kore25@gmail.com")
+    BREVO_FROM_EMAIL: str = os.getenv("BREVO_FROM_EMAIL", "")
     BREVO_FROM_NAME: str = os.getenv("BREVO_FROM_NAME", "Delta by Alpha.Kore")
     REMINDER_SECRET: str = os.getenv("REMINDER_SECRET", "")
     # Daily reminders. On a host that sleeps when idle, the sweep is triggered by
@@ -106,7 +129,7 @@ class Settings(BaseSettings):
     REMINDER_TIMEZONE: str = os.getenv("REMINDER_TIMEZONE", "Asia/Kolkata")
     REMINDER_HOUR_LOCAL: int = int(os.getenv("REMINDER_HOUR_LOCAL", "9"))
     REMINDER_CHECK_INTERVAL_SECONDS: int = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "900"))
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://delta-ai.vercel.app")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     class Config:
         env_file = ".env"

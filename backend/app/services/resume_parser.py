@@ -15,6 +15,18 @@ KNOWN_SKILLS = [
 ]
 
 
+def _all_known_skills() -> list[str]:
+    """Tech skills above plus every field's core skills, so résumés from any
+    field (nursing, CA, law, design...) yield skills, not just developers'."""
+    from app.services.domain_packs import DOMAIN_PACKS
+    seen, out = set(), []
+    for name in KNOWN_SKILLS + [sk for p in DOMAIN_PACKS.values() for sk in p["skill_taxonomy"]]:
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            out.append(name)
+    return out
+
+
 def parse_resume(content: bytes, filename: str) -> dict:
     """Parse PDF/text resume bytes and extract skills, education, and experience signals."""
     text = _extract_text(content, filename)
@@ -120,9 +132,10 @@ def _extract_text(content: bytes, filename: str) -> str:
 def _extract_skills(text: str) -> list[dict]:
     text_lower = text.lower()
     parsed = []
-    for skill in KNOWN_SKILLS:
+    for skill in _all_known_skills():
         pattern = re.escape(skill.lower()).replace("\\ ", r"[\s-]+")
-        if re.search(rf"(?<![a-z0-9+#.]){pattern}(?![a-z0-9+#.])", text_lower):
+        # A trailing "." only blocks the match when it continues a token (e.g. "node.js").
+        if re.search(rf"(?<![a-z0-9+#.]){pattern}(?![a-z0-9+#]|\.[a-z0-9])", text_lower):
             confidence = 0.9 if _has_evidence_near_skill(text, skill) else 0.68
             parsed.append({"name": skill, "confidence": confidence})
     return parsed
@@ -134,7 +147,8 @@ def _has_evidence_near_skill(text: str, skill: str) -> bool:
     if idx < 0:
         return False
     window = text_lower[max(0, idx - 180): idx + 180]
-    evidence_terms = ["project", "built", "developed", "deployed", "intern", "github", "certified", "implemented"]
+    evidence_terms = ["project", "built", "developed", "deployed", "intern", "github", "certified", "implemented",
+                      "presented", "published", "portfolio", "clinical", "audit", "campaign", "case", "led", "managed"]
     return any(term in window for term in evidence_terms)
 
 
@@ -148,8 +162,24 @@ def _extract_experience_years(text: str) -> float:
 def _extract_education(text: str) -> str:
     patterns = [
         r"(B\.?\s?Tech[^,\n]*)",
+        r"(MBBS[^,\n]*)",
+        r"(B\.?\s?Sc\.?\s?Nursing[^,\n]*)",
+        r"(B\.?\s?Pharm[^,\n]*)",
+        r"(LL\.?\s?B[^,\n]*)",
+        r"(B\.?\s?Arch[^,\n]*)",
+        r"(B\.?\s?Ed\b[^,\n]*)",
+        r"(B\.?\s?Com[^,\n]*)",
+        r"(BBA[^,\n]*)",
+        r"(BHM[^,\n]*)",
+        r"(BCA[^,\n]*)",
+        r"(B\.?\s?Sc\b[^,\n]*)",
+        r"(B\.?\s?A\.?\s[^,\n]*)",
         r"(Bachelor[^,\n]*)",
         r"(M\.?\s?Tech[^,\n]*)",
+        r"(MBA[^,\n]*)",
+        r"(M\.?\s?Com[^,\n]*)",
+        r"(MCA[^,\n]*)",
+        r"(M\.?\s?Sc\b[^,\n]*)",
         r"(Master[^,\n]*)",
         r"(Diploma[^,\n]*)",
         r"(Class\s*12[^,\n]*)",

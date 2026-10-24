@@ -5,6 +5,7 @@ import {
   Paperclip, CheckCircle2, Loader2, ClipboardList,
   Edit3, Save, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import { FIELD_IDS, FIELD_LABELS } from '../lib/fields';
 import { useAuthStore } from '../store/authStore';
 import { useUserWithSkills } from '../hooks/useUser';
 import { useQueryClient } from '@tanstack/react-query';
@@ -146,7 +147,7 @@ export default function Onboarding() {
   const [parsing,    setParsing]    = useState(false);
 
   // Wizard state: one question per screen, resume-first, with go-back editing
-  const [phase,  setPhase]  = useState('resume');   // 'resume' | 'questions'
+  const [phase,  setPhase]  = useState('resume');   // 'audience' | 'resume' | 'choice' | 'questions'
   const [steps,  setSteps]  = useState([]);          // [{ question, answer, round }]
   const [cursor, setCursor] = useState(0);
   const [draft,  setDraft]  = useState('');
@@ -166,6 +167,28 @@ export default function Onboarding() {
       setProfile(data);
     } catch (e) {
       console.error("Could not load profile:", e);
+    }
+  }, [userId]);
+
+  /* start (or resume) the intake session and build the question steps */
+  const beginSession = useCallback(async (journeyType) => {
+    const res = await ingestionAPI.start(userId, journeyType);
+    setSessionId(res.session_id);
+    const built = buildSteps(res.conversation);
+    const answered = built.filter(s => s.round != null).length;
+    if (answered > 0) {
+      // Returning to an in-progress intake — offer Continue / Start over
+      setSteps(built);
+      setCursor(built.length - 1);
+      setDraft('');
+      setPhase('choice');
+    } else {
+      const firstQ = res.initial_question || res.message || (built[0] && built[0].question) ||
+        "Let's start with the basics: your name, what you're currently doing (school, college, or working), and the role or field you want to build toward.";
+      setSteps(built.length ? built : [{ question: firstQ, answer: '', round: null }]);
+      setCursor(0);
+      setDraft('');
+      setPhase('resume');
     }
   }, [userId]);
 
@@ -189,24 +212,13 @@ export default function Onboarding() {
           return;
         }
 
-        const res = await ingestionAPI.start(userId, 'general');
-        setSessionId(res.session_id);
-        const built = buildSteps(res.conversation);
-        const answered = built.filter(s => s.round != null).length;
-        if (answered > 0) {
-          // Returning to an in-progress intake — offer Continue / Start over
-          setSteps(built);
-          setCursor(built.length - 1);
-          setDraft('');
-          setPhase('choice');
-        } else {
-          const firstQ = res.initial_question || res.message || (built[0] && built[0].question) ||
-            "Let's start with the basics: your name, what you're currently doing (school, college, or working), and the role or field you want to build toward.";
-          setSteps(built.length ? built : [{ question: firstQ, answer: '', round: null }]);
-          setCursor(0);
-          setDraft('');
-          setPhase('resume');
+        // New intake: ask first whether they're a student or a working professional
+        // (Delta for Professionals gets different questions and a job-friendly pace).
+        if (!state.profile?.audience) {
+          setPhase('audience');
+          return;
         }
+        await beginSession('general');
       } catch (e) {
         console.error(e);
         setSteps([{ question: "Let's start with the basics: your name, what you're currently doing, and the role or field you want to build toward.", answer: '', round: null }]);
@@ -214,7 +226,7 @@ export default function Onboarding() {
         setIsThinking(false);
       }
     })();
-  }, [userId, loadProfileData]);
+  }, [userId, loadProfileData, beginSession]);
 
   const applyProgress = useCallback((res) => {
     if (res.confidence_score !== undefined) setProgress(Math.round(res.confidence_score * 100));
@@ -284,6 +296,18 @@ export default function Onboarding() {
   };
 
   const skipResume = () => setPhase('questions');
+
+  const chooseAudience = async (audience) => {
+    setIsThinking(true);
+    try {
+      await beginSession(audience);
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not start your intake. Please try again.');
+    } finally {
+      setIsThinking(false);
+    }
+  };
 
   const continueSession = () => {
     setCursor(steps.length - 1);
@@ -390,9 +414,10 @@ export default function Onboarding() {
       if (reviewMode) {
         await ingestionAPI.forceComplete(userId);
         setReviewMode(false);
-        queryClient.invalidateQueries({ queryKey: ['user', userId] });
-        queryClient.invalidateQueries({ queryKey: ['user-with-skills', userId] });
       }
+      // Wait for the fresh "onboarding complete" flag before leaving: the route
+      // guard reads the cached user and would otherwise bounce back here.
+      await queryClient.refetchQueries({ queryKey: ['user', userId] });
       navigate('/roadmap?from=intake');
     } catch (e) {
       console.error(e);
@@ -498,16 +523,23 @@ export default function Onboarding() {
                 { key: 'email', label: 'Email Address', type: 'text' },
                 { key: 'current_status', label: 'Current Status', type: 'select', options: ['school', 'dropped_out', 'undergrad', 'graduate', 'working', 'career_switcher', 'exam_aspirant', 'other'] },
                 { key: 'education_stage', label: 'Education / Life Stage', type: 'text' },
+                { key: 'field', label: 'Career Field', type: 'select', options: FIELD_IDS, labels: FIELD_LABELS },
                 { key: 'target_role', label: 'Target Career Role', type: 'text' },
                 { key: 'goal_direction', label: 'Goal Direction if Role is Unclear', type: 'text' },
+                ...(profile.audience === 'professional' ? [
+                  { key: 'current_role', label: 'Current Job', type: 'text' },
+                  { key: 'industry', label: 'Industry', type: 'text' },
+                  { key: 'years_experience', label: 'Years of Experience', type: 'number' },
+                  { key: 'goal_type', label: 'Goal Type', type: 'select', options: ['upskill_current_role', 'career_switch', 'promotion', 'new_skill'] },
+                ] : []),
                 { key: 'major', label: 'Degree Major / School Stream', type: 'text' },
                 { key: 'university', label: 'School / College / University', type: 'text' },
                 { key: 'study_year', label: 'Class / Year / Status', type: 'text' },
                 { key: 'gpa', label: 'GPA', type: 'text' },
                 { key: 'phone_number', label: 'Phone Number', type: 'text' },
                 { key: 'linkedin_url', label: 'LinkedIn Profile URL', type: 'text' },
-                { key: 'github_url', label: 'GitHub Profile URL', type: 'text' },
-                { key: 'portfolio_url', label: 'Portfolio URL', type: 'text' },
+                { key: 'github_url', label: 'GitHub URL (if you code)', type: 'text' },
+                { key: 'portfolio_url', label: 'Portfolio / Work Samples URL', type: 'text' },
                 { key: 'experience_level', label: 'Experience Level', type: 'select', options: ['beginner', 'intermediate', 'advanced'] },
                 { key: 'learning_style', label: 'Learning Style', type: 'select', options: ['practical', 'theoretical', 'mixed'] },
                 { key: 'relocation', label: 'Relocation Openness', type: 'select', options: ['yes', 'no', 'maybe'] },
@@ -535,7 +567,7 @@ export default function Onboarding() {
                         }}
                       >
                         <option value="">Select...</option>
-                        {f.options.map(o => <option key={o} value={o}>{o.toUpperCase()}</option>)}
+                        {f.options.map(o => <option key={o} value={o}>{f.labels?.[o] || o.toUpperCase()}</option>)}
                       </select>
                     ) : (
                       <input
@@ -549,7 +581,7 @@ export default function Onboarding() {
                       />
                     )
                   ) : (
-                    <span style={{ fontSize: '0.88rem', fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word', display: 'block', minWidth: 0 }}>{profile[f.key] || 'Not specified'}</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600, overflowWrap: 'break-word', wordBreak: 'break-word', display: 'block', minWidth: 0 }}>{(f.labels && f.labels[profile[f.key]]) || profile[f.key] || 'Not specified'}</span>
                   )}
                 </div>
               ))}
@@ -680,7 +712,6 @@ export default function Onboarding() {
                       try {
                         await ingestionAPI.resetProfile(userId);
                         queryClient.invalidateQueries({ queryKey: ['user', userId] });
-                        queryClient.invalidateQueries({ queryKey: ['user-with-skills', userId] });
                         window.location.reload();
                       } catch (e) {
                         console.error('Reset error:', e);
@@ -879,13 +910,43 @@ export default function Onboarding() {
               Part 1: Tell us about yourself
             </h1>
             <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-              {phase === 'resume'
+              {phase === 'audience'
+                ? 'First, which of these describes you? It changes the questions we ask and how we pace your plan.'
+                : phase === 'resume'
                 ? 'Start by uploading your resume if you have one — Delta pre-fills what it recognizes. No resume? Just skip and answer a few quick questions.'
                 : phase === 'choice'
                 ? 'You already have an intake in progress.'
                 : 'Answer one question at a time. You can go back and change any earlier answer.'}
             </p>
           </motion.div>
+
+          {/* Audience: college student vs working professional */}
+          {phase === 'audience' && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{ display: 'grid', gap: 12 }}
+            >
+              {[
+                { key: 'student', title: "I'm a college student", desc: 'Preparing for placements and interviews, or building skills during my degree.' },
+                { key: 'professional', title: "I'm a working professional", desc: 'Upskilling for my current job, aiming for a promotion, or switching careers, learning around work.' },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => chooseAudience(opt.key)}
+                  disabled={isThinking}
+                  style={{
+                    background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '20px 22px',
+                    textAlign: 'left', cursor: isThinking ? 'wait' : 'pointer', color: 'var(--ink)',
+                  }}
+                >
+                  <span style={{ display: 'block', fontSize: '1rem', fontWeight: 700, marginBottom: 4 }}>{opt.title}</span>
+                  <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: '0.86rem', lineHeight: 1.5 }}>{opt.desc}</span>
+                </button>
+              ))}
+              {isThinking && <Loader2 size={18} style={{ color: 'var(--ink-soft)', animation: 'spin 1s linear infinite', margin: '6px auto 0' }} />}
+            </motion.div>
+          )}
 
           {/* Returning user: continue or start over */}
           {phase === 'choice' && (

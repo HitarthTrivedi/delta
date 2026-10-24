@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import supabase from '../lib/supabaseClient';
+import { DEV_AUTH, devUserFromEmail, loadDevUser, saveDevUser, clearDevUser } from '../lib/devAuth';
 
 // Mirror keys must respect the same "remember me" flag as Supabase's own
 // session storage (see customStorage in lib/supabaseClient.js), otherwise the
@@ -59,6 +60,13 @@ export const useAuthStore = create((set) => ({
   initializeAuth: async () => {
     set({ loading: true });
 
+    if (DEV_AUTH) {
+      // Local dev mode: no Supabase. Identity is the saved dev user.
+      const devUser = loadDevUser();
+      set({ userId: devUser?.id || null, token: null, user: devUser, loading: false });
+      return;
+    }
+
     // Get initial session
     const { data: { session } } = await supabase.auth.getSession();
 
@@ -94,6 +102,12 @@ export const useAuthStore = create((set) => ({
 
   // Email & Password Sign In
   login: async (email, password) => {
+    if (DEV_AUTH) {
+      const devUser = devUserFromEmail(email);
+      saveDevUser(devUser);
+      set({ userId: devUser.id, token: null, user: devUser, loading: false });
+      return { user: devUser, devSession: true };
+    }
     set({ loading: true });
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -117,6 +131,13 @@ export const useAuthStore = create((set) => ({
 
   // Email & Password Sign Up
   signUp: async (email, password, name) => {
+    if (DEV_AUTH) {
+      // Dev mode signs you straight in (no email confirmation).
+      const devUser = devUserFromEmail(email, name);
+      saveDevUser(devUser);
+      set({ userId: devUser.id, token: null, user: devUser, loading: false });
+      return { user: devUser, devSession: true };
+    }
     set({ loading: true });
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -136,12 +157,13 @@ export const useAuthStore = create((set) => ({
   },
 
   // Google OAuth Login
-  loginWithGoogle: async () => {
+  loginWithGoogle: async (redirectPath = '/roadmap') => {
+    if (DEV_AUTH) throw new Error('Google sign-in is off in local dev mode. Use email instead.');
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         // /roadmap gates on profile completion and falls back to onboarding.
-        redirectTo: window.location.origin + '/roadmap',
+        redirectTo: window.location.origin + redirectPath,
       }
     });
     if (error) throw error;
@@ -154,6 +176,12 @@ export const useAuthStore = create((set) => ({
   // deleting it here meant a forced logout (e.g. a transient 401) silently
   // downgraded the next OAuth session to sessionStorage-only.
   logout: async () => {
+    if (DEV_AUTH) {
+      clearDevUser();
+      set({ userId: null, token: null, user: null, loading: false });
+      clearPersistedSession();
+      return;
+    }
     set({ loading: true });
     await supabase.auth.signOut();
     set({ userId: null, token: null, user: null, loading: false });

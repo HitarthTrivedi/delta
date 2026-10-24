@@ -1,14 +1,16 @@
 import json
 import logging
 import re
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 _log = logging.getLogger("delta.career_os")
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.auth import require_owner
+from app.dependencies.auth import current_identity, require_owner
+from app.services import compliance
+from app.limiter import limiter
 from app.models import (
     CareerMemoryProfile,
     IngestionSession,
@@ -54,7 +56,10 @@ def get_domain_packs():
 
 
 @router.get("/system-status")
-def get_system_status(db: Session = Depends(get_db)):
+def get_system_status(db: Session = Depends(get_db), identity=Depends(current_identity)):
+    # Platform-wide counts are for Delta admins only.
+    if not compliance.is_admin(identity[1]):
+        raise HTTPException(status_code=403, detail="Admin access required.")
     active_tensions = db.query(TensionNodeModel).filter(
         TensionNodeModel.status.in_(["active", "challenged"])
     ).count()
@@ -106,7 +111,8 @@ def get_career_context(user_id: str, background_tasks: BackgroundTasks, db: Sess
 
 
 @router.post("/user/{user_id}/initialize")
-def initialize_career_os(user_id: str, payload: CareerOSInitializeRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("10/hour")
+def initialize_career_os(request: Request, user_id: str, payload: CareerOSInitializeRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return initialize_career_os_for_user(
             db=db,
@@ -141,7 +147,8 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
 
 
 @router.post("/user/{user_id}/weekly-cycle")
-def run_weekly_cycle(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("20/hour")
+def run_weekly_cycle(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return run_weekly_career_cycle(db, user_id)
     except ValueError as exc:
@@ -158,22 +165,26 @@ class TaskDetailRequest(BaseModel):
 
 
 @router.post("/user/{user_id}/task-detail")
-def get_task_detail(user_id: str, payload: TaskDetailRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("30/minute")
+def get_task_detail(request: Request, user_id: str, payload: TaskDetailRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Generate a detailed how-to breakdown for a specific task using AI."""
     try:
         from app.services.ai_service import generate_json
         user = db.query(User).filter(User.id == user_id).first()
-        target_role = (user.target_role if user else None) or "Software Engineer"
+        from app.services.domain_packs import field_for_user
+        pack = field_for_user(user_id, db=db)
+        target_role = (user.target_role if user else None) or pack["label"]
 
         context = f"{payload.task_description[:300]}" if payload.task_description else ""
         prompt = (
-            f"Task: {payload.task_title}. Skill: {payload.skill or 'General'}. Role: {target_role}. {context}\n\n"
+            f"Task: {payload.task_title}. Skill: {payload.skill or 'General'}. Role: {target_role}. Field: {pack['label']}. {context}\n\n"
             "Return ONLY this JSON, no markdown:\n"
             '{"how_to_start":"one sentence","steps":["s1","s2","s3"],'
             '"resources":[{"title":"name","url":"https://real.com","type":"course","duration":"Xh","why":"reason"}],'
             '"estimated_hours":5,"timeline_note":"which part this week if long","proof_output":"what exists when done",'
             '"pro_tip":"expert insight"}\n\n'
-            "Use real URLs (leetcode.com, coursera.org, roadmap.sh, docs.python.org). Steps must be concrete actions."
+            "Use real URLs from reputable sources for THIS field (e.g. coursera.org, nptel.ac.in, swayam.gov.in, khanacademy.org, "
+            "official regulator or professional-body sites; roadmap.sh or docs only for software). Steps must be concrete actions."
         )
 
         detail = generate_json(prompt, temperature=0.3)
@@ -190,7 +201,8 @@ def get_task_detail(user_id: str, payload: TaskDetailRequest, db: Session = Depe
 
 
 @router.post("/user/{user_id}/consolidate-memory")
-def run_memory_consolidation(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("10/hour")
+def run_memory_consolidation(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return run_memory_consolidation_cycle(db, user_id)
     except ValueError as exc:
@@ -320,7 +332,8 @@ def set_plan_style(user_id: str, payload: PlanStyleUpdate, db: Session = Depends
 
 
 @router.get("/user/{user_id}/day-plan")
-def get_day_plan(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("30/minute")
+def get_day_plan(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Return the current week's day plan, regenerating it if the week's tasks changed."""
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
     if not roadmap:
@@ -375,7 +388,8 @@ class AdvanceExpiredRequest(BaseModel):
 
 
 @router.post("/user/{user_id}/advance-expired-week")
-def advance_expired_week(user_id: str, payload: AdvanceExpiredRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("20/hour")
+def advance_expired_week(request: Request, user_id: str, payload: AdvanceExpiredRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Auto-replan a week whose 7-day window lapsed with tasks unfinished, carrying
     over the unfinished tasks the user chose to keep."""
     user = db.query(User).filter(User.id == user_id).first()

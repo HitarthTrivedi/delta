@@ -118,9 +118,9 @@ Return ONLY valid JSON in exactly this shape:
 {{
   "opportunities": [
     {{
-      "title": "specific role title, e.g. Backend Engineering Intern",
+      "title": "specific role title in the candidate's field, e.g. Audit Intern, Staff Nurse Trainee or Backend Engineering Intern",
       "role_type": "internship | full_time | part_time",
-      "target_companies": "the kind of companies to target (e.g. early-stage SaaS startups, mid-size fintech)",
+      "target_companies": "the kind of employers to target in their field (e.g. Big 4 firms, multispecialty hospitals, early-stage SaaS startups)",
       "location": "city/region honoring the user's preference, or Remote",
       "work_mode": "remote | hybrid | onsite",
       "match_score": 0-100 integer for how well this fits the user NOW,

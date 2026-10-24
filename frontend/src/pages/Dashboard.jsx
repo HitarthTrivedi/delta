@@ -8,7 +8,7 @@ import {
   Cpu,
   ExternalLink,
   FileText,
-  Github,
+  Link2,
   Loader2,
   Network,
   RefreshCw,
@@ -293,8 +293,9 @@ export default function Dashboard() {
   }, [refreshDerived, playBeep, resolverAnswers, userId]);
 
   const submitMilestone = async (recId, skillName) => {
-    if (!githubUrl.trim() || !githubUrl.includes('github.com/')) {
-      toast.error('Use a valid github.com repository link.');
+    // Proof can live anywhere: GitHub, Behance, Drive, a portfolio, a certificate page...
+    if (!/^https?:\/\/\S+\.\S+/.test(githubUrl.trim())) {
+      toast.error('Paste a full link to your proof, starting with https://');
       return;
     }
 
@@ -303,7 +304,7 @@ export default function Dashboard() {
     try {
       await briefsAPI.completeRecommendation(recId, {
         evidence_url: githubUrl.trim(),
-        evidence_type: 'github',
+        evidence_type: githubUrl.includes('github.com/') ? 'github' : 'link',
       });
       toast.dismiss();
       toast.success(`Proof verified for ${skillName}.`);
@@ -484,7 +485,7 @@ export default function Dashboard() {
           </Panel>
 
           <Panel>
-            <SectionTitle icon={Github} title="Proof To Ship" meta={readiness} />
+            <SectionTitle icon={Link2} title="Proof To Ship" meta={readiness} />
             {primaryProject ? (
               <div className="space-y-3">
                 <h3 className="text-base font-black text-ink">{primaryProject.title}</h3>
@@ -804,7 +805,7 @@ export default function Dashboard() {
                 <p className="text-sm leading-relaxed text-ink">{selectedNode.description}</p>
                 {selectedNode.tech_twist && (
                   <Row>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-oxblood">Tech twist</p>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-oxblood">Expert tip</p>
                     <p className="mt-1 text-sm leading-relaxed text-ink">{selectedNode.tech_twist}</p>
                   </Row>
                 )}
@@ -850,7 +851,7 @@ export default function Dashboard() {
                           onChange={(event) => setGithubUrl(event.target.value)}
                           disabled={verifying}
                           className="min-w-0 flex-1 border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-oxblood"
-                          placeholder="https://github.com/user/project"
+                          placeholder="Link to your proof: portfolio, GitHub, Behance, Drive, certificate…"
                         />
                         <button
                           onClick={() => submitMilestone(rec.id, rec.skill)}

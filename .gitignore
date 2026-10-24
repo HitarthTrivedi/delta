@@ -37,12 +37,20 @@ Thumbs.db
 .emergent/
 memory/
 test_reports/
-tests/
+/tests/
 test_result.md
 
 # Local User Data
 data/
 
-# npm lockfile (project uses yarn)
-package-lock.json
 
+
+# Business documents (pricing, pitch, funding) live outside the repo
+*pitch*.md
+*INVESTOR*
+pitch-deck*
+*.docx
+business/
+
+# Claude Code worktrees
+.claude/worktrees/

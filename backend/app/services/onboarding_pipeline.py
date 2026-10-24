@@ -3,12 +3,15 @@ import json
 from app.services.ai_service import generate_response
 from app.services.market_pulse import get_market_snapshot
 
-def start_onboarding(raw_input: str, target_role: str = "AI Developer / Software Engineer") -> dict:
+def start_onboarding(raw_input: str, target_role: str | None = None) -> dict:
     """
     Initial step of conversational onboarding.
     Scans the raw input, fetches current market demand signals, creates custom prompts, 
     and returns a set of highly customized, adaptive follow-up questions targeting gaps.
     """
+    if not target_role:
+        from app.services.domain_packs import resolve_field
+        target_role = (resolve_field(text=raw_input)["target_roles"][:1] or ["Entry-level professional"])[0]
     # 1. Fetch structured market pulse signals for the target role
     market_pulse = get_market_snapshot(target_role)
     
@@ -22,7 +25,7 @@ def start_onboarding(raw_input: str, target_role: str = "AI Developer / Software
     """
     
     prompt = f"""
-    You are Delta Onboarding Intelligence, an elite career planning agent for Indian CS/engineering students.
+    You are Delta Onboarding Intelligence, an elite career planning agent for Indian students and early-career people in every field (engineering, commerce, healthcare, law, design, teaching, government exams and more).
     Your mission is to upgrade the onboarding intake into structured career intelligence.
     
     Current Market Expectations for this target role:
@@ -35,9 +38,9 @@ def start_onboarding(raw_input: str, target_role: str = "AI Developer / Software
     1. Parse their ambition, baseline context, and potential bottlenecks.
     2. Compare the user's starting capabilities and background against recruiter expectations in the Market Context.
     3. Generate exactly 3 highly customized, adaptive follow-up questions designed to probe specific gaps between their raw input and high-priority recruiter requirements:
-       - Question 1: Probe their actual technical baseline with respect to a critical demanded skill (e.g. have they written code in Python/SQL, built backends, etc.).
-       - Question 2: Probe their background and capability gaps (e.g. comfort level with logic/math, hands-on building preference, or why they target this role).
-       - Question 3: Probe their real-world constraints and evidence proof capabilities (e.g. weekly study time limits, college load, GitHub repo presence).
+       - Question 1: Probe their actual baseline in a critical demanded skill for THEIR field (the core subjects, tools or methods the role needs).
+       - Question 2: Probe their background and capability gaps (e.g. comfort with the field's fundamentals, hands-on practice, or why they target this role).
+       - Question 3: Probe their real-world constraints and proof of work (e.g. weekly time, college or job load, projects, internships, portfolio or certificates).
        
     Output your response strictly as a JSON object with this format:
     {{
@@ -47,7 +50,7 @@ def start_onboarding(raw_input: str, target_role: str = "AI Developer / Software
         "Second personalized question probing a capability or comfort gap...",
         "Third personalized question probing constraints or evidence proof gaps..."
       ],
-      "market_demand_focus": "A highly punchy, custom 1-sentence warning or focus alert based on 2026 recruiter pulse (e.g., 'Recruiters are rejecting prompt-only projects; you will need Dockerized API proof.')"
+      "market_demand_focus": "A highly punchy, custom 1-sentence warning or focus alert based on 2026 recruiter pulse (e.g., 'Recruiters want proof of practical work in this field, not just certificates.')"
     }}
     """
     try:
@@ -66,13 +69,13 @@ def start_onboarding(raw_input: str, target_role: str = "AI Developer / Software
         print(f"Onboarding start error: {e}")
         # Return fallback high-quality custom questions matching target role
         return {
-            "ambition_summary": f"Aspiring to become a world-class {target_role}.",
+            "ambition_summary": f"Aspiring to become a world-class {target_role or 'professional in their chosen field'}.",
             "adaptive_questions": [
-                f"What specific programming languages or tools have you experimented with so far?",
-                "How comfortable are you with mathematics and logic (e.g., post-12th level, linear algebra)?",
-                "How many hours per week can you realistically commit to hands-on building?"
+                "Which subjects, tools or methods from your field have you worked with so far?",
+                "How comfortable are you with the core fundamentals this role needs?",
+                "How many hours per week can you realistically commit to hands-on practice?"
             ],
-            "market_demand_focus": "Focus on high-growth clusters like LLM orchestration, Docker containers, and clean coding practices.",
+            "market_demand_focus": "Focus on the skills recruiters list most for this role, and on showing proof of practical work.",
             "market_snapshot": market_pulse
         }
 
@@ -247,29 +250,33 @@ def finalize_onboarding(raw_input: str, follow_ups: list, answers: list) -> dict
         
     except Exception as e:
         print(f"Onboarding finalize error: {e}")
-        # Fallback profile aligned perfectly with the blueprint schema
+        # Fallback profile aligned with the blueprint schema, built from the detected field
+        from app.services.domain_packs import resolve_field
+        pack = resolve_field(text=" ".join([raw_input or ""] + [str(a) for a in (answers or [])]))
+        role = (pack["target_roles"][:1] or ["Your chosen role"])[0]
+        tax = pack["skill_taxonomy"]
         fallback = {
             "identity_context": {
                 "name": "",
                 "education_stage": "Beginner",
                 "location": "unknown",
                 "language_comfort": "English",
-                "background_summary": "Starting computer science and software development roadmap journey.",
+                "background_summary": f"Starting a {pack['label']} roadmap journey.",
                 "self_awareness_level": "medium"
             },
             "ambition_map": {
-                "long_term_goals": ["Become a world-class AI/Software Engineer"],
-                "short_term_targets": ["Build web backend APIs"],
-                "dream_roles": ["Software Engineer"],
-                "preferred_industries": ["Tech"],
+                "long_term_goals": [f"Become a skilled {role}"],
+                "short_term_targets": [f"Build strong {tax[0].lower()} foundations"],
+                "dream_roles": [role],
+                "preferred_industries": [pack["label"]],
                 "confidence_level": "medium"
             },
             "capability_map": {
-                "current_skills": ["Python"],
-                "skill_depth": {"Python": "basics, syntax"},
-                "technical_baseline": "scripting-only",
+                "current_skills": [],
+                "skill_depth": {},
+                "technical_baseline": "beginner",
                 "industry_readiness_score": 0.35,
-                "identified_gaps": ["Docker", "LLMs", "FastAPI", "SQL", "System Design"]
+                "identified_gaps": tax[:5]
             },
             "constraint_map": {
                 "time_limit": "15 hours per week",
@@ -282,7 +289,7 @@ def finalize_onboarding(raw_input: str, follow_ups: list, answers: list) -> dict
             "preference_map": {
                 "learning_style": "hands-on",
                 "content_type": ["hands-on projects"],
-                "project_taste": "backend APIs",
+                "project_taste": (pack["starter_projects"][:1] or ["practical projects"])[0],
                 "communication_tone": "encouraging"
             },
             "motivation_and_risk_map": {
@@ -294,23 +301,23 @@ def finalize_onboarding(raw_input: str, follow_ups: list, answers: list) -> dict
             "evidence_map": {
                 "projects": [],
                 "certificates": [],
-                "github_presence": "needs creation",
+                "github_presence": "needs creation" if pack["is_tech"] else "not applicable",
                 "resumes": [],
                 "contests_and_hackathons": [],
                 "writing_and_portfolio": []
             },
             "open_questions": [],
-            "market_search_prompt": "FastAPI Docker Backend entry level jobs recruiter expectations",
-            "follow_up_question_strategy": "First probe github repository structure, then verify docker deployment comfort in week 2",
+            "market_search_prompt": f"{role} entry level jobs recruiter expectations",
+            "follow_up_question_strategy": f"First probe existing proof of work ({pack['portfolio_hint']}), then check comfort with {tax[0]} in week 2",
             
             # Legacy field translations
-            "ambitions": "Become a world-class AI/Software Engineer",
+            "ambitions": f"Become a skilled {role}",
             "current_level": "Beginner",
             "hours_per_week": 15,
             "learning_style": "hands-on",
-            "extracted_skills": ["Python"],
-            "gaps_identified": ["Docker", "LLMs", "FastAPI", "SQL", "System Design"],
-            "recommended_starting_phase": "Phase 1: Advanced APIs & Backend Systems",
+            "extracted_skills": [],
+            "gaps_identified": tax[:5],
+            "recommended_starting_phase": f"Phase 1: {pack['phases'][0]}",
             "constraints": ["Time limit: 15 hours per week"],
             "content_preferences": ["hands-on projects"],
             "behavior": {"consistency": "medium", "risk_flags": [], "decision_patterns": []},

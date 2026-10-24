@@ -29,6 +29,7 @@ from app.services.central_engine import (
 )
 from app.services.onboarding_pipeline import finalize_onboarding, start_onboarding
 from app.services.profile_store import profile_as_context_string, profile_as_compact_context, load_profile
+from app.services.domain_packs import resolve_field, template_key
 from app.services.agent2_memory import (
     append_chat_turn,
     append_progress_event,
@@ -39,7 +40,7 @@ from app.services.agent2_memory import (
     upsert_upcoming_event,
 )
 from app.limiter import limiter
-from app.dependencies.auth import require_owner, verify_resource_owner
+from app.dependencies.auth import current_identity, require_owner, verify_resource_owner
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -132,6 +133,10 @@ def _split_skills(profile: dict) -> list[str]:
     return [str(skill).strip() for skill in skills if str(skill).strip()]
 
 
+def _field_pack_for(profile: dict, user: User | None = None) -> dict:
+    return resolve_field({**(profile or {}), "target_role": (profile or {}).get("target_role") or (user.target_role if user else None)})
+
+
 def _domain_from_profile(profile: dict, user: User | None = None) -> str:
     text = " ".join([
         str(profile.get("target_role", "")),
@@ -139,17 +144,8 @@ def _domain_from_profile(profile: dict, user: User | None = None) -> str:
         str(profile.get("past_experience", "")),
         " ".join(_split_skills(profile)),
         str(user.target_role if user else ""),
-    ]).lower()
-    domain_markers = [
-        ("ai_agents", ["multi-agent", "multi agent", "agentic rag", "adversarial ai", "llm orchestration", "agent routing", "alpha.kore"]),
-        ("commerce", ["commerce", "finance", "accounting", "business", "marketing", "economics", "audit", "tax", "sales"]),
-        ("mechanical", ["mechanical", "cad", "solidworks", "autocad", "thermodynamics", "manufacturing", "ansys"]),
-        ("electrical", ["electrical", "electronics", "circuit", "pcb", "arduino", "matlab", "power systems", "embedded", "iot"]),
-        ("arts", ["arts", "design", "fine arts", "illustration", "animation", "writing", "music", "film", "portfolio"]),
-    ]
-    scores = {domain: sum(1 for marker in markers if marker in text) for domain, markers in domain_markers}
-    best = max(scores, key=scores.get)
-    return best if scores[best] else "general"
+    ])
+    return template_key(_field_pack_for(profile, user)["id"], text)
 
 
 def _advanced_actions(profile: dict, user: User | None, difficulty: str = "tough") -> list[dict]:
@@ -804,8 +800,8 @@ def _resume_guidance(actions: list[dict]) -> str:
     second_title = actions[1].get("title") if len(actions) > 1 else ""
 
     bullets = [
-        f"Built a memory-quality evaluation suite for an agent workflow with 8-10 test prompts covering recall, forgetting, retrieval accuracy, and failure cases.",
-        "Red-teamed an agent workflow with adversarial prompts, documented failure patterns, and added one guardrail or scoring rule to improve reliability.",
+        f"Completed {first_title}: what you produced, the method you used, and one measurable result.",
+        f"Completed {second_title}: what you checked or reviewed, what didn't work at first, and what you improved." if second_title else "",
     ]
     if second_title:
         task_line = f"Your two proof tasks are: {first_title}; {second_title}."
@@ -814,11 +810,11 @@ def _resume_guidance(actions: list[dict]) -> str:
 
     return (
         f"{task_line}\n\n"
-        f"Skills you can gain: {', '.join(skill_names[:6])}, evaluation design, adversarial testing, reliability analysis, documentation, and proof-based project presentation.\n\n"
+        f"Skills you can gain: {', '.join(skill_names[:6])}, problem solving, documentation, and presenting proof of your work.\n\n"
         "How to put it on your resume after you actually finish it:\n"
         f"- {bullets[0]}\n"
-        f"- {bullets[1] if second_title else 'Documented the experiment setup, scoring rubric, results, and next improvements in a GitHub README.'}\n\n"
-        "Do not write it as just 'learned AI agents'. Write it as proof: what you built, how you tested it, what failed, and what improved."
+        f"- {bullets[1] if second_title else 'Documented the method, results, and next improvements in a short write-up or portfolio entry.'}\n\n"
+        "Do not write it as just 'learned X'. Write it as proof: what you did, how you checked it, what failed, and what improved."
     )
 
 
@@ -829,8 +825,8 @@ def _explain_action(action: dict | None) -> str:
     source_text = _action_source(action)
     return (
         f"Start with: {title}.\n\n"
-        f"1. Create a small folder or GitHub repo for only this task.\n"
-        f"2. Add a README with the goal in 2-3 lines.\n"
+        f"1. Create a small folder, document or portfolio page for only this task.\n"
+        f"2. Write the goal in 2-3 lines at the top.\n"
         f"3. Do the actual work: {description}\n"
         f"4. Use this source if attached: {source_text}\n"
         f"5. Add proof: screenshots, logs, notebook output, demo link, design notes, or a small results table.\n"
@@ -1265,13 +1261,9 @@ def chat_message(
                     updated_actions=updated_actions, week_phase="Pace-adjusted week",
                 )
 
-            # Check if the user is CS / software-engineering oriented
-            _pf = profile_file or {}
-            _role_lower = (str(user.target_role or "") + " " + str(_pf.get("major", "") or "")).lower()
-            _cs_keywords = {"software", "developer", "engineer", "cs", "computer science", "cse",
-                            "data scientist", "machine learning", "ml", "ai", "backend", "frontend",
-                            "fullstack", "sde", "swe", "programmer", "data engineer"}
-            is_cs_user = any(kw in _role_lower for kw in _cs_keywords)
+            # LeetCode context only for software users (field resolver, not keyword guesses)
+            _field = _field_pack_for(profile_file or {}, user)
+            is_cs_user = _field["id"] == "cs_ai"
 
             # Build LeetCode context block — only for CS users whose current tasks include problems
             leetcode_block = ""
@@ -1295,7 +1287,7 @@ def chat_message(
             leetcode_rule = (
                 leetcode_block if leetcode_block
                 else "\nDo NOT mention LeetCode, DSA practice, or coding interview problems. "
-                     "This student is not pursuing CS/engineering."
+                     f"This student's field is {_field['label']}, not software; keep advice specific to that field."
                 if not is_cs_user else ""
             )
 
@@ -1576,7 +1568,8 @@ def chat_history(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
 
 
 @router.post("/onboarding/start", response_model=OnboardingStartResponse)
-def onboarding_start(data: OnboardingStartRequest):
+@limiter.limit("10/minute")
+def onboarding_start(request: Request, data: OnboardingStartRequest, _=Depends(current_identity)):
     res = start_onboarding(data.raw_input, data.target_role)
     return OnboardingStartResponse(
         ambition_summary=res.get("ambition_summary", "Aspirations loaded."),
@@ -1587,7 +1580,15 @@ def onboarding_start(data: OnboardingStartRequest):
 
 
 @router.post("/onboarding/finalize", response_model=OnboardingFinalizeResponse)
-def onboarding_finalize(data: OnboardingFinalizeRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def onboarding_finalize(
+    request: Request,
+    data: OnboardingFinalizeRequest,
+    db: Session = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
+    verify_resource_owner(data.user_id, x_user_id=x_user_id, authorization=authorization)
     user = db.query(User).filter(User.id == data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

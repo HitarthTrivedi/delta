@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Loader2, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
 import supabase from '../lib/supabaseClient';
+import { DEV_AUTH } from '../lib/devAuth';
 
-export default function LoginPage() {
+export default function LoginPage({ variant = 'student' }) {
+  const isRecruiter = variant === 'recruiter';
+  const location = useLocation();
+  // Optional ?next=/path (e.g. parents going to Delta for School). Same-site paths only.
+  const nextParam = new URLSearchParams(location.search).get('next');
+  const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
   const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -27,7 +33,12 @@ export default function LoginPage() {
     try {
       localStorage.setItem('delta_remember_me', rememberMe ? 'true' : 'false');
       if (isSignUp) {
-        await signUp(email, password, name);
+        const created = await signUp(email, password, name);
+        if (created?.devSession) {
+          toast.success('Signed in (local dev mode).');
+          navigate(isRecruiter ? '/recruiter' : nextPath || '/roadmap');
+          return;
+        }
         toast.success('Account created! Please sign in.');
         setIsSignUp(false);
         setEmail('');
@@ -39,7 +50,7 @@ export default function LoginPage() {
         // Send returning users to their roadmap. The /roadmap route's
         // ProtectedRoute redirects to /onboarding automatically if the profile
         // isn't complete, so incomplete users still land in intake.
-        navigate('/roadmap');
+        navigate(isRecruiter ? '/recruiter' : nextPath || '/roadmap');
       }
     } catch (err) {
       toast.error(err.message || 'Authentication failed');
@@ -54,7 +65,7 @@ export default function LoginPage() {
       // on return, customStorage reads this flag to pick localStorage vs
       // sessionStorage. Without it Google users were never remembered.
       localStorage.setItem('delta_remember_me', rememberMe ? 'true' : 'false');
-      await loginWithGoogle();
+      await loginWithGoogle(nextPath || '/roadmap');
     } catch (err) {
       toast.error(err.message || 'Google Sign-In failed');
     }
@@ -78,12 +89,19 @@ export default function LoginPage() {
               />
             </div>
             <span className="font-display text-[26px] font-semibold text-ink tracking-tight">Delta</span>
-            <span className="kicker mt-1">Career Intelligence</span>
+            <span className="kicker mt-1">{isRecruiter ? 'For Recruiters' : 'Career Intelligence'}</span>
           </div>
+
+          {DEV_AUTH && (
+            <p className="mb-5 border border-oxblood px-3 py-2 text-center text-[12px] leading-relaxed text-ink">
+              <strong className="text-oxblood">Local dev mode.</strong> Any email signs you in, and the password isn't checked.
+              The same email always opens the same account. Only works on this computer.
+            </p>
+          )}
 
           {/* Heading */}
           <h2 className="font-display text-[28px] font-semibold text-oxblood mb-1.5 text-center">
-            {isSignUp ? 'Create your account' : 'Welcome back'}
+            {isSignUp ? (isRecruiter ? 'Create a recruiter account' : 'Create your account') : 'Welcome back'}
           </h2>
           <p className="text-sm text-ink-soft text-center mb-8">
             {isSignUp ? (
@@ -122,7 +140,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email address"
+                placeholder={isRecruiter ? 'Work email address' : 'Email address'}
                 disabled={loading}
                 className={inputClass}
               />
@@ -213,6 +231,9 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Recruiters sign in with a work email only */}
+          {!isRecruiter && (
+            <>
           {/* Divider */}
           <div className="flex items-center gap-3.5 my-6">
             <div className="flex-1 h-px bg-rule" />
@@ -236,13 +257,25 @@ export default function LoginPage() {
             </svg>
             Continue with Google
           </button>
+            </>
+          )}
 
           {/* Footer */}
           <p className="mt-8 text-center text-[11px] text-ink-soft leading-relaxed">
-            By continuing, you agree to Delta's{' '}
-            <a href="/terms" target="_blank" rel="noreferrer" className="text-oxblood underline">Terms</a>
+            Before you use Delta we'll ask you to accept our{' '}
+            <a href="/terms" target="_blank" rel="noreferrer" className="text-oxblood underline">Terms of Use</a>
             {' '}and{' '}
-            <a href="/privacy" target="_blank" rel="noreferrer" className="text-oxblood underline">Privacy Policy</a>
+            <a href="/privacy" target="_blank" rel="noreferrer" className="text-oxblood underline">Privacy Policy</a>.
+          </p>
+          <p className="mt-3 text-center text-[13px] text-ink-soft">
+            {isRecruiter ? (
+              <>Looking to learn? <a href="/login" className="text-oxblood underline">Student sign-in</a></>
+            ) : (
+              <>
+                Hiring? <a href="/recruiter/login" className="text-oxblood underline">Recruiter sign-in</a>
+                {' · '}Parent? <a href="/login?next=/school" className="text-oxblood underline">Delta for School</a>
+              </>
+            )}
           </p>
 
         </div>
@@ -264,10 +297,14 @@ export default function LoginPage() {
         <div className="relative z-[2] h-full flex flex-col justify-end p-12">
           <div className="bg-bone/95 border border-rule px-8 py-7">
             <p className="font-display text-ink text-[1.35rem] font-semibold leading-normal mb-3.5">
-              Your personal career strategist — builds a roadmap from your story, not just your resume.
+              {isRecruiter
+                ? 'Meet candidates who have proven their skills, not just listed them.'
+                : 'Your personal career strategist — builds a roadmap from your story, not just your resume.'}
             </p>
             <p className="text-[13px] text-ink-soft leading-relaxed">
-              Delta learns your goals, skills, and constraints, then gives you a weekly plan that actually fits your life.
+              {isRecruiter
+                ? 'Tell Delta what you are hiring for. We rank students who chose to be visible by verified test, coding and interview scores.'
+                : 'Delta learns your goals, skills, and constraints, then gives you a weekly plan that actually fits your life.'}
             </p>
           </div>
         </div>
