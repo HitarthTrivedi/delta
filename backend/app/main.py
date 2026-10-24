@@ -21,7 +21,7 @@ from app.limiter import limiter
 from app.config import settings
 from app.database import engine, Base
 from app.models import *  # noqa: F401,F403 — ensures all models register with Base
-from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders, achievements, opportunities, sandbox_coding, sandbox_interview, sandbox_theory, privacy, recruiter, school, sandbox_report, engagement
+from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders, achievements, opportunities, sandbox_coding, sandbox_interview, sandbox_theory, privacy, recruiter, school, sandbox_report, engagement, practice
 
 # Global rate limiter imported from app.limiter (avoids circular imports)
 
@@ -134,6 +134,7 @@ app.include_router(recruiter.router)
 app.include_router(school.router)
 app.include_router(sandbox_report.router)
 app.include_router(engagement.router)
+app.include_router(practice.router)
 
 
 @app.on_event("startup")

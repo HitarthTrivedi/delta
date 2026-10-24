@@ -43,9 +43,12 @@ def _valid_question(q) -> bool:
 
 
 def generate_test(user_id: str, topic: str | None, num_questions: int = 10, difficulty: str = "medium",
-                  category: str = "technical", area: str | None = None) -> tuple[str, list[dict]]:
+                  category: str = "technical", area: str | None = None, personalize: bool = True) -> tuple[str, list[dict]]:
     """Returns (topic, questions). Raises ValueError if the model output is
-    unusable — callers must not substitute placeholder questions."""
+    unusable — callers must not substitute placeholder questions.
+
+    personalize=False leaves the learner's profile out of the prompt, for
+    questions stored in the shared practice bank and reused by everyone."""
     difficulty = difficulty if difficulty in DIFFICULTIES else "medium"
     if category == "aptitude":
         area = area if area in APTITUDE_AREAS else "quantitative"
@@ -58,14 +61,16 @@ Difficulty: {DIFFICULTIES[difficulty]}
 Write exactly {num_questions} questions. Each must have ONE unambiguous correct answer; for numerical questions, compute the answer carefully and make sure exactly one option matches it. Questions must be solvable in about one minute each without a calculator. Vary the sub-types within the area.
 """
     else:
-        profile = load_profile(user_id) or {}
+        profile = (load_profile(user_id) or {}) if user_id else {}
         target_role = profile.get("target_role") or profile.get("goal_direction") or ""
         from app.services.domain_packs import resolve_field
         topic = (topic or "").strip()[:120] or target_role or f"Core concepts of {resolve_field(profile)['label']}"
+        candidate = (profile_as_compact_context(user_id) if personalize else "") or \
+            "No detailed profile — pitch questions at an intermediate student level."
         prompt = f"""You are writing a technical theory test (multiple choice) on: {topic}.
 
 ━━ CANDIDATE PROFILE ━━
-{profile_as_compact_context(user_id) or 'No detailed profile yet — pitch questions at an intermediate student level.'}
+{candidate}
 
 Difficulty: {DIFFICULTIES[difficulty]}
 
