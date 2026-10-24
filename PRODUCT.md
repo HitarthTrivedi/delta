@@ -26,6 +26,8 @@ No strong anti-reference beyond avoiding generic AI-slop defaults (gradient text
 - **Honest over decorative.** Progress, stats, and states should reflect what's actually true (real completion, real market data) rather than being smoothed over for a nicer-looking screen. No fake progress, no inflated empty states.
 - **Adaptive, not rigid.** The UI should make it easy to see and act on change (skip a task, ask the agent, adjust pace) rather than presenting the plan as fixed.
 - **Warm, not corporate.** Approachable language and inviting empty/first-run states — this is a tutor, not enterprise software — even within the more restrained editorial visual system.
+- **One next step.** Every screen leads with a single primary action. Today (`/today`) is the home: one button, the habit at a glance, at most three things for the day.
+- **Habit before intensity, never shame.** Any one real learning action keeps the streak; freezes, break mode and repair forgive missed days. Copy never guilt-trips, invents urgency or nags (India's CCPA dark-pattern guidelines). Reminders are opt-in, at most one a day, at the learner's own time, and easy to turn off. XP rewards learning only and never changes a score recruiters see.
 - **Read-only feels read-only.** Views that just display state (loading context, viewing progress) must never have destructive side effects on the user's data as a byproduct of merely opening the page.
 
 ## Accessibility & Inclusion

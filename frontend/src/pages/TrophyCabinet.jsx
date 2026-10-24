@@ -161,7 +161,7 @@ export default function TrophyCabinet() {
         ) : visible.length === 0 ? (
           <section style={{ ...panelStyle, padding: '30px 26px' }}>
             <h2 style={{ margin: '0 0 8px', fontFamily: serif, fontSize: 22, fontWeight: 600 }}>
-              {items.length === 0 ? 'Your cabinet is empty.' : 'Nothing of this type yet.'}
+              {items.length === 0 ? 'Nothing here yet. Add a certificate or project you\'re proud of.' : 'Nothing of this type yet.'}
             </h2>
             <p style={{ margin: '0 0 20px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.6, maxWidth: '58ch' }}>
               {items.length === 0

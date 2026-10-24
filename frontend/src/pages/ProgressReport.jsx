@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getTaskProgress } from '../lib/taskProgress';
 import { useAuthStore } from '../store/authStore';
 import { fetchCareerContext } from '../hooks/useCareerOS';
+import { useEngagement } from '../hooks/useEngagement';
 
 const panel = {
   background: 'var(--paper)',
@@ -151,6 +152,7 @@ function TaskLine({ task, tone, first }) {
 
 export default function ProgressReport() {
   const userId = useAuthStore((state) => state.userId);
+  const { data: habit } = useEngagement(userId);
   const queryClient = useQueryClient();
   const [context, setContext] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -185,7 +187,6 @@ export default function ProgressReport() {
   const changedCount = progress.changed.length;
   const weeksCompleted = summary.weeks_completed ?? Math.max(weekNumber - 1, 0);
   const totalCompleted = summary.total_tasks_completed ?? doneCount;
-  const totalSkipped = summary.total_tasks_skipped ?? skippedCount;
   const knowledgeGained = (summary.knowledge_gained?.length ? summary.knowledge_gained : progress.done.map(task => ({
     skill: task.skill || task.title,
     completed_tasks: 1,
@@ -238,7 +239,7 @@ export default function ProgressReport() {
           <Stat label="Weeks complete" value={weeksCompleted} note={`You are currently on week ${weekNumber}.`} />
           <Stat label="Tasks done" value={totalCompleted} note="Across all saved weeks." />
           <Stat label="This week" value={totalCurrent} note={`${doneCount} done, ${leftCount} left.`} />
-          <Stat label="Skipped" value={skippedCount} note={`${totalSkipped} skipped in total.`} />
+          <Stat label="Day streak" value={habit?.streak ?? 0} note={habit ? `Longest so far: ${habit.longest_streak} days.` : 'Study a little each day.'} />
         </section>
 
         <div className="pr-main" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.62fr) minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
@@ -310,11 +311,6 @@ export default function ProgressReport() {
                   <span style={{ fontSize: 13, color: 'var(--ink)' }}>Completed lifetime</span>
                   <span aria-hidden="true" style={{ flex: 1, borderBottom: '1px dotted var(--rule)' }} />
                   <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 600 }}>{totalCompleted}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: 'var(--ink)' }}>Skipped lifetime</span>
-                  <span aria-hidden="true" style={{ flex: 1, borderBottom: '1px dotted var(--rule)' }} />
-                  <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 600 }}>{totalSkipped}</span>
                 </div>
               </div>
             </section>

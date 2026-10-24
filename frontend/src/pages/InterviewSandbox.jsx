@@ -20,8 +20,8 @@ import InterviewReport from '../components/interview/InterviewReport';
 // three.js + the 3D model only load when the 3D interviewer is actually used.
 const Avatar3D = lazy(() => import('../components/interview/Avatar3D'));
 
-const panel = { background: '#050505', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10 };
-const muted = 'rgba(255,255,255,0.5)';
+const panel = { background: 'var(--paper)', border: '1px solid rgb(var(--ink-rgb) / 0.1)', borderRadius: 10 };
+const muted = 'rgb(var(--ink-rgb) / 0.5)';
 
 const ROLE_TYPE_KEYS = ['technical', 'behavioral', 'case', 'system_design'];
 const TECH_FIELDS = ['cs_ai', 'data'];
@@ -91,9 +91,9 @@ function Segmented({ options, value, onChange, label }) {
           aria-checked={value === o.key}
           onClick={() => onChange(o.key)}
           style={{
-            padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#fff',
-            background: value === o.key ? 'rgba(255,255,255,0.12)' : '#0a0a0a',
-            border: `1px solid ${value === o.key ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
+            padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--ink)',
+            background: value === o.key ? 'rgb(var(--ink-rgb) / 0.12)' : 'var(--paper)',
+            border: `1px solid ${value === o.key ? 'rgb(var(--ink-rgb) / 0.35)' : 'rgb(var(--ink-rgb) / 0.1)'}`,
           }}
         >
           {o.label}
@@ -364,23 +364,23 @@ export default function InterviewSandbox() {
   // ─────────────────────────────── Setup ───────────────────────────────
   if (stage === 'setup') {
     return (
-      <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1.5rem 3rem' }}>
+      <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
         <div style={{ maxWidth: 980, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 28, alignItems: 'start' }}>
           <div>
             <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>AI Mock Interview</p>
-            <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, margin: 0 }}>Face a real interview before the real one.</h1>
+            <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', lineHeight: 1.08, margin: 0 }}>Practise interviews without the pressure.</h1>
             <p style={{ margin: '14px 0 24px', color: muted, fontSize: 15, lineHeight: 1.6 }}>
-              Aria, your AI interviewer, asks questions out loud on a video call, follows up on what you say, and scores you like a hiring panel would.
+              Aria, your AI interviewer, asks questions out loud on a video call, follows up on what you say, and gives you friendly, specific feedback with model answers.
               Answer by speaking or typing.
             </p>
-            <div style={{ position: 'relative', height: 280, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: use3d ? 'radial-gradient(circle at 50% 40%, #191726 0%, #050505 75%)' : 'transparent' }}>
+            <div style={{ position: 'relative', height: 280, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: use3d ? 'radial-gradient(circle at 50% 40%, #191726 0%, #0d0c14 75%)' : 'transparent' }}>
               {renderInterviewer(<InterviewerAvatar state={voice.speaking ? 'speaking' : 'idle'} getLevel={voice.getLevel} size={220} />)}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
               <button
                 onClick={() => { unlockAudio(); say(`Hi${user?.name ? ` ${user.name.split(' ')[0]}` : ''}, I'm Aria. I'll be interviewing you today. Ready when you are.`); }}
                 disabled={!use3d && !voice.supported}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 14px', color: '#fff', fontSize: 13, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgb(var(--ink-rgb) / 0.07)', border: '1px solid rgb(var(--ink-rgb) / 0.15)', borderRadius: 8, padding: '8px 14px', color: 'var(--ink)', fontSize: 13, cursor: 'pointer' }}
               >
                 <Volume2 size={14} /> Hear Aria
               </button>
@@ -389,7 +389,7 @@ export default function InterviewSandbox() {
                   value={voice.voice?.voiceURI || ''}
                   onChange={(e) => voice.setVoiceURI(e.target.value)}
                   aria-label="Interviewer voice"
-                  style={{ background: '#0a0a0a', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '8px 10px', fontSize: 13, maxWidth: 240 }}
+                  style={{ background: 'var(--paper)', color: 'var(--ink)', border: '1px solid rgb(var(--ink-rgb) / 0.15)', borderRadius: 8, padding: '8px 10px', fontSize: 13, maxWidth: 240 }}
                 >
                   {voice.voices.map((v) => <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>)}
                 </select>
@@ -407,9 +407,9 @@ export default function InterviewSandbox() {
                     onClick={() => setRoleType(rt.key)}
                     aria-pressed={roleType === rt.key}
                     style={{
-                      textAlign: 'left', padding: '12px 14px', borderRadius: 8, cursor: 'pointer', color: '#fff',
-                      background: roleType === rt.key ? 'rgba(255,255,255,0.1)' : '#0a0a0a',
-                      border: `1px solid ${roleType === rt.key ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                      textAlign: 'left', padding: '12px 14px', borderRadius: 8, cursor: 'pointer', color: 'var(--ink)',
+                      background: roleType === rt.key ? 'rgb(var(--ink-rgb) / 0.1)' : 'var(--paper)',
+                      border: `1px solid ${roleType === rt.key ? 'rgb(var(--ink-rgb) / 0.35)' : 'rgb(var(--ink-rgb) / 0.1)'}`,
                     }}
                   >
                     <span style={{ display: 'block', fontWeight: 700, fontSize: 14.5 }}>{rt.label}</span>
@@ -427,7 +427,7 @@ export default function InterviewSandbox() {
                 onChange={(e) => setTargetRole(e.target.value)}
                 placeholder="e.g. Staff Nurse, Financial Analyst, Backend Engineer"
                 maxLength={120}
-                style={{ width: '100%', boxSizing: 'border-box', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: 12, color: '#fff', fontSize: 14, outline: 'none' }}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'var(--paper)', border: '1px solid rgb(var(--ink-rgb) / 0.12)', borderRadius: 8, padding: 12, color: 'var(--ink)', fontSize: 14, outline: 'none' }}
               />
             </div>
 
@@ -463,7 +463,7 @@ export default function InterviewSandbox() {
               onClick={() => startInterview()}
               disabled={starting}
               style={{
-                width: '100%', background: '#fff', color: '#000', border: 'none', borderRadius: 8, padding: 14,
+                width: '100%', background: 'var(--ink)', color: 'var(--paper)', border: 'none', borderRadius: 8, padding: 14,
                 fontWeight: 800, fontSize: 15, cursor: starting ? 'wait' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
@@ -481,16 +481,16 @@ export default function InterviewSandbox() {
   // ─────────────────────────────── Report ───────────────────────────────
   if (stage === 'report' && report) {
     return (
-      <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1.5rem 3rem' }}>
+      <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>Interview complete · {fmt(elapsed)}</p>
           <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', margin: '0 0 20px' }}>Your interview report</h1>
           <InterviewReport feedback={report.feedback} transcript={report.transcript} settings={report.settings} />
           <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
-            <button onClick={() => { setStage('setup'); setReport(null); }} style={{ flex: 1, minWidth: 200, background: '#fff', color: '#000', border: 'none', borderRadius: 8, padding: 14, fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <button onClick={() => { setStage('setup'); setReport(null); }} style={{ flex: 1, minWidth: 200, background: 'var(--ink)', color: 'var(--paper)', border: 'none', borderRadius: 8, padding: 14, fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <RotateCcw size={16} /> Practice again
             </button>
-            <button onClick={() => navigate('/practice')} style={{ flex: 1, minWidth: 200, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: 14, fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <button onClick={() => navigate('/practice')} style={{ flex: 1, minWidth: 200, background: 'rgb(var(--ink-rgb) / 0.08)', color: 'var(--ink)', border: '1px solid rgb(var(--ink-rgb) / 0.15)', borderRadius: 8, padding: 14, fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <LayoutDashboard size={16} /> Back to Test Center
             </button>
           </div>
@@ -502,29 +502,29 @@ export default function InterviewSandbox() {
   // ─────────────────────────────── Call ───────────────────────────────
   const canSend = phase === 'listening' && answer.trim().length > 0;
   return (
-    <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '4.75rem 1rem 1.5rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '4.75rem 1rem 1.5rem' }}>
       <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 12 }}>
         {/* top bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 0 4px rgba(239,68,68,0.2)' }} aria-hidden="true" />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 0 4px rgba(34,197,94,0.2)' }} aria-hidden="true" />
             <span style={{ fontWeight: 700 }}>{roleTypes.find((r) => r.key === roleType)?.label || 'Mock'} interview</span>
             <span style={{ color: muted }}>· {targetRole || 'General'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13 }}>
-            <span style={{ color: muted }}>Question <strong style={{ color: '#fff' }}>{qNum}</strong> of {total}</span>
+            <span style={{ color: muted }}>Question <strong style={{ color: 'var(--ink)' }}>{qNum}</strong> of {total}</span>
             <span style={{ fontVariantNumeric: 'tabular-nums', color: muted }} aria-label="Elapsed time">{fmt(elapsed)}</span>
           </div>
         </div>
 
         {/* video tiles */}
         <div className="iv-tiles">
-          <section style={{ ...panel, minHeight: 380, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 50% 40%, #191726 0%, #050505 75%)' }}>
+          <section style={{ ...panel, minHeight: 380, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: 'radial-gradient(circle at 50% 40%, #191726 0%, #0d0c14 75%)' }}>
             {renderInterviewer(<InterviewerAvatar state={avatarState} getLevel={voice.getLevel} size={250} />)}
             <span style={{ position: 'absolute', top: 14, left: 14, fontSize: 12, fontWeight: 700, background: 'rgba(0,0,0,0.55)', padding: '5px 10px', borderRadius: 6 }}>
               Aria · AI Interviewer
             </span>
-            <span style={{ position: 'absolute', top: 14, right: 14, fontSize: 12, color: avatarState === 'listening' ? '#4ade80' : avatarState === 'speaking' ? '#f472b6' : muted, background: 'rgba(0,0,0,0.55)', padding: '5px 10px', borderRadius: 6 }}>
+            <span style={{ position: 'absolute', top: 14, right: 14, fontSize: 12, color: avatarState === 'listening' ? '#4ade80' : avatarState === 'speaking' ? '#f472b6' : 'rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.55)', padding: '5px 10px', borderRadius: 6 }}>
               {phase === 'finish_error' ? 'Report failed' : STATE_LABEL[phase] || STATE_LABEL[avatarState]}
             </span>
             {captions && question && (
@@ -534,18 +534,18 @@ export default function InterviewSandbox() {
             )}
           </section>
 
-          <section style={{ ...panel, minHeight: 220, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0b0b0f' }}>
+          <section style={{ ...panel, minHeight: 220, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: '#0b0b0f' }}>
             {cam.on ? (
               <video ref={cam.videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', position: 'absolute', inset: 0 }} />
             ) : (
-              <div style={{ width: 84, height: 84, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 800 }}>
+              <div style={{ width: 84, height: 84, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 800 }}>
                 {(user?.name || 'You')[0].toUpperCase()}
               </div>
             )}
             <span style={{ position: 'absolute', bottom: 12, left: 12, fontSize: 12, fontWeight: 700, background: 'rgba(0,0,0,0.55)', padding: '5px 10px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {mic.listening ? <Mic size={12} style={{ color: '#4ade80' }} /> : <MicOff size={12} style={{ color: muted }} />} You
+              {mic.listening ? <Mic size={12} style={{ color: '#4ade80' }} /> : <MicOff size={12} style={{ color: 'rgba(255,255,255,0.6)' }} />} You
             </span>
-            {cam.error && <span style={{ position: 'absolute', top: 12, left: 12, right: 12, fontSize: 11.5, color: muted }}>{cam.error}</span>}
+            {cam.error && <span style={{ position: 'absolute', top: 12, left: 12, right: 12, fontSize: 11.5, color: 'rgba(255,255,255,0.7)' }}>{cam.error}</span>}
           </section>
         </div>
 
@@ -558,7 +558,7 @@ export default function InterviewSandbox() {
               ) : (
                 <>
                   <span style={{ color: muted }}>The report couldn't be generated.</span>
-                  <button onClick={finish} style={{ background: '#fff', color: '#000', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 700, cursor: 'pointer' }}>Try again</button>
+                  <button onClick={finish} style={{ background: 'var(--ink)', color: 'var(--paper)', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 700, cursor: 'pointer' }}>Try again</button>
                 </>
               )}
             </div>
@@ -569,7 +569,7 @@ export default function InterviewSandbox() {
                   {phase === 'joining' ? 'Aria is joining the call…' : phase === 'speaking' ? 'Aria is asking…' : phase === 'thinking' ? 'Aria is thinking about your answer…'
                     : mic.listening ? 'Listening. Speak your answer (you can also edit the text).' : 'Type your answer, or press the mic to speak.'}
                 </span>
-                {mic.silenceLeft != null && autoSend && <span style={{ color: '#4ade80' }}>Sending in {mic.silenceLeft}s… keep talking to continue</span>}
+                {mic.silenceLeft != null && autoSend && <span style={{ color: '#15803d' }}>Sending in {mic.silenceLeft}s… keep talking to continue</span>}
               </label>
               <textarea
                 id="iv-answer"
@@ -579,9 +579,9 @@ export default function InterviewSandbox() {
                 disabled={phase !== 'listening'}
                 rows={3}
                 placeholder={phase === 'listening' ? 'Your answer…' : ''}
-                style={{ width: '100%', boxSizing: 'border-box', background: '#0a0a0a', border: `1px solid ${mic.listening ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.12)'}`, borderRadius: 8, padding: 12, color: '#fff', fontSize: 15, lineHeight: 1.55, resize: 'vertical', outline: 'none' }}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'var(--paper)', border: `1px solid ${mic.listening ? 'rgba(21,128,61,0.45)' : 'rgb(var(--ink-rgb) / 0.12)'}`, borderRadius: 8, padding: 12, color: 'var(--ink)', fontSize: 15, lineHeight: 1.55, resize: 'vertical', outline: 'none' }}
               />
-              {mic.error && <p style={{ margin: '8px 0 0', fontSize: 12.5, color: '#fbbf24' }}>{mic.error}</p>}
+              {mic.error && <p style={{ margin: '8px 0 0', fontSize: 12.5, color: '#b45309' }}>{mic.error}</p>}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 {voiceMode && (
                   <button
@@ -590,8 +590,8 @@ export default function InterviewSandbox() {
                     aria-pressed={mic.listening}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 7, borderRadius: 999, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: phase === 'listening' ? 'pointer' : 'not-allowed',
-                      background: mic.listening ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.08)', color: mic.listening ? '#4ade80' : '#fff',
-                      border: `1px solid ${mic.listening ? 'rgba(74,222,128,0.5)' : 'rgba(255,255,255,0.15)'}`,
+                      background: mic.listening ? 'rgba(21,128,61,0.15)' : 'rgb(var(--ink-rgb) / 0.08)', color: mic.listening ? '#15803d' : 'var(--ink)',
+                      border: `1px solid ${mic.listening ? 'rgba(21,128,61,0.5)' : 'rgb(var(--ink-rgb) / 0.15)'}`,
                     }}
                   >
                     {mic.listening ? <Mic size={15} /> : <MicOff size={15} />} {mic.listening ? 'Mic on' : 'Mic off'}
@@ -612,7 +612,7 @@ export default function InterviewSandbox() {
                   onClick={() => submitAnswer()}
                   disabled={!canSend}
                   title="Send answer (Ctrl+Enter)"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: canSend ? '#fff' : 'rgba(255,255,255,0.12)', color: '#000', border: 'none', borderRadius: 999, padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: canSend ? 'pointer' : 'not-allowed' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: canSend ? 'var(--ink)' : 'rgb(var(--ink-rgb) / 0.12)', color: 'var(--paper)', border: 'none', borderRadius: 999, padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: canSend ? 'pointer' : 'not-allowed' }}
                 >
                   {phase === 'thinking' ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={15} />} Send answer
                 </button>
@@ -637,7 +637,7 @@ function IconToggle({ on, onClick, onIcon: OnIcon, offIcon: OffIcon, label }) {
       aria-pressed={on}
       aria-label={label}
       title={label}
-      style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: on ? 'rgba(255,255,255,0.08)' : 'rgba(239,68,68,0.15)', color: on ? '#fff' : '#f87171', border: `1px solid ${on ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.4)'}` }}
+      style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: on ? 'rgb(var(--ink-rgb) / 0.08)' : 'rgba(239,68,68,0.15)', color: on ? 'var(--ink)' : '#f87171', border: `1px solid ${on ? 'rgb(var(--ink-rgb) / 0.15)' : 'rgba(239,68,68,0.4)'}` }}
     >
       {on ? <OnIcon size={16} /> : <OffIcon size={16} />}
     </button>

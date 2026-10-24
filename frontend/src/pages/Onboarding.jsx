@@ -90,19 +90,6 @@ const parseFile = async (file) => {
   throw new Error('Unsupported file type. Use .pdf, .docx, .txt, or .md');
 };
 
-const REQUIRED_FIELDS_METADATA = [
-  { key: 'name', label: 'Name' },
-  { key: 'current_status', label: 'Status' },
-  { key: 'education_stage', label: 'Stage' },
-  { key: 'target_role', label: 'Direction' },
-  { key: 'goal_direction', label: 'Goal' },
-  { key: 'learning_style', label: 'Style' },
-  { key: 'hours_per_week', label: 'Hours' },
-  { key: 'skills', label: 'Skills' },
-  { key: 'past_experience', label: 'Experience' },
-  { key: 'career_goals', label: 'Goals' },
-];
-
 /* Helper conversions for arrays */
 const arrayToString = (val) => {
   if (Array.isArray(val)) return val.join(', ');
@@ -153,7 +140,6 @@ export default function Onboarding() {
   const [draft,  setDraft]  = useState('');
 
   const [progress, setProgress] = useState(0);
-  const [filledFields, setFilledFields] = useState([]);
   const [profile, setProfile] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -200,7 +186,6 @@ export default function Onboarding() {
         // Load latest ingestion state first to populate progress
         const state = await ingestionAPI.getState(userId);
         setProgress(Math.round((state.confidence_score || 0) * 100));
-        setFilledFields(state.filled_fields || []);
         if (state.profile) {
           setProfile(state.profile);
         }
@@ -230,7 +215,6 @@ export default function Onboarding() {
 
   const applyProgress = useCallback((res) => {
     if (res.confidence_score !== undefined) setProgress(Math.round(res.confidence_score * 100));
-    if (res.filled_fields) setFilledFields(res.filled_fields);
     if (res.profile) setProfile(res.profile);
   }, []);
 
@@ -453,7 +437,7 @@ export default function Onboarding() {
               <CheckCircle2 size={26} style={{ color: 'var(--bone)' }} />
             </div>
             <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--oxblood)', fontSize: 'clamp(1.4rem, 5vw, 2rem)', fontWeight: 600, letterSpacing: 0, marginBottom: 8 }}>
-              {reviewMode ? 'Review Your Delta Profile' : 'Onboarding Profile Sync'}
+              {reviewMode ? 'Check your profile' : "You're all set!"}
             </h1>
             <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', lineHeight: 1.6, maxWidth: 500, margin: '0 auto' }}>
               {reviewMode
@@ -827,7 +811,7 @@ export default function Onboarding() {
               Profile setup
             </span>
             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.66rem', color: 'var(--oxblood)', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 500 }}>
-              {progress}% complete
+              {progress}% there
             </span>
           </div>
           {/* Progress Bar track */}
@@ -845,46 +829,6 @@ export default function Onboarding() {
                 background: 'var(--oxblood)',
               }}
             />
-          </div>
-          {/* Required Fields Pills — horizontally scrollable so this row never
-              wraps to extra lines and grows the fixed header's height on
-              narrow screens (which would push it into the chat below). */}
-          <div style={{
-            display: 'flex', flexWrap: 'nowrap', gap: 6,
-            overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2,
-          }}>
-            {REQUIRED_FIELDS_METADATA.map(({ key, label }) => {
-              const isFilled = filledFields.includes(key);
-              return (
-                <div
-                  key={key}
-                  style={{
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    fontSize: '0.6rem',
-                    fontWeight: 500,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                    padding: '3px 8px',
-                    borderRadius: 0,
-                    border: isFilled ? '1px solid var(--oxblood)' : '1px dashed var(--rule)',
-                    background: isFilled ? 'var(--paper)' : 'transparent',
-                    color: isFilled ? 'var(--ink)' : 'var(--ink-soft)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <div style={{
-                    width: 4, height: 4, borderRadius: 0,
-                    background: isFilled ? 'var(--oxblood)' : 'var(--rule)',
-                  }} />
-                  {label}
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>
@@ -1030,7 +974,7 @@ export default function Onboarding() {
               style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: 'clamp(20px, 5vw, 36px)' }}
             >
               <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.66rem', color: 'var(--oxblood)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: 500 }}>
-                Question {cursor + 1}
+                Question {cursor + 1} of about 6
               </span>
               <p style={{ color: 'var(--ink)', fontSize: '1.05rem', lineHeight: 1.55, fontWeight: 500, margin: '12px 0 20px' }}>
                 {steps[cursor].question}
