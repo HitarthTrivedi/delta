@@ -5,8 +5,8 @@ import { TalkingHead } from '@met4citizen/talkinghead';
 import { LipsyncEn } from '@met4citizen/talkinghead/modules/lipsync-en.mjs';
 import { sandboxInterviewAPI } from '../../lib/api';
 
-// The interviewer's 3D face. Model: the MPFB example avatar from the TalkingHead
-// project (CC0, public domain), Meshopt-compressed to ~4.5 MB.
+// The interviewer's 3D face. Model: "Aria", built with MPFB from CC0 MakeHuman
+// assets in a business suit (see tools/avatar/), Meshopt-compressed to ~2.3 MB.
 // Voice + word timings come from our backend (Google Cloud TTS); TalkingHead turns
 // the words into mouth shapes (visemes) in time with the audio.
 const AVATAR_URL = '/avatars/interviewer.glb';
