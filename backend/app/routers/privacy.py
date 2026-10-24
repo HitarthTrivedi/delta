@@ -16,7 +16,7 @@ from app.services import compliance
 
 router = APIRouter(prefix="/api/privacy", tags=["privacy"])
 
-CONSENTABLE = {compliance.TERMS, compliance.RECRUITER_VISIBILITY}
+CONSENTABLE = {compliance.TERMS, compliance.RECRUITER_VISIBILITY, compliance.LEARNING_REMINDERS}
 
 
 def _not_guest(user_id: str) -> None:
@@ -39,6 +39,7 @@ class DeletePayload(BaseModel):
 def _consent_state(db: Session, user_id: str) -> dict:
     terms = compliance.latest_consent(db, user_id, compliance.TERMS)
     vis = compliance.latest_consent(db, user_id, compliance.RECRUITER_VISIBILITY)
+    reminders = compliance.latest_consent(db, user_id, compliance.LEARNING_REMINDERS)
     history = db.query(ConsentRecord).filter(ConsentRecord.user_id == user_id) \
         .order_by(ConsentRecord.created_at.desc()).limit(50).all()
     return {
@@ -46,6 +47,7 @@ def _consent_state(db: Session, user_id: str) -> dict:
         "terms_accepted": compliance.has_current_terms_consent(db, user_id),
         "terms_accepted_version": terms.policy_version if terms and terms.action == "granted" else None,
         "recruiter_visible": bool(vis and vis.action == "granted"),
+        "learning_reminders": bool(reminders and reminders.action == "granted"),
         "is_recruiter": db.query(Recruiter).filter(Recruiter.id == user_id).first() is not None,
         "history": [
             {"purpose": h.purpose, "action": h.action, "policy_version": h.policy_version,
@@ -85,7 +87,12 @@ def set_consent(
     elif payload.granted and not compliance.has_current_terms_consent(db, user_id):
         raise HTTPException(status_code=400, detail="Accept the Terms of Use and Privacy Policy first.")
 
-    compliance.record_consent(db, user_id, payload.purpose, payload.granted)
+    if payload.purpose == compliance.LEARNING_REMINDERS:
+        # Records the consent and switches reminders on/off in one place.
+        from app.services import engagement
+        engagement.set_reminders(db, user_id, payload.granted)
+    else:
+        compliance.record_consent(db, user_id, payload.purpose, payload.granted)
     return _consent_state(db, user_id)
 
 

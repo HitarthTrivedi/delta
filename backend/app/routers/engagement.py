@@ -55,3 +55,68 @@ def start_break(request: Request, user_id: str, payload: BreakPayload, db: Sessi
 @router.delete("/{user_id}/break")
 def end_break(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     return engagement.end_break(db, user_id)
+
+
+# ── Reminders (opt-in) ───────────────────────────────────────────────────────
+
+class RemindersPayload(BaseModel):
+    enabled: bool
+    channel: Optional[str] = None  # email | push | both
+
+
+class PushKeys(BaseModel):
+    p256dh: str = Field(min_length=10, max_length=200)
+    auth: str = Field(min_length=8, max_length=100)
+
+
+class PushPayload(BaseModel):
+    endpoint: str = Field(min_length=10, max_length=1000)
+    keys: Optional[PushKeys] = None
+
+
+class UnsubscribePayload(BaseModel):
+    u: str = Field(min_length=1, max_length=64)
+    t: str = Field(min_length=10, max_length=80)
+
+
+@router.put("/{user_id}/reminders")
+@limiter.limit("20/minute")
+def set_reminders(request: Request, user_id: str, payload: RemindersPayload, db: Session = Depends(get_db),
+                  _: str = Depends(require_owner)):
+    try:
+        return engagement.set_reminders(db, user_id, payload.enabled, payload.channel)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/push/public-key")
+def push_public_key():
+    from app.services.push_service import push_configured
+    from app.config import settings
+    return {"key": settings.VAPID_PUBLIC_KEY if push_configured() else None}
+
+
+@router.post("/{user_id}/push")
+@limiter.limit("10/minute")
+def add_push(request: Request, user_id: str, payload: PushPayload, db: Session = Depends(get_db),
+             _: str = Depends(require_owner)):
+    if not payload.endpoint.startswith("https://") or payload.keys is None:
+        raise HTTPException(status_code=400, detail="Invalid push subscription.")
+    engagement.add_push_subscription(db, user_id, payload.endpoint, payload.keys.p256dh, payload.keys.auth)
+    return {"ok": True}
+
+
+@router.delete("/{user_id}/push")
+def remove_push(user_id: str, payload: PushPayload, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    engagement.remove_push_subscription(db, user_id, payload.endpoint)
+    return {"ok": True}
+
+
+@router.post("/unsubscribe")
+@limiter.limit("10/minute")
+def unsubscribe(request: Request, payload: UnsubscribePayload, db: Session = Depends(get_db)):
+    """One-click unsubscribe from an email link: no login needed, the link is signed."""
+    if not engagement.verify_unsubscribe_token(payload.u, payload.t):
+        raise HTTPException(status_code=400, detail="This unsubscribe link isn't valid.")
+    engagement.set_reminders(db, payload.u, False)
+    return {"ok": True}

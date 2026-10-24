@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     # Local testing only: turns off weekly pacing guards and allows the offline
     # mock AI replies when no Gemini key is set. Never set on a deployed host.
     DEV_MODE: bool = parse_bool_env("DEV_MODE", False)
+    # Browser push for study reminders (Web Push / VAPID). Empty = push disabled,
+    # email reminders still work. Generate once: see docs/OPERATIONS.md.
+    VAPID_PUBLIC_KEY: str = os.getenv("VAPID_PUBLIC_KEY", "")
+    VAPID_PRIVATE_KEY: str = os.getenv("VAPID_PRIVATE_KEY", "")
+    VAPID_SUBJECT: str = os.getenv("VAPID_SUBJECT", "")  # e.g. mailto:team@example.com
+    # Signs one-click unsubscribe links in reminder emails (falls back to REMINDER_SECRET).
+    EMAIL_LINK_SECRET: str = os.getenv("EMAIL_LINK_SECRET", "")
     # Error reporting (Sentry). Empty = disabled. No personal data is sent.
     SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -122,12 +129,13 @@ class Settings(BaseSettings):
     BREVO_FROM_EMAIL: str = os.getenv("BREVO_FROM_EMAIL", "")
     BREVO_FROM_NAME: str = os.getenv("BREVO_FROM_NAME", "Delta by Alpha.Kore")
     REMINDER_SECRET: str = os.getenv("REMINDER_SECRET", "")
-    # Daily reminders. On a host that sleeps when idle, the sweep is triggered by
-    # the first user request at/after REMINDER_HOUR_LOCAL in REMINDER_TIMEZONE —
-    # so "9" means 9am for the users, not 9am UTC.
+    # Opt-in study reminders, checked every REMINDER_CHECK_INTERVAL_SECONDS (and on
+    # user traffic, for hosts that sleep). Each learner is nudged at their own time;
+    # REMINDER_TIMEZONE is the default timezone for new learners.
     REMINDERS_ENABLED: bool = os.getenv("REMINDERS_ENABLED", "true").lower() == "true"
     REMINDER_TIMEZONE: str = os.getenv("REMINDER_TIMEZONE", "Asia/Kolkata")
-    REMINDER_HOUR_LOCAL: int = int(os.getenv("REMINDER_HOUR_LOCAL", "9"))
+    # Hour (local) for a learner's reminder when they haven't picked a study time.
+    REMINDER_HOUR_LOCAL: int = int(os.getenv("REMINDER_HOUR_LOCAL", "19"))
     REMINDER_CHECK_INTERVAL_SECONDS: int = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "900"))
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 

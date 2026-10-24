@@ -62,6 +62,17 @@ class XpEvent(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
+class PushSubscription(Base):
+    """A browser's Web Push endpoint for study reminders (one per device)."""
+    __tablename__ = "push_subscriptions"
+
+    endpoint = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    p256dh = Column(String, nullable=False)
+    auth = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 class DailyActivity(Base):
     """One row per learner per local day they were active (or protected)."""
     __tablename__ = "daily_activity"

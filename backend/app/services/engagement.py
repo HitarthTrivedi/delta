@@ -240,6 +240,7 @@ def record_activity(db: Session, user_id: str, source_type: str, source_id: str,
     day.xp += xp
     day.actions += 1
     eng.xp_total += xp
+    eng.ignored_nudges = 0  # they came back: reminders return to the normal rhythm
     _extend_streak(eng, today)
 
     goal_just_met = False
@@ -423,6 +424,65 @@ def update_settings(db: Session, user_id: str, *, timezone: str | None = None, g
         eng.reminder_channel = reminder_channel
     db.commit()
     return summary(db, user_id)
+
+
+# ── reminders (opt-in) ───────────────────────────────────────────────────────
+
+def set_reminders(db: Session, user_id: str, enabled: bool, channel: str | None = None) -> dict:
+    """Switch study reminders on/off. Every switch is a recorded consent event."""
+    from app.services import compliance
+    if enabled and not compliance.has_current_terms_consent(db, user_id):
+        raise ValueError("Accept the Terms of Use and Privacy Policy first.")
+    eng = get_or_create(db, user_id)
+    if channel is not None:
+        if channel not in ("email", "push", "both"):
+            raise ValueError("Unknown reminder channel.")
+        eng.reminder_channel = channel
+    if bool(eng.reminders_opt_in) != bool(enabled):
+        compliance.record_consent(db, user_id, compliance.LEARNING_REMINDERS, enabled)
+    eng.reminders_opt_in = enabled
+    eng.ignored_nudges = 0
+    db.commit()
+    return summary(db, user_id)
+
+
+def _link_secret() -> bytes:
+    secret = settings.EMAIL_LINK_SECRET or settings.REMINDER_SECRET
+    return secret.encode("utf-8") if secret else b""
+
+
+def unsubscribe_token(user_id: str) -> str | None:
+    import hashlib
+    import hmac
+    secret = _link_secret()
+    if not secret:
+        return None
+    return hmac.new(secret, f"unsubscribe:{user_id}".encode(), hashlib.sha256).hexdigest()[:40]
+
+
+def verify_unsubscribe_token(user_id: str, token: str) -> bool:
+    import hmac
+    expected = unsubscribe_token(user_id)
+    return bool(expected and token and hmac.compare_digest(expected, token))
+
+
+def add_push_subscription(db: Session, user_id: str, endpoint: str, p256dh: str, auth: str) -> None:
+    from app.models.engagement import PushSubscription
+    sub = db.get(PushSubscription, endpoint)
+    if sub is None:
+        sub = PushSubscription(endpoint=endpoint, user_id=user_id, p256dh=p256dh, auth=auth)
+        db.add(sub)
+    else:  # same browser, maybe a different account now
+        sub.user_id, sub.p256dh, sub.auth = user_id, p256dh, auth
+    db.commit()
+
+
+def remove_push_subscription(db: Session, user_id: str, endpoint: str) -> None:
+    from app.models.engagement import PushSubscription
+    sub = db.get(PushSubscription, endpoint)
+    if sub and sub.user_id == user_id:
+        db.delete(sub)
+        db.commit()
 
 
 def _valid_hhmm(value: str) -> bool:

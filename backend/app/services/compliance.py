@@ -29,6 +29,7 @@ RECRUITER_VISIBILITY = "recruiter_visibility"
 RECRUITER_TERMS = "recruiter_terms"
 ACCOUNT_DELETED = "account_deleted"
 PARENTAL_CONSENT = "parental_consent"
+LEARNING_REMINDERS = "learning_reminders"  # opt-in study reminders (email / browser push)
 
 # Tables that are deliberately kept (pseudonymous) after erasure, or handled separately.
 _RETAINED_TABLES = {"consent_records", "recruiter_profile_views", "users"}
