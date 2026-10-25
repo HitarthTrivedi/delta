@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { Check, Loader2, RefreshCw, Send, MessageSquare, Bell, X, Pencil, Plus, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Loader2, RefreshCw, Send, MessageSquare, Bell, X, Pencil, Plus, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { careerOSAPI } from '../lib/api';
 import { getTaskProgress } from '../lib/taskProgress';
-import { useReminder, requestNotificationPermission } from '../lib/useReminder';
 import { useAuthStore } from '../store/authStore';
 import { useAgent2Chat } from '../store/agent2ChatStore';
 import { careerContextKey, seedCareerContext } from '../hooks/useCareerOS';
@@ -383,9 +382,6 @@ export default function WeeklyPlan() {
   const resetAgent2Chat = useAgent2Chat((s) => s.reset);
   const loadAgent2History = useAgent2Chat((s) => s.loadHistory);
   const [input, setInput] = useState('');
-  const [notifPermission, setNotifPermission] = useState(
-    'Notification' in window ? Notification.permission : 'unsupported'
-  );
 
   // Context docs (permanent rules + next-week requests)
   const [contextDocs, setContextDocs] = useState({ permanent: [], next_week: [] });
@@ -517,7 +513,6 @@ export default function WeeklyPlan() {
 
   const actions = useMemo(() => getTaskProgress(context, fallbackActions).actions, [context]);
 
-  useReminder(actions, checked);
 
   // Signature of this week's tasks — refetch the day plan when the tasks change.
   const weekSig = useMemo(() => actions.map(a => a.id || a.title).join('|'), [actions]);
@@ -870,14 +865,6 @@ export default function WeeklyPlan() {
     setTimeout(() => sendMessageText(`Feedback on this week's tasks: ${text}`), 150);
   };
 
-  const handleEnableReminders = async (e) => {
-    e.stopPropagation();
-    const perm = await requestNotificationPermission();
-    setNotifPermission(perm);
-    if (perm === 'granted') toast.success('Reminders enabled.');
-    else if (perm === 'denied') toast.error('Browser blocked notifications. Enable them in browser settings.');
-  };
-
   const requestNextWeek = async () => {
     setAdvancing(true);
     try {
@@ -942,26 +929,34 @@ export default function WeeklyPlan() {
     </div>
   ) : null;
 
+  const doneCount = actions.filter((_, i) => checked[i]).length;
+  const titleStyle = { margin: 0, fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 };
+
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3.5rem' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
 
-        {/* Header */}
-        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-end', marginBottom: 26 }}>
-          <div>
-            <h1 style={{ fontFamily: serif, fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', lineHeight: 1.1, letterSpacing: 0, margin: 0, maxWidth: 640 }}>
-              {studentName}'s week, adjusted to your pace.
+        {/* Header: one line of context, the layout switch and refresh */}
+        <header style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 16, alignItems: 'flex-end', marginBottom: 22 }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontFamily: serif, fontWeight: 500, color: 'var(--oxblood)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', lineHeight: 1.1, letterSpacing: 0, margin: 0 }}>
+              {studentName}'s week
             </h1>
-            <p style={{ margin: '8px 0 0', color: 'var(--ink-soft)', fontSize: 14.5, lineHeight: 1.5 }}>
-              Week {context?.week_number || 1}. Aria plans one week at a time, around your real availability.
+            <p style={{ margin: '8px 0 0', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.5 }}>
+              Week {context?.week_number || 1} · {weeklyFocus.phase_name || 'First useful week'} · {targetRole} · {hoursPerWeek}h a week
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-            {notifPermission !== 'granted' && notifPermission !== 'unsupported' && (
-              <button className="wp-btn wp-btn-ghost" onClick={handleEnableReminders}>
-                <Bell size={13} /> Reminders
-              </button>
-            )}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div role="group" aria-label="Layout" title="Week lists every task together. Day spreads them across your 7 days."
+              style={{ display: 'inline-flex', border: '1px solid var(--rule)' }}>
+              {[{ k: 'week', label: 'Week' }, { k: 'day', label: 'Day' }].map(opt => (
+                <button key={opt.k} onClick={() => handleSelectPlanStyle(opt.k)} aria-pressed={planStyle === opt.k}
+                  style={{ fontFamily: mono, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '9px 16px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                    background: planStyle === opt.k ? 'var(--ink)' : 'var(--paper)', color: planStyle === opt.k ? 'var(--bone)' : 'var(--ink)' }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <button className="wp-btn wp-btn-ghost" onClick={refreshWeek} disabled={refreshing || advancing}>
               {refreshing || advancing
                 ? <Loader2 size={13} className="wp-spin" style={{ animation: 'spin 1s linear infinite' }} />
@@ -971,53 +966,15 @@ export default function WeeklyPlan() {
           </div>
         </header>
 
-        {/* Stats bar (hidden on phones so the first task is above the fold) */}
-        <section className="wp-stats" style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 1, background: 'var(--rule)', border: '1px solid var(--rule)', marginBottom: 20,
-        }}>
-          {[
-            { label: 'Student', value: `${studentName} · ${educationStage}` },
-            { label: 'Goal', value: targetRole },
-            { label: 'Available pace', value: `${hoursPerWeek}h / week` },
-            { label: 'Focus', value: weeklyFocus.phase_name || 'First useful week' },
-          ].map(item => (
-            <div key={item.label} style={{ background: 'var(--paper)', padding: '16px 18px' }}>
-              <p style={{ ...monoLabel, margin: '0 0 8px' }}>{item.label}</p>
-              <p style={{ color: 'var(--ink)', margin: 0, fontSize: 14.5, lineHeight: 1.4, fontWeight: 650 }}>{item.value}</p>
-            </div>
-          ))}
-        </section>
-
         <div className="wp-main">
         <div className="wp-center">
-
-        {/* Plan style toggle */}
-        <section style={{ ...panelStyle, padding: '14px 18px', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-          <div title="Week view lists all tasks together. Day view spreads them across your 7 days.">
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Layout</p>
-            <p className="wp-layout-hint" style={{ margin: 0, fontSize: 12, color: 'var(--ink-soft)' }}>Week view lists all tasks together. Day view spreads them across your 7 days around your commitments.</p>
-          </div>
-          <div style={{ display: 'inline-flex', border: '1px solid var(--rule)' }}>
-            {[{ k: 'week', label: 'Week' }, { k: 'day', label: 'Day' }].map(opt => (
-              <button key={opt.k} onClick={() => handleSelectPlanStyle(opt.k)}
-                style={{ fontFamily: mono, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '9px 18px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                  background: planStyle === opt.k ? 'var(--ink)' : 'var(--paper)', color: planStyle === opt.k ? 'var(--bone)' : 'var(--ink)' }}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </section>
 
         {/* Day-by-day view — one day at a time, not the whole week at once */}
         {planStyle === 'day' && (
           <section style={{ ...panelStyle, padding: '20px 22px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
-              <div>
-                <h2 style={{ margin: '0 0 6px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Today's plan</h2>
-                <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.5 }}>Check off what you finish today. Anything you miss rolls forward to another day this week.</p>
-              </div>
-              <button onClick={() => setScheduleOpen(true)} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', whiteSpace: 'nowrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              <h2 style={titleStyle}>Today's plan</h2>
+              <button onClick={() => setScheduleOpen(true)} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 650, display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                 <Pencil size={14} /> Edit schedule
               </button>
             </div>
@@ -1043,17 +1000,14 @@ export default function WeeklyPlan() {
           </section>
         )}
 
-        {/* Tasks — full weekly list (day view shows the single-day board above instead) */}
+        {/* Tasks — the weekly list, or the editor while editing */}
         {planStyle !== 'day' && (
         <section style={{ ...panelStyle, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 10 }}>
-            <div>
-              <h2 style={{ margin: '0 0 6px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Tasks for this week</h2>
-              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.55 }}>
-                One step at a time. Tick a task when it's done, or tell Aria if the plan needs to change.
-              </p>
-            </div>
-            {loading && <Loader2 size={18} className="wp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, marginBottom: 6 }}>
+            <h2 style={titleStyle}>{editingTasks ? 'Edit this week\'s tasks' : 'Tasks'}</h2>
+            {loading
+              ? <Loader2 size={18} className="wp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />
+              : context && !editingTasks && actions.length > 0 && <span style={{ ...monoLabel }}>{doneCount} of {actions.length} done</span>}
           </div>
 
           {/* Advance progress — one honest status line, not a simulated multi-step sequence */}
@@ -1087,197 +1041,7 @@ export default function WeeklyPlan() {
             </div>
           )}
 
-          {/* Task list — one ruled ledger, not a stack of boxed cards */}
-          <div style={{ display: advancing || !context ? 'none' : 'block' }}>
-            {actions.map((action, index) => {
-              const isDone = !!checked[index];
-              const isSkipped = !!skipped[index];
-              return (
-                <button
-                  key={action.id}
-                  className="wp-task"
-                  onClick={() => toggleTask(action, index)}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) auto', gap: 14,
-                    alignItems: 'start', textAlign: 'left', width: '100%',
-                    background: 'transparent', border: 'none',
-                    borderTop: index ? '1px solid var(--rule)' : 'none',
-                    borderRadius: 0, padding: '16px 2px',
-                    color: 'var(--ink)', cursor: advancing ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  <span style={{
-                    width: 22, height: 22, borderRadius: 0, marginTop: 1,
-                    border: isDone ? 'none' : '1px solid var(--ink-soft)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: isDone ? 'var(--ink)' : 'transparent', color: 'var(--bone)', flexShrink: 0,
-                  }}>
-                    {isDone && <Check size={13} />}
-                  </span>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, marginBottom: 5, lineHeight: 1.4, color: isDone ? 'var(--ink-soft)' : 'var(--ink)', textDecoration: isDone ? 'line-through' : 'none' }}>
-                      {action.title}
-                    </span>
-                    {action.difficulty_level && (() => {
-                      const LEVELS = ['Beginner', 'Easy', 'Intermediate', 'Advanced', 'Expert'];
-                      const COLORS = {
-                        Beginner:     '#66645e',
-                        Easy:         '#4a7c59',
-                        Intermediate: '#7d5a2b',
-                        Advanced:     '#7d3a2b',
-                        Expert:       '#7d252b',
-                      };
-                      const BG = {
-                        Beginner:     'rgba(102,100,94,0.08)',
-                        Easy:         'rgba(74,124,89,0.10)',
-                        Intermediate: 'rgba(125,90,43,0.10)',
-                        Advanced:     'rgba(125,58,43,0.10)',
-                        Expert:       'rgba(125,37,43,0.10)',
-                      };
-                      const filled = LEVELS.indexOf(action.difficulty_level) + 1;
-                      const color = COLORS[action.difficulty_level] || 'var(--ink-soft)';
-                      return (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-                            padding: '2px 7px', borderRadius: 2,
-                            border: '1px solid var(--rule)',
-                            background: BG[action.difficulty_level] || 'var(--accent-surface)',
-                            color,
-                          }}>
-                            {action.difficulty_level}
-                          </span>
-                          <span style={{ display: 'inline-flex', gap: 2 }}>
-                            {[1,2,3,4,5].map(i => (
-                              <svg key={i} width="11" height="11" viewBox="0 0 24 24" fill={i <= filled ? '#c8b89a' : 'none'} stroke={'#c8b89a'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: i <= filled ? 1 : 0.2 }}>
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                              </svg>
-                            ))}
-                          </span>
-                        </span>
-                      );
-                    })()}
-                    <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.55, maxWidth: '68ch' }}>{action.detail}</span>
-                    {action.problems?.length > 0 ? (
-                      <span style={{ display: 'block', marginTop: 10 }}>
-                        <span style={{ color: 'var(--ink-soft)', fontSize: 12, display: 'block', marginBottom: 6 }}>Problems this week:</span>
-                        <span style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          {action.problems.map((p) => (
-                            <a
-                              key={p.id}
-                              href={p.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none', fontSize: 13 }}
-                            >
-                              <span style={{
-                                fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 0, flexShrink: 0,
-                                background: 'var(--accent-surface)', border: '1px solid var(--rule)',
-                                color: 'var(--ink-soft)',
-                              }}>{p.difficulty}</span>
-                              <span style={{ color: 'var(--ink)', textDecoration: 'underline' }}>#{p.id} {p.title}</span>
-                            </a>
-                          ))}
-                        </span>
-                      </span>
-                    ) : (action.source || action.url) ? (
-                      <span style={{ display: 'block', marginTop: 8, color: 'var(--ink-soft)', fontSize: 13 }}>
-                        {action.source || 'Resource'}
-                        {action.url ? (
-                          <> · <a href={action.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: 'var(--ink)', textDecoration: 'underline' }}>Open</a></>
-                        ) : null}
-                      </span>
-                    ) : null}
-                    <span style={{ display: 'flex', gap: 14, marginTop: 12, alignItems: 'center' }}>
-                      {!isDone && !isSkipped && (
-                        <span
-                          role="button" tabIndex={0}
-                          onClick={(e) => skipTask(e, action, index)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') skipTask(e, action, index); }}
-                          style={{ color: 'var(--ink-soft)', fontSize: 13, textDecoration: 'underline', cursor: 'pointer' }}
-                        >
-                          Skip this task
-                        </span>
-                      )}
-                      <span
-                        role="button" tabIndex={0}
-                        onClick={(e) => askAgent2AboutTask(e, action)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') askAgent2AboutTask(e, action); }}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 5,
-                          color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer',
-                        }}
-                      >
-                        <MessageSquare size={12} /> How to do this
-                      </span>
-                    </span>
-                  </span>
-                  <span style={{ ...monoLabel, marginTop: 4 }}>
-                    {isDone ? 'Done' : isSkipped ? 'Skipped' : 'To do'}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Request next week */}
-          {nextWeekCTA}
-        </section>
-        )}
-
-        </div>
-
-        {/* Right side rail: controls and the agent, beside the tasks */}
-        <div className="wp-bside">
-
-        {/* Task feedback + manual edit */}
-        <section style={{ ...panelStyle, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: editingTasks ? 16 : 0 }}>
-            <div>
-              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Task controls</h2>
-              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
-                Edit tasks manually or give Aria feedback on this week's selection
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => { setFeedbackOpen(o => !o); setEditingTasks(false); }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-surface)', color: 'var(--ink)', border: '1px solid var(--rule)', borderRadius: 0, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
-              >
-                <ThumbsUp size={13} /> Feedback
-              </button>
-              <button
-                onClick={() => { startEditTasks(); setFeedbackOpen(false); }}
-                disabled={editingTasks}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: editingTasks ? 'var(--rule)' : 'var(--ink)', color: editingTasks ? 'var(--ink-soft)' : 'var(--bone)', border: 'none', borderRadius: 0, padding: '9px 14px', fontSize: 13, cursor: editingTasks ? 'not-allowed' : 'pointer', fontWeight: 700 }}
-              >
-                <Pencil size={13} /> Edit Tasks
-              </button>
-            </div>
-          </div>
-
-          {/* Feedback form */}
-          {feedbackOpen && (
-            <div style={{ marginTop: 14 }}>
-              <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--ink-soft)' }}>
-                What's wrong with this week's tasks? Aria will adjust based on your feedback.
-              </p>
-              <textarea
-                value={feedbackText}
-                onChange={e => setFeedbackText(e.target.value)}
-                placeholder="e.g. This week's practice set is too hard, I'd prefer easier problems. The project task has no clear goal."
-                rows={3}
-                style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '10px 12px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
-              />
-              <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
-                <button onClick={() => setFeedbackOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '8px 14px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={submitFeedback} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Send to Aria</button>
-              </div>
-            </div>
-          )}
-
-          {/* Inline task editor */}
+          {/* Inline task editor (replaces the list while editing) */}
           {editingTasks && (
             <div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1320,99 +1084,217 @@ export default function WeeklyPlan() {
               </div>
             </div>
           )}
-        </section>
 
-        {/* Agent 2 compact box */}
-        <section style={{ ...panelStyle, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div>
-              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Aria</h2>
-              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
-                Your coach for this week's plan. Ask anything.
-              </p>
-            </div>
-            <button className="wp-btn wp-btn-primary" onClick={() => setChatOpen(true)}>
-              <MessageSquare size={13} /> Talk to Aria
-            </button>
+          {/* Task list — one ruled ledger, not a stack of boxed cards */}
+          <div style={{ display: advancing || !context || editingTasks ? 'none' : 'block' }}>
+            {actions.map((action, index) => {
+              const isDone = !!checked[index];
+              const isSkipped = !!skipped[index];
+              return (
+                <button
+                  key={action.id}
+                  className="wp-task"
+                  onClick={() => toggleTask(action, index)}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) auto', gap: 14,
+                    alignItems: 'start', textAlign: 'left', width: '100%',
+                    background: 'transparent', border: 'none',
+                    borderTop: index ? '1px solid var(--rule)' : 'none',
+                    borderRadius: 0, padding: '16px 2px',
+                    color: 'var(--ink)', cursor: advancing ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <span style={{
+                    width: 22, height: 22, borderRadius: 0, marginTop: 1,
+                    border: isDone ? 'none' : '1px solid var(--ink-soft)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isDone ? 'var(--ink)' : 'transparent', color: 'var(--bone)', flexShrink: 0,
+                  }}>
+                    {isDone && <Check size={13} />}
+                  </span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 700, marginBottom: 4, lineHeight: 1.4, color: isDone ? 'var(--ink-soft)' : 'var(--ink)', textDecoration: isDone ? 'line-through' : 'none' }}>
+                      {action.title}
+                    </span>
+                    {!isDone && (
+                      <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.55, maxWidth: '68ch' }}>
+                        {action.difficulty_level && <span style={{ color: 'var(--ink)' }}>{action.difficulty_level} · </span>}
+                        {action.detail}
+                      </span>
+                    )}
+                    {!isDone && (
+                      <>
+                    {action.problems?.length > 0 ? (
+                      <span style={{ display: 'block', marginTop: 10 }}>
+                        <span style={{ color: 'var(--ink-soft)', fontSize: 12, display: 'block', marginBottom: 6 }}>Problems this week:</span>
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          {action.problems.map((p) => (
+                            <a
+                              key={p.id}
+                              href={p.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none', fontSize: 13 }}
+                            >
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 0, flexShrink: 0,
+                                background: 'var(--accent-surface)', border: '1px solid var(--rule)',
+                                color: 'var(--ink-soft)',
+                              }}>{p.difficulty}</span>
+                              <span style={{ color: 'var(--ink)', textDecoration: 'underline' }}>#{p.id} {p.title}</span>
+                            </a>
+                          ))}
+                        </span>
+                      </span>
+                    ) : (action.source || action.url) ? (
+                      <span style={{ display: 'block', marginTop: 8, color: 'var(--ink-soft)', fontSize: 13 }}>
+                        {action.source || 'Resource'}
+                        {action.url ? (
+                          <> · <a href={action.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: 'var(--ink)', textDecoration: 'underline' }}>Open</a></>
+                        ) : null}
+                      </span>
+                    ) : null}
+                      </>
+                    )}
+
+                    {!isDone && (
+                      <span style={{ display: 'flex', gap: 16, marginTop: 10, alignItems: 'center' }}>
+                        <span
+                          role="button" tabIndex={0}
+                          onClick={(e) => askAgent2AboutTask(e, action)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') askAgent2AboutTask(e, action); }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}
+                        >
+                          <MessageSquare size={12} /> How to do this
+                        </span>
+                        {!isSkipped && (
+                          <span
+                            role="button" tabIndex={0}
+                            onClick={(e) => skipTask(e, action, index)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') skipTask(e, action, index); }}
+                            style={{ color: 'var(--ink-soft)', fontSize: 13, textDecoration: 'underline', cursor: 'pointer' }}
+                          >
+                            Skip
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ ...monoLabel, marginTop: 4 }}>{isSkipped ? 'Skipped' : ''}</span>
+                </button>
+              );
+            })}
           </div>
-          <p style={{ margin: '0 0 12px', color: 'var(--ink-soft)', fontSize: 13 }}>Things you can ask:</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {(nextQuestions.length ? nextQuestions.slice(0, 4) : SUGGESTIONS).map((s, i) => (
-              <button
-                key={i}
-                onClick={() => openChatWithSuggestion(s)}
-                style={{
-                  background: 'var(--accent-surface)', color: 'var(--ink)',
-                  border: '1px solid var(--rule)', borderRadius: 0,
-                  padding: '7px 14px', fontSize: 13, cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--rule)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent-surface)'; }}
-              >
-                {s}
+
+          {/* Request next week */}
+          {!editingTasks && nextWeekCTA}
+        </section>
+        )}
+
+        </div>
+
+        {/* Side rail: Aria and small adjustments, beside the tasks */}
+        <div className="wp-bside">
+
+        <section style={{ ...panelStyle, padding: '18px 20px' }}>
+          <h2 style={titleStyle}>Ask Aria</h2>
+          <p style={{ margin: '4px 0 12px', color: 'var(--ink-soft)', fontSize: 13 }}>Your coach for this week. Stuck, busy or bored? Say so.</p>
+          <button className="wp-btn wp-btn-primary" onClick={() => setChatOpen(true)} style={{ width: '100%', justifyContent: 'center' }}>
+            <MessageSquare size={13} /> Talk to Aria
+          </button>
+          <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
+            {(nextQuestions.length ? nextQuestions : SUGGESTIONS).slice(0, 2).map((q, i) => (
+              <button key={i} onClick={() => openChatWithSuggestion(q)}
+                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.45, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                {q}
               </button>
             ))}
           </div>
         </section>
 
-        {/* Opportunities */}
-        {opportunities.length > 0 && (
-          <section style={{ ...panelStyle, padding: '20px 22px' }}>
-            <h2 style={{ margin: '0 0 8px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Opportunities</h2>
-            {opportunities.slice(0, 4).map((item, i) => (
-              <div key={i} style={{ borderTop: i ? '1px solid var(--rule)' : 'none', padding: i ? '11px 0' : '4px 0 11px' }}>
-                <p style={{ margin: '0 0 3px', fontSize: 13.5, fontWeight: 700, lineHeight: 1.4 }}>{item.title || item.name}</p>
-                <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 12 }}>
-                  {item.platform}{item.match_percentage ? ` · ${item.match_percentage}% match` : ''}
-                </p>
+        <section style={{ ...panelStyle, padding: '18px 20px' }}>
+          <h2 style={titleStyle}>Adjust this week</h2>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => { setFeedbackOpen(o => !o); setEditingTasks(false); }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-surface)', color: 'var(--ink)', border: '1px solid var(--rule)', borderRadius: 0, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+            >
+              <ThumbsUp size={13} /> Give feedback
+            </button>
+            <button
+              onClick={() => { startEditTasks(); setFeedbackOpen(false); }}
+              disabled={editingTasks || planStyle === 'day'}
+              title={planStyle === 'day' ? 'Switch to Week to edit tasks' : undefined}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--accent-surface)', color: 'var(--ink)', border: '1px solid var(--rule)', borderRadius: 0, padding: '9px 14px', fontSize: 13, cursor: editingTasks || planStyle === 'day' ? 'not-allowed' : 'pointer', fontWeight: 600, opacity: editingTasks || planStyle === 'day' ? 0.6 : 1 }}
+            >
+              <Pencil size={13} /> Edit tasks
+            </button>
+          </div>
+          {/* Feedback form */}
+          {feedbackOpen && (
+            <div style={{ marginTop: 14 }}>
+              <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--ink-soft)' }}>
+                What's wrong with this week's tasks? Aria will adjust based on your feedback.
+              </p>
+              <textarea
+                value={feedbackText}
+                onChange={e => setFeedbackText(e.target.value)}
+                placeholder="e.g. This week's practice set is too hard, I'd prefer easier problems. The project task has no clear goal."
+                rows={3}
+                style={{ width: '100%', background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '10px 12px', color: 'var(--ink)', fontSize: 13, resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => setFeedbackOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '8px 14px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={submitFeedback} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Send to Aria</button>
               </div>
-            ))}
-          </section>
+            </div>
+          )}
+
+        </section>
+
+        {opportunities.length > 0 && (
+          <Link to="/opportunities" style={{ ...panelStyle, padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, color: 'var(--ink)', textDecoration: 'none' }}>
+            <span style={{ fontSize: 13.5 }}>
+              <strong>{opportunities.length} opportunit{opportunities.length === 1 ? 'y' : 'ies'}</strong> match your plan
+            </span>
+            <ArrowRight size={15} />
+          </Link>
         )}
         </div>
+        </div>
 
-        {/* Left side rail: the long view and standing preferences */}
-        <div className="wp-aside">
-
-        {/* Long-horizon plan */}
-        {longHorizonLanes.length > 0 && (
-          <section style={{ ...panelStyle, padding: '20px 22px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', marginBottom: 6 }}>
-              <h2 style={{ margin: 0, fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Long-scale plan</h2>
-              <span style={{ ...monoLabel, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {longHorizonPlan.horizon_months || roadmap.destination?.planning_horizon_months || 12} months
-              </span>
-            </div>
-            <p style={{ margin: '0 0 6px', color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.5 }}>
-              Delta keeps these lanes alive across the selected timeline, then chooses the right weekly slice.
-            </p>
-            {longHorizonLanes.map((lane, index) => (
+        {/* Plan settings: the long view and standing preferences, folded away */}
+        <details className="wp-settings" style={{ ...panelStyle, marginTop: 20 }}>
+          <summary style={{ padding: '16px 22px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span>
+              <span style={{ ...titleStyle, display: 'block' }}>Plan settings</span>
+              <span style={{ display: 'block', marginTop: 4, color: 'var(--ink-soft)', fontSize: 13 }}>Your long-term plan, and rules Aria follows when planning your weeks</span>
+            </span>
+            <ChevronDown size={18} className="wp-settings-chevron" aria-hidden="true" />
+          </summary>
+          <div className="wp-settings-body" style={{ padding: '4px 22px 22px', display: 'grid', gap: 24 }}>
+            {longHorizonLanes.length > 0 && (
+              <div>
+                <p style={{ ...monoLabel, margin: '0 0 4px' }}>
+                  Long-term plan · {longHorizonPlan.horizon_months || roadmap.destination?.planning_horizon_months || 12} months
+                </p>
+                {longHorizonLanes.map((lane, index) => (
               <div key={lane.name} style={{ borderTop: index ? '1px solid var(--rule)' : 'none', padding: index ? '12px 0' : '12px 0 12px' }}>
                 <p style={{ margin: '0 0 2px', color: 'var(--ink)', fontSize: 13.5, fontWeight: 700 }}>{lane.name}</p>
                 <p style={{ margin: '0 0 5px', color: 'var(--ink-soft)', fontSize: 12 }}>{lane.cadence}</p>
                 <p style={{ margin: 0, color: 'var(--ink)', fontSize: 13, lineHeight: 1.5 }}>{lane.rule}</p>
               </div>
             ))}
-          </section>
-        )}
-
-        {/* Plan Preferences — permanent rules + next-week requests */}
-        <section style={{ ...panelStyle, padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div>
-              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Plan preferences</h2>
-              <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
-                Permanent rules apply every week · Next week requests carry forward once
-              </p>
-            </div>
-            {docsLoading && <Loader2 size={15} className="wp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
-          </div>
-          <div className="plan-preferences-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+              </div>
+            )}
+            <div style={{ display: 'grid', gap: 16 }}>
+              {docsLoading && <Loader2 size={15} className="wp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
             {/* Permanent */}
             <div>
-              <p style={{ ...monoLabel, margin: '0 0 10px' }}>Permanent rules</p>
+              <p style={{ ...monoLabel, margin: '0 0 10px' }}>Always remember</p>
               {contextDocs.permanent.length === 0 && (
-                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No permanent rules yet. Add one below.</p>
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>Nothing yet. Add a rule Aria should follow every week.</p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                 {contextDocs.permanent.map((item, i) => (
@@ -1438,8 +1320,8 @@ export default function WeeklyPlan() {
               </div>
             </div>
             {/* Next week requests */}
-            <div style={{ borderTop: '1px solid var(--rule)', paddingTop: 14 }}>
-              <p style={{ ...monoLabel, margin: '0 0 10px' }}>Next week requests</p>
+            <div>
+              <p style={{ ...monoLabel, margin: '0 0 10px' }}>For the next few weeks</p>
               {contextDocs.next_week.length === 0 && (
                 <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No requests yet. Add one below or tell Aria.</p>
               )}
@@ -1485,11 +1367,9 @@ export default function WeeklyPlan() {
                 </button>
               </div>
             </div>
+            </div>
           </div>
-        </section>
-
-        </div>
-        </div>
+        </details>
       </div>
 
       {/* Skip task dialog */}
@@ -1672,7 +1552,6 @@ export default function WeeklyPlan() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @media (max-width: 640px) { .wp-stats, .wp-layout-hint { display: none !important; } }
         .wp-btn {
           font-family: 'IBM Plex Mono', ui-monospace, monospace;
           font-size: 11px;
@@ -1701,27 +1580,21 @@ export default function WeeklyPlan() {
           display: grid;
           gap: 20px;
           align-items: start;
-          grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.6fr) minmax(0, 0.95fr);
-          grid-template-areas: "aside center bside";
+          grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+          grid-template-areas: "center bside";
         }
-        .wp-center { grid-area: center; display: grid; gap: 20px; min-width: 0; }
-        .wp-aside { grid-area: aside; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; align-content: start; }
-        .wp-bside { grid-area: bside; display: grid; gap: 20px; min-width: 0; align-content: start; }
-        @media (max-width: 1180px) {
-          .wp-main {
-            grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-            grid-template-areas:
-              "center bside"
-              "center aside";
-          }
-        }
+        .wp-center { grid-area: center; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
+        .wp-bside { grid-area: bside; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; align-content: start; }
+        .wp-settings summary { list-style: none; }
+        .wp-settings summary::-webkit-details-marker { display: none; }
+        .wp-settings[open] .wp-settings-chevron { transform: rotate(180deg); }
+        @media (min-width: 900px) { .wp-settings-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
         @media (max-width: 940px) {
           .wp-main {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
             grid-template-areas:
               "center"
-              "bside"
-              "aside";
+              "bside";
           }
         }
         @media (prefers-reduced-motion: reduce) {
