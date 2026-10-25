@@ -14,6 +14,9 @@ const PURPOSE_LABEL = {
   recruiter_terms: 'Recruiter terms',
   parental_consent: 'Parental consent (Delta for School)',
   account_deleted: 'Account deleted',
+  learning_reminders: 'Study reminders',
+  leaderboard_visibility: 'Weekly leagues',
+  recruiter_habit_badge: '"Consistent learner" badge for recruiters',
 };
 
 const SHARED = [
@@ -29,6 +32,7 @@ const NOT_SHARED = [
   'Your conversations with Delta\'s AI',
   'Your personal introduction and backstory',
   'Résumé text, weekly plans, progress notes, phone number, GPA',
+  'Your XP, streak, badges and league standing',
 ];
 
 const sectionClass = 'bg-paper border border-rule p-5 sm:p-6 mb-5';
@@ -76,6 +80,22 @@ export default function PrivacySettings() {
       setConsent(next);
       queryClient.invalidateQueries({ queryKey: ['engagement', userId] });
       toast.success(granted ? 'Study reminders on.' : 'Study reminders off.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not update this setting.');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  // Optional extras with their own consent: weekly leagues, the recruiter habit badge.
+  const setExtra = async (purpose, granted, onText, offText) => {
+    setBusy(purpose);
+    try {
+      const next = await privacyAPI.setConsent(userId, { purpose, granted });
+      setConsent(next);
+      queryClient.invalidateQueries({ queryKey: ['engagement', userId] });
+      queryClient.invalidateQueries({ queryKey: ['league', userId] });
+      toast.success(granted ? onText : offText);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Could not update this setting.');
     } finally {
@@ -167,6 +187,25 @@ export default function PrivacySettings() {
             </div>
           </div>
 
+          <div className="mt-5 pt-5 border-t border-rule flex items-start justify-between gap-4 flex-wrap">
+            <div className="max-w-[520px]">
+              <p className="text-[14px] font-semibold text-ink m-0">Optional: "Consistent learner" badge</p>
+              <p className={`${pClass} mt-1 text-[13.5px]`}>
+                When you are visible, recruiters also see this badge if you studied on 20 or more of the last 30 days.
+                It is a yes or no only: never your XP, streak or day count.
+              </p>
+            </div>
+            <button
+              onClick={() => setExtra('recruiter_habit_badge', !consent.recruiter_habit_badge,
+                'Recruiters can now see your "Consistent learner" badge when you earn it.', 'Badge hidden from recruiters.')}
+              disabled={busy === 'recruiter_habit_badge'}
+              className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer hover:border-oxblood hover:text-oxblood`}
+            >
+              {busy === 'recruiter_habit_badge' ? <Loader2 size={14} className="animate-spin" /> : null}
+              {consent.recruiter_habit_badge ? 'Turn off' : 'Turn on'}
+            </button>
+          </div>
+
           <div className="mt-5 pt-5 border-t border-rule">
             {visible ? (
               <button
@@ -220,6 +259,28 @@ export default function PrivacySettings() {
             >
               {busy === 'reminders' ? <Loader2 size={14} className="animate-spin" /> : null}
               {consent.learning_reminders ? 'Turn off' : 'Turn on'}
+            </button>
+          </div>
+        </section>
+
+        {/* Weekly leagues (opt-in) */}
+        <section className={sectionClass}>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="max-w-[520px]">
+              <h2 className={h2Class}>Weekly leagues</h2>
+              <p className={pClass}>
+                {consent.leaderboard_visibility
+                  ? 'On. Other learners in your league see your first name, last initial and weekly XP. Nothing else.'
+                  : 'Off. You are not in any league and no other learner can see you.'}
+              </p>
+            </div>
+            <button
+              onClick={() => setExtra('leaderboard_visibility', !consent.leaderboard_visibility, 'You joined this week\'s league.', 'You left leagues.')}
+              disabled={busy === 'leaderboard_visibility'}
+              className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer hover:border-oxblood hover:text-oxblood`}
+            >
+              {busy === 'leaderboard_visibility' ? <Loader2 size={14} className="animate-spin" /> : null}
+              {consent.leaderboard_visibility ? 'Leave leagues' : 'Join'}
             </button>
           </div>
         </section>

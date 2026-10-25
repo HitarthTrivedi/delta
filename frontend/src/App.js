@@ -47,6 +47,7 @@ const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const ProgressReport = lazy(() => import("./pages/ProgressReport"));
 const ResumePage = lazy(() => import("./pages/ResumePage"));
 const TrophyCabinet = lazy(() => import("./pages/TrophyCabinet"));
+const League = lazy(() => import("./pages/League"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const PracticeHub = lazy(() => import("./pages/PracticeHub"));
 const CodingSandbox = lazy(() => import("./pages/CodingSandbox"));
@@ -212,6 +213,7 @@ function AppContent() {
         <Route path="/progress-report" element={<RequireAuth><ProtectedRoute><ProgressReport /></ProtectedRoute></RequireAuth>} />
         <Route path="/resume" element={<RequireAuth><ProtectedRoute><ResumePage /></ProtectedRoute></RequireAuth>} />
         <Route path="/achievements" element={<RequireAuth><ProtectedRoute><TrophyCabinet /></ProtectedRoute></RequireAuth>} />
+        <Route path="/league" element={<RequireAuth><ProtectedRoute><League /></ProtectedRoute></RequireAuth>} />
         <Route path="/opportunities" element={<RequireAuth><ProtectedRoute><Opportunities /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice" element={<RequireAuth><ProtectedRoute><PracticeHub /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/coding" element={<RequireAuth><ProtectedRoute><CodingSandbox /></ProtectedRoute></RequireAuth>} />

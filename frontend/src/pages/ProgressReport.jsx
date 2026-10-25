@@ -6,6 +6,7 @@ import { getTaskProgress } from '../lib/taskProgress';
 import { useAuthStore } from '../store/authStore';
 import { fetchCareerContext } from '../hooks/useCareerOS';
 import { useEngagement } from '../hooks/useEngagement';
+import ProgressPath from '../components/engage/ProgressPath';
 
 const panel = {
   background: 'var(--paper)',
@@ -241,6 +242,10 @@ export default function ProgressReport() {
           <Stat label="This week" value={totalCurrent} note={`${doneCount} done, ${leftCount} left.`} />
           <Stat label="Day streak" value={habit?.streak ?? 0} note={habit ? `Longest so far: ${habit.longest_streak} days.` : 'Study a little each day.'} />
         </section>
+
+        <div style={{ marginBottom: 20 }}>
+          <ProgressPath phases={context?.roadmap?.phases} activePhaseId={context?.roadmap?.active_phase_id} />
+        </div>
 
         <div className="pr-main" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.62fr) minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
           {/* Left column: this week's picture, then the task ledger */}
