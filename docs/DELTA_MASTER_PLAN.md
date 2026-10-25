@@ -102,6 +102,9 @@ This module has two sides.
 | Retention | Referrals (invite link; both get a streak freeze after the friend's 3 study days; `referral_link` consent; 5 rewards/month cap) | Built (Phase 3) | `services/referrals.py`, `lib/referral.js` |
 | Retention | Personalised reminders: wording picked by a Thompson-sampling bandit (`nudge_log`), suggested study time from when the learner actually studies | Built (Phase 3) | `services/reminder_service.py`, `engagement.suggested_study_time` |
 | Retention | WhatsApp reminders | Not planned (decision: email + browser push only) | — |
+| College | Job match: paste a job ad -> skill gaps (code, not AI) -> add up to 3 tasks to this week, or plan the next 4 weeks around it (weekly cycle puts its gap tasks first) | Built | `services/job_match.py`, `routers/jobs.py`, `pages/JobMatch.jsx` |
+| Recruiter | Trustworthy scores: per-session integrity notes (timed, tab switches, pasted code, implausibly fast answers), shown to the learner and to recruiters | Built | `services/integrity.py`, `hooks/useSessionSignals.js`, `components/IntegrityNote.jsx` |
+| Recruiter | Public "verify this badge" links (`/v/:token`), created on share and revocable | Built | `badges.share/public_view`, `routers/public.py`, `pages/VerifyBadge.jsx` |
 
 ## 4. Build order
 
@@ -204,7 +207,7 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 6. ✅ **Monitoring:** Sentry wired (set `SENTRY_DSN`), `/health` checks the database; add the UptimeRobot monitor.
 7. **Staging environment + load test** (at least 500 concurrent users) before any big college onboarding.
 8. ✅ **Backups:** nightly encrypted off-site dump (`db-backup.yml`) + `restore_backup.sh`; set the secrets and run the monthly restore drill (`docs/OPERATIONS.md`).
-9. **Anti-cheating** for sandbox scores recruiters rely on.
+9. **Anti-cheating** for sandbox scores recruiters rely on: integrity notes are built (signals, not proof); next would be a short supervised re-check for the scores recruiters weigh most.
 10. **Legal:** lawyer review of `frontend/public/legal/*.md`; update the Data Fiduciary name once the company is registered.
 
 **Gamification and retention** (research and plan: Duolingo's published streak, league and notification results; spaced retrieval; implementation intentions; CCPA dark-pattern rules; DPDP §9):
