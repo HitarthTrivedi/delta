@@ -236,7 +236,7 @@ export const sandboxCodingAPI = {
   getProblems: (userId) => api.get(`/sandbox/coding/${userId}/problems`).then(r => r.data),
   startProblem: (userId, topic, problemId) => api.post(`/sandbox/coding/${userId}/problems/start`, { topic, problem_id: problemId }, { timeout: 60000 }).then(r => r.data),
   run: (userId, sessionId, language, code, stdin = '') => api.post(`/sandbox/coding/${userId}/sessions/${sessionId}/run`, { language, code, stdin }, { timeout: 30000 }).then(r => r.data),
-  submit: (userId, sessionId, language, code) => api.post(`/sandbox/coding/${userId}/sessions/${sessionId}/submit`, { language, code }, { timeout: 60000 }).then(r => r.data),
+  submit: (userId, sessionId, language, code, integrity) => api.post(`/sandbox/coding/${userId}/sessions/${sessionId}/submit`, { language, code, integrity }, { timeout: 60000 }).then(r => r.data),
   getSessions: (userId) => api.get(`/sandbox/coding/${userId}/sessions`).then(r => r.data),
 };
 
@@ -246,7 +246,7 @@ export const sandboxInterviewAPI = {
   start: (userId, opts) => api.post(`/sandbox/interview/${userId}/start`, opts, { timeout: 60000 }).then(r => r.data),
   respond: (userId, sessionId, answer) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/respond`, { answer }, { timeout: 60000 }).then(r => r.data),
   // The report is one long LLM call on the backend (up to 120s + one retry): don't give up first.
-  finish: (userId, sessionId) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/finish`, {}, { timeout: 150000 }).then(r => r.data),
+  finish: (userId, sessionId, integrity) => api.post(`/sandbox/interview/${userId}/sessions/${sessionId}/finish`, { integrity }, { timeout: 150000 }).then(r => r.data),
   avatar: (userId) => api.get(`/sandbox/interview/${userId}/avatar`).then(r => r.data),
   tts: (userId, text, voice) => api.post(`/sandbox/interview/${userId}/tts`, { text, voice }, { timeout: 20000 }).then(r => r.data),
   getSessions: (userId) => api.get(`/sandbox/interview/${userId}/sessions`).then(r => r.data),
@@ -269,9 +269,27 @@ export const engagementAPI = {
   badges: (userId) => api.get(`/engagement/${userId}/badges`).then(r => r.data),
   league: (userId) => api.get(`/engagement/${userId}/league`).then(r => r.data),
   setLeague: (userId, enabled) => api.put(`/engagement/${userId}/league`, { enabled }).then(r => r.data),
+  shareBadge: (userId, key) => api.post(`/engagement/${userId}/badges/${key}/share`).then(r => r.data),
+  unshareBadge: (userId, key) => api.delete(`/engagement/${userId}/badges/${key}/share`).then(r => r.data),
   referrals: (userId) => api.get(`/engagement/${userId}/referrals`).then(r => r.data),
   referralPreview: (userId, code) => api.get(`/engagement/${userId}/referrals/preview/${encodeURIComponent(code)}`).then(r => r.data),
   claimReferral: (userId, code) => api.post(`/engagement/${userId}/referrals/claim`, { code }).then(r => r.data),
+};
+
+// ── Job match: paste a job ad -> gaps -> tasks ──
+export const jobsAPI = {
+  list: (userId) => api.get(`/jobs/${userId}`).then(r => r.data),
+  // The first read of a new ad calls the model: allow time.
+  analyse: (userId, text) => api.post(`/jobs/${userId}/analyse`, { text }, { timeout: 90000 }).then(r => r.data),
+  get: (userId, id) => api.get(`/jobs/${userId}/${id}`).then(r => r.data),
+  addToWeek: (userId, id, skills) => api.post(`/jobs/${userId}/${id}/add-to-week`, { skills }).then(r => r.data),
+  plan: (userId, id, on) => api.post(`/jobs/${userId}/${id}/plan`, { on }).then(r => r.data),
+  remove: (userId, id) => api.delete(`/jobs/${userId}/${id}`).then(r => r.data),
+};
+
+// ── Public, no-login pages ──
+export const publicAPI = {
+  badge: (token) => api.get(`/public/badges/${encodeURIComponent(token)}`).then(r => r.data),
 };
 
 // ── Study circles (opt-in private groups) ──
@@ -295,7 +313,7 @@ export const quickPracticeAPI = {
 export const sandboxTheoryAPI = {
   // opts: { topic, num_questions, difficulty, category, area, timed }
   start: (userId, opts) => api.post(`/sandbox/theory/${userId}/start`, opts, { timeout: 90000 }).then(r => r.data),
-  submit: (userId, sessionId, answers) => api.post(`/sandbox/theory/${userId}/sessions/${sessionId}/submit`, { answers }, { timeout: 30000 }).then(r => r.data),
+  submit: (userId, sessionId, answers, integrity) => api.post(`/sandbox/theory/${userId}/sessions/${sessionId}/submit`, { answers, integrity }, { timeout: 30000 }).then(r => r.data),
   getSessions: (userId) => api.get(`/sandbox/theory/${userId}/sessions`).then(r => r.data),
   getSession: (userId, sessionId) => api.get(`/sandbox/theory/${userId}/sessions/${sessionId}`).then(r => r.data),
   suggestions: (userId) => api.get(`/sandbox/theory/${userId}/suggestions`).then(r => r.data),

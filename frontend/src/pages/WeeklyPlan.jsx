@@ -1215,6 +1215,9 @@ export default function WeeklyPlan() {
 
         <section style={{ ...panelStyle, padding: '18px 20px' }}>
           <h2 style={titleStyle}>Adjust this week</h2>
+          <Link to="/jobs" style={{ display: 'inline-block', marginTop: 6, color: 'var(--ink-soft)', fontSize: 13, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+            Aiming at a specific job? Match it to your plan
+          </Link>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             <button
               onClick={() => { setFeedbackOpen(o => !o); setEditingTasks(false); }}

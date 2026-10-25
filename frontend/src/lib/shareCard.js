@@ -34,7 +34,11 @@ function star(g, cx, cy, outer, inner) {
   g.closePath();
 }
 
-export function badgeCardBlob({ title, description, tier, maxTier, name, earnedAt }) {
+export function verifyLink(token) {
+  return `${window.location.origin}/v/${token}`;
+}
+
+export function badgeCardBlob({ title, description, tier, maxTier, name, earnedAt, link }) {
   const c = document.createElement('canvas');
   c.width = 1200;
   c.height = 630;
@@ -70,18 +74,24 @@ export function badgeCardBlob({ title, description, tier, maxTier, name, earnedA
   g.fillStyle = INK;
   g.font = '600 28px system-ui, -apple-system, Segoe UI, sans-serif';
   g.fillText([name, when].filter(Boolean).join(' · '), x, 530);
+  if (link) {
+    g.fillStyle = INK_SOFT;
+    g.font = '22px system-ui, -apple-system, Segoe UI, sans-serif';
+    g.fillText(`Verify: ${link.replace(/^https?:\/\//, '')}`, x, 578);
+  }
 
   return new Promise((resolve) => c.toBlob(resolve, 'image/png'));
 }
 
-/** Opens the phone's share sheet (WhatsApp, LinkedIn...) or downloads the image. */
-export async function shareBadge(badge, name) {
+/** Opens the phone's share sheet (WhatsApp, LinkedIn...) or downloads the image.
+ *  `link` is the badge's public verify link, printed on the card and added to the text. */
+export async function shareBadge(badge, name, link) {
   const blob = await badgeCardBlob({
     title: badge.title, description: badge.description, tier: badge.tier, maxTier: badge.max_tier,
-    name, earnedAt: badge.earned_at,
+    name, earnedAt: badge.earned_at, link,
   });
   const file = new File([blob], `delta-badge-${badge.key}.png`, { type: 'image/png' });
-  const text = `I earned the "${badge.title}" badge on Delta: ${badge.description}.`;
+  const text = `I earned the "${badge.title}" badge on Delta: ${badge.description}.${link ? ` Verify it: ${link}` : ''}`;
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], text });

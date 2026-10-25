@@ -16,6 +16,8 @@ import useAnswerMic from '../hooks/useAnswerMic';
 import useWebcam from '../hooks/useWebcam';
 import InterviewerAvatar from '../components/interview/InterviewerAvatar';
 import InterviewReport from '../components/interview/InterviewReport';
+import useSessionSignals from '../hooks/useSessionSignals';
+import IntegrityNote from '../components/IntegrityNote';
 
 // three.js + the 3D model only load when the 3D interviewer is actually used.
 const Avatar3D = lazy(() => import('../components/interview/Avatar3D'));
@@ -151,6 +153,7 @@ export default function InterviewSandbox() {
 
   // ── report
   const [report, setReport] = useState(null);
+  const signals = useSessionSignals(stage === 'call' ? sessionId : null);
 
   const submitRef = useRef(null);
   const activeRef = useRef(false);
@@ -279,11 +282,11 @@ export default function InterviewSandbox() {
     setPhase('finishing');
     if (!mutedVoice) say("Thank you, that's the end of our interview. Give me a moment to put together your feedback.");
     try {
-      const data = await sandboxInterviewAPI.finish(userId, sessionId);
+      const data = await sandboxInterviewAPI.finish(userId, sessionId, signals.snapshot());
       activeRef.current = false;
       hush();
       cam.stop();
-      setReport({ feedback: data.feedback, transcript: data.transcript, settings: data.settings });
+      setReport({ feedback: data.feedback, transcript: data.transcript, settings: data.settings, integrity: data.integrity });
       setStage('report');
       refreshEngagement(queryClient, userId);
     } catch (err) {
@@ -486,6 +489,7 @@ export default function InterviewSandbox() {
           <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px' }}>Interview complete · {fmt(elapsed)}</p>
           <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', margin: '0 0 20px' }}>Your interview report</h1>
           <InterviewReport feedback={report.feedback} transcript={report.transcript} settings={report.settings} />
+          <IntegrityNote notes={report.integrity} style={{ marginTop: 14 }} />
           <div style={{ display: 'flex', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
             <button onClick={() => { setStage('setup'); setReport(null); }} style={{ flex: 1, minWidth: 200, background: 'var(--ink)', color: 'var(--paper)', border: 'none', borderRadius: 8, padding: 14, fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <RotateCcw size={16} /> Practice again
@@ -575,6 +579,7 @@ export default function InterviewSandbox() {
                 id="iv-answer"
                 value={answer}
                 onChange={(e) => { if (mic.listening) mic.stop(); setAnswer(e.target.value); }}
+                onPaste={(e) => signals.notePaste(e.clipboardData?.getData('text') || '')}
                 onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitAnswer(); }}
                 disabled={phase !== 'listening'}
                 rows={3}

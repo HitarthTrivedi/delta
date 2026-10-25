@@ -28,6 +28,7 @@ const SHARED = [
   'Target role',
   'Skills and their levels',
   'Practice results: technical test, coding and mock-interview scores, with a per-skill breakdown',
+  'How each session was taken: whether a test was timed, and notes such as leaving the tab or pasting code',
   'Your email, plus any LinkedIn / GitHub / portfolio links you added, so recruiters can contact you',
 ];
 const NOT_SHARED = [
