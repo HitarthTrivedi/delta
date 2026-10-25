@@ -132,7 +132,8 @@ Restore the latest backup into a scratch Postgres (a free Supabase project or a 
 - DAU, WAU, MAU and DAU/WAU;
 - the share of weekly-active learners on a 7+ day streak;
 - Quick 5 completions;
-- reminder opt-ins, opt-outs, and how often a nudge is followed by studying within a day.
+- reminder opt-ins, opt-outs, and how often a nudge is followed by studying within a day;
+- per reminder wording (`reminders.wordings`): how often it was sent and how often the learner studied that day. The bandit shifts towards the wordings that work; new wordings start from an even chance.
 
 Watch opt-outs: a rising opt-out rate means reminders are too frequent or too pushy.
 
