@@ -93,7 +93,11 @@ This module has two sides.
 | Retention | Opt-in study reminders (email + Web Push), per-learner time, backoff, one-click unsubscribe | Built (Phase 1), **needs VAPID keys + EMAIL_LINK_SECRET** | `services/reminder_service.py`, `services/push_service.py`, `public/sw.js` |
 | Retention | Admin retention metrics (cohorts, DAU/WAU, streaks, reminders) | Built | `services/engagement_metrics.py` |
 | Retention | De-intimidation pass (light practice pages, no-fear copy, Rewards + No-Fear design rules) | Built | `DESIGN.md`, practice pages |
-| Retention | Phase 2: daily quests, automatic badges + share cards, opt-in leagues, progress path, "Consistent learner" recruiter badge | Not started | — |
+| Retention | Daily quests (Quick 5 + 2 rotating, from verified XP events) + weekly challenge (quests on 4 days earns a streak freeze) | Built (Phase 2) | `services/quests.py`, `pages/Today.jsx` |
+| Retention | Automatic badges (8 badges x 3 tiers, skill mastery needs evidence) + canvas share cards | Built (Phase 2) | `services/badges.py`, `components/engage/BadgeShelf.jsx`, `lib/shareCard.js` |
+| Retention | Opt-in weekly leagues (5 tiers, groups of 20, XP-ranked, forgiving demotion, `leaderboard_visibility` consent) | Built (Phase 2) | `services/leagues.py`, `pages/League.jsx` |
+| Retention | Progress path (roadmap phases as a path with "You are here") | Built (Phase 2) | `components/engage/ProgressPath.jsx` (Progress page) |
+| Retention | "Consistent learner" recruiter badge (own `recruiter_habit_badge` consent; 20+ active days of 30; yes/no only) | Built (Phase 2) | `engagement.consistent_learners`, `routers/recruiter.py` |
 | Retention | Phase 3: study circles / friend streaks, referrals (freeze for both), personalised reminder timing | Not started | — |
 
 ## 4. Build order
@@ -201,13 +205,12 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 10. **Legal:** lawyer review of `frontend/public/legal/*.md`; update the Data Fiduciary name once the company is registered.
 
 **Gamification and retention** (research and plan: Duolingo's published streak, league and notification results; spaced retrieval; implementation intentions; CCPA dark-pattern rules; DPDP §9):
-- Phase 1 is built (see Status). The design rules are in `DESIGN.md` (Rewards exception, No-Fear rule) and `PRODUCT.md`.
-- Phase 2, once Phase 1 data exists:
-  - daily quests and a weekly challenge;
-  - automatic badges, with share cards for LinkedIn/WhatsApp;
-  - opt-in weekly leagues: about 20 learners per cohort in the same field, ranked by XP only, needing a `leaderboard_visibility` consent;
-  - a progress path for the roadmap;
-  - a "Consistent learner" badge for recruiters (opted-in students only; update the Privacy Policy §6 list).
+- Phases 1 and 2 are built (see Status). The design rules are in `DESIGN.md` (Rewards exception, No-Fear rule) and `PRODUCT.md`.
+- Phase 2 decisions worth knowing:
+  - leagues prefer a same-field group but join any group at the tier with room, so early leagues aren't groups of one; revisit once there are enough learners per field;
+  - the "Consistent learner" badge has its own consent on top of recruiter visibility, because the Privacy Policy promised recruiters never see habit data;
+  - share cards are images made in the browser; a public "verify this badge" page is not built.
+- Next for Phase 2, once there is data: tune quest rotation, league size and the challenge target from the retention numbers (`docs/OPERATIONS.md` §7).
 - Phase 3:
   - study circles and friend streaks;
   - referrals (a freeze for both);
