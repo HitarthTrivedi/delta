@@ -21,6 +21,7 @@ import logging
 import uuid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -50,6 +51,8 @@ BREAK_DAYS_PER_MONTH = 7
 REPAIR_WINDOW_DAYS = 2           # win a lost streak back within 2 days...
 REPAIR_GOAL_DAYS = 2             # ...by meeting the daily goal on 2 days
 TASK_REAWARD_DAYS = 7            # one award per plan task per week
+CONSISTENT_DAYS = 20             # "Consistent learner": studied on 20+...
+CONSISTENT_WINDOW_DAYS = 30      # ...of the last 30 days
 
 # Cumulative XP needed for each level; beyond the table, +800 XP per level.
 LEVEL_XP = [0, 50, 150, 300, 500, 800, 1200, 1700, 2300, 3000]
@@ -233,7 +236,7 @@ def record_activity(db: Session, user_id: str, source_type: str, source_id: str,
                                                   repeat_key=repeat_key, local_date=today).first():
         xp = 0  # same test/problem again today: still practice (keeps the streak), no extra XP
 
-    level_before = level_for(eng.xp_total)["level"]
+    xp_before = eng.xp_total
     db.add(XpEvent(id=str(uuid.uuid4()), user_id=user_id, source_type=source_type, source_id=source_id,
                    repeat_key=repeat_key, xp=xp, local_date=today))
     day = _day(db, user_id, today)
@@ -243,25 +246,51 @@ def record_activity(db: Session, user_id: str, source_type: str, source_id: str,
     eng.ignored_nudges = 0  # they came back: reminders return to the normal rhythm
     _extend_streak(eng, today)
 
-    goal_just_met = False
-    if not day.goal_met and day.xp >= goal_xp(eng):
-        day.goal_met = True
-        goal_just_met = True
-        bonus = XP_TABLE["daily_goal"]
-        db.add(XpEvent(id=str(uuid.uuid4()), user_id=user_id, source_type="daily_goal",
-                       source_id=today.isoformat(), xp=bonus, local_date=today))
-        day.xp += bonus
-        eng.xp_total += bonus
-        _on_goal_met(eng, today)
+    def award(kind: str, sid: str, amount: int) -> bool:
+        """Book a bonus (goal, quests, weekly challenge) at most once."""
+        if db.query(XpEvent).filter_by(user_id=user_id, source_type=kind, source_id=sid).first():
+            return False
+        db.add(XpEvent(id=str(uuid.uuid4()), user_id=user_id, source_type=kind, source_id=sid,
+                       xp=amount, local_date=today))
+        day.xp += amount
+        eng.xp_total += amount
+        return True
 
+    goal_just_met = False
+
+    def check_goal() -> None:
+        nonlocal goal_just_met
+        if not day.goal_met and day.xp >= goal_xp(eng):
+            day.goal_met = goal_just_met = True
+            award("daily_goal", today.isoformat(), XP_TABLE["daily_goal"])
+            _on_goal_met(eng, today)
+
+    from app.services import badges, quests
+    check_goal()
+    db.flush()
+    quest = quests.evaluate(db, eng, today, award)
+    check_goal()  # the quest bonus can complete the goal
+    db.flush()
+    new_badges = badges.check(db, eng)
     db.commit()
-    level_after = level_for(eng.xp_total)["level"]
+
+    if eng.leagues_opt_in:
+        try:
+            from app.services import leagues
+            leagues.ensure_membership(db, eng)
+        except Exception:  # a league hiccup must never cost the learner their XP
+            _log.exception("league membership failed for %s", user_id)
+            db.rollback()
+
     return {
-        "awarded": xp + (XP_TABLE["daily_goal"] if goal_just_met else 0),
+        "awarded": eng.xp_total - xp_before,
         "goal_met": goal_just_met,
         "streak": eng.current_streak,
-        "level_up": level_after > level_before,
-        "level": level_after,
+        "level_up": level_for(eng.xp_total)["level"] > level_for(xp_before)["level"],
+        "level": level_for(eng.xp_total)["level"],
+        "quests_done": quest["quests_done"],
+        "challenge_won": quest["challenge_won"],
+        "badges": new_badges,
     }
 
 
@@ -348,6 +377,7 @@ def summary(db: Session, user_id: str, timezone: str | None = None) -> dict:
                                              source_id=today.isoformat()).first() is not None
     month = today.strftime("%Y-%m")
     break_left = BREAK_DAYS_PER_MONTH - (eng.break_days_used if eng.break_month == month else 0)
+    from app.services import badges, quests
     return {
         "timezone": eng.timezone,
         "today": today.isoformat(),
@@ -375,6 +405,9 @@ def summary(db: Session, user_id: str, timezone: str | None = None) -> dict:
         "study_time": eng.study_time,
         "reminders_opt_in": eng.reminders_opt_in,
         "reminder_channel": eng.reminder_channel,
+        "quests": quests.state(db, eng, today),
+        "badges": badges.overview(db, user_id),
+        "leagues_opt_in": eng.leagues_opt_in,
     }
 
 
@@ -486,6 +519,23 @@ def remove_push_subscription(db: Session, user_id: str, endpoint: str) -> None:
     if sub and sub.user_id == user_id:
         db.delete(sub)
         db.commit()
+
+
+def consistent_learners(db: Session, user_ids) -> set[str]:
+    """Learners who chose to show recruiters the "Consistent learner" badge and
+    studied on 20+ of the last 30 days. Recruiters get a yes/no only: no XP,
+    streak or day counts leave Delta."""
+    from app.services import compliance
+    ids = compliance.granted_user_ids(db, compliance.RECRUITER_HABIT_BADGE, user_ids)
+    if not ids:
+        return set()
+    since = _now().date() - datetime.timedelta(days=CONSISTENT_WINDOW_DAYS - 1)
+    rows = (db.query(DailyActivity.user_id)
+            .filter(DailyActivity.user_id.in_(list(ids)), DailyActivity.actions > 0,
+                    DailyActivity.local_date >= since)
+            .group_by(DailyActivity.user_id)
+            .having(func.count(DailyActivity.local_date) >= CONSISTENT_DAYS).all())
+    return {r[0] for r in rows}
 
 
 def _valid_hhmm(value: str) -> bool:

@@ -1,7 +1,9 @@
 """Daily-habit (gamification) state: streaks, XP and per-day activity.
 
-XP and streaks reward the *habit* of learning. They never feed readiness,
-sandbox scores or anything recruiters see. Every table has `user_id`, so
+XP and streaks reward the *habit* of learning. They never feed readiness or
+sandbox scores, and recruiters never see XP, streaks or league standing (the
+only exception is the separately consented "Consistent learner" yes/no badge).
+Every per-learner table has `user_id`, so
 privacy export and erasure cover it automatically. Children (Delta for
 School) never get rows here (DPDP §9: no behavioural tracking of children).
 """
@@ -41,6 +43,10 @@ class UserEngagement(Base):
     reminder_channel = Column(String, nullable=False, default="email")  # email | push | both
     last_nudged_on = Column(Date, nullable=True)
     ignored_nudges = Column(Integer, nullable=False, default=0)
+
+    # Weekly leagues (opt-in, consent recorded in consent_records).
+    leagues_opt_in = Column(Boolean, nullable=False, default=False)
+    league_tier = Column(Integer, nullable=False, default=0)  # index into leagues.TIERS
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -84,3 +90,37 @@ class DailyActivity(Base):
     goal_met = Column(Boolean, nullable=False, default=False)
     freeze_used = Column(Boolean, nullable=False, default=False)
     on_break = Column(Boolean, nullable=False, default=False)
+
+
+class UserBadge(Base):
+    """An earned achievement badge; `tier` rises 1 -> 3 as the learner keeps going."""
+    __tablename__ = "user_badges"
+
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True)
+    badge_key = Column(String, primary_key=True)
+    tier = Column(Integer, nullable=False, default=1)
+    earned_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)  # when this tier was reached
+
+
+class LeagueCohort(Base):
+    """A weekly league group of up to 20 opted-in learners at the same tier.
+    `size` counts claimed places; places are claimed atomically."""
+    __tablename__ = "league_cohorts"
+
+    id = Column(String, primary_key=True)
+    week_start = Column(Date, nullable=False, index=True)  # Monday
+    field = Column(String, nullable=False)  # field pack id of the learner who opened it
+    tier = Column(Integer, nullable=False)
+    size = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class LeagueMember(Base):
+    """One learner's place in one week's league."""
+    __tablename__ = "league_members"
+
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True)
+    week_start = Column(Date, primary_key=True)
+    cohort_id = Column(String, ForeignKey("league_cohorts.id"), nullable=False, index=True)
+    tier = Column(Integer, nullable=False)
+    outcome = Column(String, nullable=True)  # promoted | stayed | demoted, settled after the week

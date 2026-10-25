@@ -16,7 +16,8 @@ from app.services import compliance
 
 router = APIRouter(prefix="/api/privacy", tags=["privacy"])
 
-CONSENTABLE = {compliance.TERMS, compliance.RECRUITER_VISIBILITY, compliance.LEARNING_REMINDERS}
+CONSENTABLE = {compliance.TERMS, compliance.RECRUITER_VISIBILITY, compliance.LEARNING_REMINDERS,
+               compliance.LEADERBOARD_VISIBILITY, compliance.RECRUITER_HABIT_BADGE}
 
 
 def _not_guest(user_id: str) -> None:
@@ -40,6 +41,8 @@ def _consent_state(db: Session, user_id: str) -> dict:
     terms = compliance.latest_consent(db, user_id, compliance.TERMS)
     vis = compliance.latest_consent(db, user_id, compliance.RECRUITER_VISIBILITY)
     reminders = compliance.latest_consent(db, user_id, compliance.LEARNING_REMINDERS)
+    leagues = compliance.latest_consent(db, user_id, compliance.LEADERBOARD_VISIBILITY)
+    habit_badge = compliance.latest_consent(db, user_id, compliance.RECRUITER_HABIT_BADGE)
     history = db.query(ConsentRecord).filter(ConsentRecord.user_id == user_id) \
         .order_by(ConsentRecord.created_at.desc()).limit(50).all()
     return {
@@ -48,6 +51,8 @@ def _consent_state(db: Session, user_id: str) -> dict:
         "terms_accepted_version": terms.policy_version if terms and terms.action == "granted" else None,
         "recruiter_visible": bool(vis and vis.action == "granted"),
         "learning_reminders": bool(reminders and reminders.action == "granted"),
+        "leaderboard_visibility": bool(leagues and leagues.action == "granted"),
+        "recruiter_habit_badge": bool(habit_badge and habit_badge.action == "granted"),
         "is_recruiter": db.query(Recruiter).filter(Recruiter.id == user_id).first() is not None,
         "history": [
             {"purpose": h.purpose, "action": h.action, "policy_version": h.policy_version,
@@ -91,6 +96,10 @@ def set_consent(
         # Records the consent and switches reminders on/off in one place.
         from app.services import engagement
         engagement.set_reminders(db, user_id, payload.granted)
+    elif payload.purpose == compliance.LEADERBOARD_VISIBILITY:
+        # Records the consent and joins/leaves leagues in one place.
+        from app.services import leagues
+        leagues.set_opt_in(db, user_id, payload.granted)
     else:
         compliance.record_consent(db, user_id, payload.purpose, payload.granted)
     return _consent_state(db, user_id)
