@@ -7,6 +7,16 @@ import { useAuthStore } from '../../store/authStore';
 
 const SANDBOX_LABEL = { theory: 'Technical test', coding: 'Coding', interview: 'Mock interview' };
 
+// Shown only when the student opted in to this badge and studied on 20+ of the last 30 days.
+function ConsistentBadge() {
+  return (
+    <span title="Studied on 20 or more of the last 30 days (shared with the student's consent)"
+      className="inline-flex items-center font-mono text-[10px] uppercase tracking-[0.12em] px-2 py-0.5 border border-ink text-ink">
+      Consistent learner
+    </span>
+  );
+}
+
 const inputClass = 'w-full bg-paper border border-rule px-3.5 py-3 text-ink placeholder:text-ink-soft text-sm outline-none focus:border-oxblood box-border';
 const labelClass = 'block text-[13px] font-semibold text-ink mb-1.5';
 const primaryBtn = 'inline-flex items-center justify-center gap-2 px-5 py-3 border font-mono text-xs uppercase tracking-[0.14em] transition-colors';
@@ -250,7 +260,7 @@ function CandidateCard({ c, onOpen }) {
         <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft mt-1">Fit</div>
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="m-0 text-[17px] font-semibold text-ink">{c.name}</h3>
+        <h3 className="m-0 text-[17px] font-semibold text-ink flex flex-wrap items-center gap-2">{c.name}{c.consistent_learner && <ConsistentBadge />}</h3>
         {c.field_label && <p className="m-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxblood mt-0.5">{c.field_label}</p>}
         <p className="m-0 text-[13px] text-ink-soft">{c.target_role || 'No target role'}{edu && ` · ${edu}`}</p>
         <div className="flex flex-wrap gap-1.5 mt-3">
@@ -302,6 +312,7 @@ function CandidateDetail({ id, onClose }) {
           <>
             <p className="kicker mb-2">Candidate</p>
             <h2 className="font-display text-[30px] font-semibold text-oxblood m-0">{d.name}</h2>
+            {d.consistent_learner && <div className="mt-2"><ConsistentBadge /></div>}
             {d.field_label && <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-soft m-0 mt-1">{d.field_label}</p>}
             <p className="text-ink-soft text-[14px] m-0 mt-1">{d.target_role}</p>
             {d.work && (

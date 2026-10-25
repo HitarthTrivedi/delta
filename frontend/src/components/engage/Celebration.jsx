@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Flame, Sparkles, Trophy, X } from 'lucide-react';
+import { Award, Flame, Snowflake, Sparkles, Target, Trophy, X } from 'lucide-react';
 import { useCelebration } from '../../lib/celebrate';
 import InterviewerAvatar from '../interview/InterviewerAvatar';
 
@@ -34,7 +34,10 @@ function Confetti() {
 
 function lines(c) {
   const out = [];
+  if (c.badge) out.push({ icon: Award, text: `New badge: ${c.badge.title}` });
   if (c.levelUp) out.push({ icon: Trophy, text: `Level ${c.levelUp.level}: ${c.levelUp.name}!` });
+  if (c.challenge) out.push({ icon: Snowflake, text: c.challenge === 'freeze' ? 'Weekly challenge won: a streak freeze!' : 'Weekly challenge won!' });
+  if (c.questsDone) out.push({ icon: Target, text: "Today's quests: all done!" });
   if (c.goalMet) out.push({ icon: Sparkles, text: "Today's goal: done!" });
   if (c.streakUp && c.streak > 0) out.push({ icon: Flame, text: c.streak === 1 ? 'Streak started!' : `${c.streak}-day streak!` });
   return out;

@@ -44,13 +44,19 @@ export async function refreshEngagement(queryClient, userId, { size = 'small' } 
   if (size !== 'none' && before && after && after.xp_total > before.xp_total) {
     const levelUp = after.level.level > before.level.level ? after.level : null;
     const goalMet = after.goal_met_today && !before.goal_met_today;
+    const badge = (after.badges?.count || 0) > (before.badges?.count || 0) ? after.badges.latest : null;
+    const questsDone = !!after.quests?.all_done && !before.quests?.all_done;
+    const challenge = after.quests?.challenge?.won && !before.quests?.challenge?.won ? after.quests.challenge.reward : null;
     celebrate({
-      size: levelUp || goalMet ? 'big' : size,
+      size: levelUp || goalMet || badge || challenge ? 'big' : size,
       xp: after.xp_total - before.xp_total,
       streak: after.streak,
       streakUp: after.streak > before.streak,
       goalMet,
       levelUp,
+      badge,
+      questsDone,
+      challenge,
     });
   }
   return after;

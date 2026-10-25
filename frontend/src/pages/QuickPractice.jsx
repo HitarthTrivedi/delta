@@ -72,6 +72,9 @@ export default function QuickPractice() {
           streakUp: true,
           goalMet: !!award.goal_met,
           levelUp: null,
+          badge: award.badges?.[0] || null,
+          questsDone: !!award.quests_done,
+          challenge: award.challenge_won || null,
           message: 'Questions you missed will come back in a day or two. That spacing is what makes it stick.',
           cta: 'Back to Today',
         });

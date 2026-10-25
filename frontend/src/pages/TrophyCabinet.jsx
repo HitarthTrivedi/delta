@@ -6,6 +6,8 @@ import {
 import { toast } from 'sonner';
 import { achievementsAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import { useUserWithSkills } from '../hooks/useUser';
+import BadgeShelf from '../components/engage/BadgeShelf';
 
 const panelStyle = {
   background: 'var(--paper)',
@@ -40,6 +42,7 @@ const emptyForm = { type: 'certificate', title: '', organization: '', date_achie
 
 export default function TrophyCabinet() {
   const userId = useAuthStore((state) => state.userId);
+  const { data: user } = useUserWithSkills(userId);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -125,13 +128,17 @@ export default function TrophyCabinet() {
               Everything you've earned, in one place.
             </h1>
             <p style={{ margin: '10px 0 0', color: 'var(--ink-soft)', fontSize: 14.5, lineHeight: 1.55, maxWidth: '58ch' }}>
-              The certificates, projects, and awards you've collected on your journey. Add anything you're proud of.
+              Badges arrive on their own as you learn. Add the certificates, projects and awards you're proud of below.
             </p>
           </div>
           <button className="tc-btn tc-btn-primary" onClick={openAdd}>
             <Plus size={14} /> Add achievement
           </button>
         </header>
+
+        <BadgeShelf userId={userId} userName={user?.name} />
+
+        <h2 style={{ margin: '0 0 10px', fontFamily: serif, fontSize: 24, fontWeight: 600 }}>My certificates and projects</h2>
 
         {/* Filter tabs */}
         <div role="tablist" aria-label="Filter achievements" style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--rule)', marginBottom: 22, overflowX: 'auto' }}>

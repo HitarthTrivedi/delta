@@ -266,6 +266,9 @@ export const engagementAPI = {
   addPush: (userId, subscription) => api.post(`/engagement/${userId}/push`, subscription).then(r => r.data),
   removePush: (userId, endpoint) => api.delete(`/engagement/${userId}/push`, { data: { endpoint } }).then(r => r.data),
   unsubscribe: (u, t) => api.post('/engagement/unsubscribe', { u, t }).then(r => r.data),
+  badges: (userId) => api.get(`/engagement/${userId}/badges`).then(r => r.data),
+  league: (userId) => api.get(`/engagement/${userId}/league`).then(r => r.data),
+  setLeague: (userId, enabled) => api.put(`/engagement/${userId}/league`, { enabled }).then(r => r.data),
 };
 
 // ── Quick 5: the daily 5-question spaced review ──

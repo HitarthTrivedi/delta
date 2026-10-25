@@ -101,6 +101,8 @@ A warm paper palette with one saturated accent; a parallel dark "ink" variant ex
 
 **The Rewards Exception.** The daily-habit layer (streaks, XP, levels, celebrations) may use one extra warm color, **Reward** (`--reward`, `#b7791f` light / `#e0a84a` dark), plus soft rounded shapes (pills, rings, the celebration card) and short celebratory motion. It is spent **only on things the learner earned** (a streak day, XP, a goal met, a level). It is never used for scores, verdicts, recruiter-facing data or errors, and every animation has a `prefers-reduced-motion` alternative. Practice pages use the same bone/paper theme as the rest of the app; the interview's video tiles are the one dark surface, because they imitate a real video call.
 
+Leagues follow the same rule: a table shows only "moving up" for others; the bottom of the table is never labelled for anyone except, gently, the learner themself.
+
 **The No-Fear Rule.** Practice is for learning, not judgement. Red is reserved for real errors (a failed request, a runtime error, ending a call). A wrong answer or a low score is shown in amber or neutral ink with an explanation of what to do next. Timers are off unless the learner picks exam mode.
 
 ## 3. Typography

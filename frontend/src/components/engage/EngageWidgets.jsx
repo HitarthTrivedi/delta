@@ -4,6 +4,11 @@ import { Flame, Snowflake } from 'lucide-react';
 // Small, reusable pieces of the daily habit UI. Rewards use the warm "reward"
 // token only; scores and errors never do (see DESIGN.md, Rewards).
 
+export function daysLeftText(n) {
+  if (n <= 0) return 'ends today';
+  return n === 1 ? '1 day left' : `${n} days left`;
+}
+
 export function StreakFlame({ streak = 0, freezes = 0, done = false, compact = false }) {
   const lit = streak > 0;
   return (

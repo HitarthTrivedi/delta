@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Bell, CalendarClock, CheckCircle2, Coffee, Loader2, PauseCircle, Sparkles } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRight, Bell, CalendarClock, CheckCircle2, Coffee, Loader2, Medal, PauseCircle, Snowflake, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '../store/authStore';
 import { useUserWithSkills } from '../hooks/useUser';
@@ -11,12 +11,19 @@ import { getTaskProgress } from '../lib/taskProgress';
 import { engagementAPI } from '../lib/api';
 import { enablePush, pushSupported } from '../lib/push';
 import InterviewerAvatar from '../components/interview/InterviewerAvatar';
-import { DailyGoalRing, LevelBar, StreakFlame, WeekStrip } from '../components/engage/EngageWidgets';
+import { DailyGoalRing, LevelBar, StreakFlame, WeekStrip, daysLeftText } from '../components/engage/EngageWidgets';
 
 // Home after sign-in: one clear next step, the daily habit at a glance, and
 // Aria as a friendly guide. Copy rules: warm, no guilt, no false urgency.
 
 const card = 'rounded-2xl border border-rule bg-paper';
+const LEAGUE_OFFER_KEY = 'delta_league_offer_dismissed';
+const QUEST_ACTION = {
+  quick5: { to: '/today/quick', label: 'Start' },
+  plan_task: { to: '/roadmap', label: 'Open plan' },
+  practice: { to: '/practice', label: 'Practise' },
+  two_kinds: { to: '/practice', label: 'Practise' },
+};
 
 function greeting() {
   const h = new Date().getHours();
@@ -144,6 +151,97 @@ function BreakControl({ userId, e, onChange }) {
   );
 }
 
+function WeeklyChallenge({ c }) {
+  if (!c) return null;
+  return (
+    <div className="mt-3 rounded-xl bg-accent-surface px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <Snowflake size={15} className="text-reward" aria-hidden="true" /> Weekly challenge
+        </span>
+        <span className="flex gap-1" role="img" aria-label={`${Math.min(c.days_done, c.needed)} of ${c.needed} days`}>
+          {Array.from({ length: c.needed }, (_, i) => (
+            <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < c.days_done ? 'bg-reward' : 'bg-ink/20'}`} />
+          ))}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-ink-soft">
+        {c.won
+          ? (c.reward === 'freeze' ? 'Won! A streak freeze is yours.' : `Won! +${c.reward_xp} XP (your freezes were already full).`)
+          : `Finish your quests on ${c.needed} days this week to earn a streak freeze.`}
+      </p>
+    </div>
+  );
+}
+
+function LeagueCard({ userId, e }) {
+  const queryClient = useQueryClient();
+  const [joining, setJoining] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(LEAGUE_OFFER_KEY) === '1'; } catch { return false; }
+  });
+  const { data: league } = useQuery({
+    queryKey: ['league', userId],
+    queryFn: () => engagementAPI.league(userId),
+    enabled: !!userId && !!e.leagues_opt_in,
+    staleTime: 60 * 1000,
+  });
+
+  if (e.leagues_opt_in) {
+    if (!league?.opted_in) return null;
+    const me = league.rows.find((r) => r.you);
+    return (
+      <Link to="/league" className={`${card} flex items-center justify-between gap-3 p-4 hover:border-ink-soft`}>
+        <span className="flex items-center gap-3">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-reward/15 text-reward"><Medal size={18} aria-hidden="true" /></span>
+          <span>
+            <span className="block text-sm font-semibold text-ink">{league.tier_name} league</span>
+            <span className="block text-xs text-ink-soft">
+              {me ? `You're #${me.rank} of ${league.rows.length}` : 'Your league'} · {daysLeftText(league.days_left)}
+            </span>
+          </span>
+        </span>
+        <ArrowRight size={18} className="text-ink-soft" aria-hidden="true" />
+      </Link>
+    );
+  }
+  if (dismissed || e.streak < 3) return null;
+
+  const join = async () => {
+    setJoining(true);
+    try {
+      const board = await engagementAPI.setLeague(userId, true);
+      queryClient.setQueryData(['league', userId], board);
+      queryClient.invalidateQueries({ queryKey: engagementKey(userId) });
+      toast.success(`You're in the ${board.tier_name} league. Have fun!`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not join right now.');
+    } finally {
+      setJoining(false);
+    }
+  };
+  const notNow = () => {
+    try { localStorage.setItem(LEAGUE_OFFER_KEY, '1'); } catch { /* private mode: just hide it for now */ }
+    setDismissed(true);
+  };
+  return (
+    <section className={`${card} p-4`}>
+      <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Medal size={16} className="text-reward" aria-hidden="true" /> Fancy a friendly weekly league?</p>
+      <p className="mt-1 text-sm text-ink-soft">
+        Up to 20 learners, ranked by the XP they earn that week: effort counts, never test scores.
+        Others see only your first name and last initial, and you can leave any time.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button onClick={join} disabled={joining}
+          className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-paper hover:opacity-90 disabled:opacity-60">
+          {joining && <Loader2 size={14} className="animate-spin" />} Join
+        </button>
+        <button onClick={notNow} className="rounded-full px-4 py-1.5 text-sm text-ink-soft hover:text-ink">Not now</button>
+      </div>
+    </section>
+  );
+}
+
 export default function Today() {
   const userId = useAuthStore((s) => s.userId);
   const navigate = useNavigate();
@@ -229,17 +327,43 @@ export default function Today() {
           <HabitSetup userId={userId} e={e} onDone={() => { setSetupDone(true); queryClient.invalidateQueries({ queryKey: engagementKey(userId) }); }} />
         )}
 
-        {/* Today's list (at most 3) */}
-        <section className={`${card} p-5 sm:p-6`}>
-          <h2 className="text-sm font-semibold text-ink">Today</h2>
-          <ul className="mt-3 divide-y divide-rule">
-            <li className="flex items-center justify-between gap-3 py-3">
-              <span className="flex items-center gap-3">
-                {e.quick_done_today ? <CheckCircle2 size={18} className="text-reward" /> : <span className="h-[18px] w-[18px] rounded-full border-2 border-rule" />}
-                <span className="text-ink">Quick 5 review</span>
+        {/* Today's quests (three) + the weekly challenge */}
+        {e.quests && (
+          <section className={`${card} p-5 sm:p-6`}>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h2 className="text-sm font-semibold text-ink">Today's quests</h2>
+              <span className="text-xs text-ink-soft">
+                {e.quests.all_done ? `All done · +${e.quests.bonus_xp} XP earned` : `Finish all three for +${e.quests.bonus_xp} XP`}
               </span>
-              {!e.quick_done_today && <Link to="/today/quick" className="text-sm font-semibold text-ink underline-offset-4 hover:underline">Start</Link>}
-            </li>
+            </div>
+            <ul className="mt-3 divide-y divide-rule">
+              {e.quests.items.map((q) => {
+                const action = QUEST_ACTION[q.key];
+                return (
+                  <li key={q.key} className="flex items-center justify-between gap-3 py-3">
+                    <span className="flex min-w-0 items-center gap-3">
+                      {q.done
+                        ? <CheckCircle2 size={18} className="shrink-0 text-reward" aria-label="Done" />
+                        : <span className="h-[18px] w-[18px] shrink-0 rounded-full border-2 border-rule" />}
+                      <span className={q.done ? 'text-ink-soft' : 'text-ink'}>{q.title}</span>
+                    </span>
+                    {!q.done && (q.key === 'goal'
+                      ? <span className="shrink-0 text-xs text-ink-soft">{e.xp_today}/{e.goal_xp} XP</span>
+                      : action && <Link to={action.to} className="shrink-0 text-sm font-semibold text-ink underline-offset-4 hover:underline">{action.label}</Link>)}
+                  </li>
+                );
+              })}
+            </ul>
+            <WeeklyChallenge c={e.quests.challenge} />
+          </section>
+        )}
+
+        <LeagueCard userId={userId} e={e} />
+
+        {/* From the plan (at most 2) */}
+        <section className={`${card} p-5 sm:p-6`}>
+          <h2 className="text-sm font-semibold text-ink">From your plan this week</h2>
+          <ul className="mt-3 divide-y divide-rule">
             {openTasks.map((t) => (
               <li key={t.id || t.title} className="flex items-center justify-between gap-3 py-3">
                 <span className="flex items-center gap-3 min-w-0">

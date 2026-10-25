@@ -22,7 +22,7 @@ from app.models.compliance import Recruiter, RecruiterProfileView
 from app.models.sandbox_session import SandboxSession
 from app.models.skill_node import SkillNode
 from app.models.user import User
-from app.services import compliance
+from app.services import compliance, engagement
 from app.services.reminder_service import _supabase_admin_email
 from app.services.readiness import compute_readiness
 from app.services.domain_packs import resolve_field
@@ -245,6 +245,7 @@ def search(request: Request, prefs: Preferences, rec: Recruiter = Depends(requir
     sessions_by_user: dict[str, list[SandboxSession]] = {}
     for s in db.query(SandboxSession).filter(SandboxSession.user_id.in_(ids), SandboxSession.status == "completed").all():
         sessions_by_user.setdefault(s.user_id, []).append(s)
+    consistent = engagement.consistent_learners(db, ids)
 
     results = []
     for user in users:
@@ -264,6 +265,7 @@ def search(request: Request, prefs: Preferences, rec: Recruiter = Depends(requir
             **match,
             "sandbox": summary,
             "top_skills": [{"name": s.name, "proficiency": s.proficiency} for s in top_skills],
+            "consistent_learner": user.id in consistent,
         })
 
     results.sort(key=lambda r: (r["fit"] is not None, r["fit"] or 0, r["overall_sandbox_score"] or 0), reverse=True)
@@ -309,6 +311,7 @@ def candidate_detail(request: Request, student_id: str, rec: Recruiter = Depends
              "completed_at": s.completed_at.isoformat() if s.completed_at else None}
             for s in sessions[:20]
         ],
+        "consistent_learner": student_id in engagement.consistent_learners(db, [student_id]),
     }
 
 

@@ -22,7 +22,7 @@ from app.services.reminder_service import _supabase_base_url
 
 logger = logging.getLogger("delta.compliance")
 
-POLICY_VERSION = "2026-10-24"
+POLICY_VERSION = "2026-10-25"
 
 TERMS = "terms_privacy"
 RECRUITER_VISIBILITY = "recruiter_visibility"
@@ -30,6 +30,8 @@ RECRUITER_TERMS = "recruiter_terms"
 ACCOUNT_DELETED = "account_deleted"
 PARENTAL_CONSENT = "parental_consent"
 LEARNING_REMINDERS = "learning_reminders"  # opt-in study reminders (email / browser push)
+LEADERBOARD_VISIBILITY = "leaderboard_visibility"  # opt-in weekly leagues
+RECRUITER_HABIT_BADGE = "recruiter_habit_badge"  # opt-in "Consistent learner" badge for recruiters
 
 # Tables that are deliberately kept (pseudonymous) after erasure, or handled separately.
 _RETAINED_TABLES = {"consent_records", "recruiter_profile_views", "users"}
@@ -81,6 +83,18 @@ def visible_student_ids(db: Session) -> set[str]:
         if terms and terms.action == "granted" and terms.policy_version == POLICY_VERSION:
             visible.add(uid)
     return visible
+
+
+def granted_user_ids(db: Session, purpose: str, user_ids) -> set[str]:
+    """Of `user_ids`, those whose latest consent event for `purpose` is 'granted'."""
+    user_ids = list(user_ids)
+    if not user_ids:
+        return set()
+    rows = db.query(ConsentRecord).filter(
+        ConsentRecord.purpose == purpose, ConsentRecord.user_id.in_(user_ids)
+    ).order_by(ConsentRecord.created_at.asc()).all()
+    latest = {r.user_id: r for r in rows}
+    return {uid for uid, rec in latest.items() if rec.action == "granted"}
 
 
 def _email_set(raw: str) -> set[str]:

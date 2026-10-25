@@ -13,7 +13,7 @@ from app.models.opportunity_board import OpportunityBoard
 from app.models.sandbox_session import SandboxSession
 from app.models.compliance import ConsentRecord, Recruiter, RecruiterProfileView
 from app.models.school import ChildProfile, SchoolLesson, ChildLessonProgress
-from app.models.engagement import UserEngagement, XpEvent, DailyActivity
+from app.models.engagement import UserEngagement, XpEvent, DailyActivity, UserBadge, LeagueCohort, LeagueMember
 from app.models.practice import PracticeItem, UserPracticeState
 
 __all__ = [
@@ -24,5 +24,5 @@ __all__ = [
     "Feedback", "Achievement", "OpportunityBoard", "SandboxSession",
     "ConsentRecord", "Recruiter", "RecruiterProfileView",
     "ChildProfile", "SchoolLesson", "ChildLessonProgress",
-    "UserEngagement", "XpEvent", "DailyActivity", "PracticeItem", "UserPracticeState",
+    "UserEngagement", "XpEvent", "DailyActivity", "UserBadge", "LeagueCohort", "LeagueMember", "PracticeItem", "UserPracticeState",
 ]

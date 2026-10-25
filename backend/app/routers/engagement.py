@@ -1,4 +1,4 @@
-"""Daily habit API: streak, XP, level, daily goal, break mode."""
+"""Daily habit API: streak, XP, level, daily goal, break mode, badges, leagues."""
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -94,6 +94,36 @@ def set_reminders(request: Request, user_id: str, payload: RemindersPayload, db:
                   _: str = Depends(require_owner)):
     try:
         return engagement.set_reminders(db, user_id, payload.enabled, payload.channel)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/{user_id}/badges")
+def get_badges(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    from app.services import badges
+    eng = engagement.get_or_create(db, user_id)
+    badges.check(db, eng)  # catches up anything earned before badges existed
+    db.commit()
+    return {"badges": badges.listing(db, eng)}
+
+
+class LeaguePayload(BaseModel):
+    enabled: bool
+
+
+@router.get("/{user_id}/league")
+def get_league(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    from app.services import leagues
+    return leagues.board(db, user_id)
+
+
+@router.put("/{user_id}/league")
+@limiter.limit("10/minute")
+def set_league(request: Request, user_id: str, payload: LeaguePayload, db: Session = Depends(get_db),
+               _: str = Depends(require_owner)):
+    from app.services import leagues
+    try:
+        return leagues.set_opt_in(db, user_id, payload.enabled)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
