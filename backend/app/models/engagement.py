@@ -16,6 +16,7 @@ from app.database import Base
 
 class UserEngagement(Base):
     __tablename__ = "user_engagement"
+    __table_args__ = (UniqueConstraint("referral_code", name="uq_user_engagement_referral_code"),)
 
     user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     timezone = Column(String, nullable=False, default="Asia/Kolkata")
@@ -47,6 +48,9 @@ class UserEngagement(Base):
     # Weekly leagues (opt-in, consent recorded in consent_records).
     leagues_opt_in = Column(Boolean, nullable=False, default=False)
     league_tier = Column(Integer, nullable=False, default=0)  # index into leagues.TIERS
+
+    # Personal invite code for referrals (created on first use).
+    referral_code = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -124,3 +128,50 @@ class LeagueMember(Base):
     cohort_id = Column(String, ForeignKey("league_cohorts.id"), nullable=False, index=True)
     tier = Column(Integer, nullable=False)
     outcome = Column(String, nullable=True)  # promoted | stayed | demoted, settled after the week
+
+
+class StudyCircle(Base):
+    """A private group of up to 6 learners who study "together" (opt-in)."""
+    __tablename__ = "study_circles"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    invite_code = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class CircleMember(Base):
+    """A learner's place in a circle. `id` is the public handle other members
+    see (never the user id)."""
+    __tablename__ = "circle_members"
+    __table_args__ = (UniqueConstraint("circle_id", "user_id", name="uq_circle_member"),)
+
+    id = Column(String, primary_key=True)
+    circle_id = Column(String, ForeignKey("study_circles.id"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String, nullable=False, default="member")  # owner | member
+    joined_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+
+class Referral(Base):
+    """The invited learner (`user_id`) joined with `referrer_id`'s link. Both get
+    a streak freeze once the invited learner has studied on 3 days."""
+    __tablename__ = "referrals"
+
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True)
+    referrer_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    rewarded_at = Column(DateTime, nullable=True)
+
+
+class NudgeLog(Base):
+    """One study reminder sent, which wording it used, and whether the learner
+    studied later that day. Feeds the reminder-wording bandit and the metrics."""
+    __tablename__ = "nudge_log"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    local_date = Column(Date, nullable=False)
+    variant = Column(String, nullable=False)
+    sent_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow, index=True)
+    returned = Column(Boolean, nullable=False, default=False)

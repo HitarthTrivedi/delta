@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import datetime
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from app.models import ConsentRecord, DailyActivity, User, UserEngagement, XpEvent
+from app.models import ConsentRecord, DailyActivity, NudgeLog, User, UserEngagement, XpEvent
 from app.services import compliance
 
 WINDOWS = {"day_1": (1, 1), "week_2": (7, 13), "month_1": (30, 36)}
@@ -72,6 +72,14 @@ def retention_metrics(db: Session, today: datetime.date | None = None, weeks: in
                                              UserEngagement.last_nudged_on < today).all()
     came_back = sum(1 for e in nudged if {e.last_nudged_on, e.last_nudged_on + datetime.timedelta(days=1)}
                     & active.get(e.user_id, set()))
+    # How each reminder wording does (what the bandit is learning from).
+    wordings = [
+        {"variant": v, "sent_90d": int(n), "studied_same_day_pct": _pct(int(r or 0), int(n))}
+        for v, n, r in db.query(NudgeLog.variant, func.count(NudgeLog.id),
+                                func.sum(case((NudgeLog.returned.is_(True), 1), else_=0)))
+        .filter(NudgeLog.local_date >= today - datetime.timedelta(days=89))
+        .group_by(NudgeLog.variant).order_by(NudgeLog.variant).all()
+    ]
 
     return {
         "as_of": today.isoformat(),
@@ -79,5 +87,6 @@ def retention_metrics(db: Session, today: datetime.date | None = None, weeks: in
         "active": {"dau": len(dau), "wau": len(wau), "mau": len(mau), "dau_over_wau": _pct(len(dau), len(wau))},
         "habit": {"weekly_active_on_7_day_streak_pct": _pct(streaky, len(wau)), "quick5_completions_7d": quick5},
         "reminders": {"opted_in": opted_in, "opt_outs_30d": opt_outs,
-                      "nudged_last_7d": len(nudged), "studied_within_a_day_after_nudge_pct": _pct(came_back, len(nudged))},
+                      "nudged_last_7d": len(nudged), "studied_within_a_day_after_nudge_pct": _pct(came_back, len(nudged)),
+                      "wordings": wordings},
     }

@@ -8,6 +8,9 @@ Rules (Duolingo "protect the channel" + India's CCPA dark-pattern guidelines):
 - Back off when ignored: after 3 ignored nudges, every other day; after 14,
   one "fresh week" note on a Monday, then silence until they come back.
 - No guilt, no false urgency; every email has a one-click unsubscribe.
+- Which friendly wording to use is learnt (a Thompson-sampling bandit): each
+  wording's chance of the learner studying that day, from everyone's results
+  blended with the learner's own. Every wording follows the same copy rules.
 
 A daemon thread checks every REMINDER_CHECK_INTERVAL_SECONDS, and real user
 traffic also triggers a check (a sleeping host would miss the thread). A
@@ -18,15 +21,17 @@ from __future__ import annotations
 
 import datetime
 import logging
+import random
 import threading
 import time
+import uuid
 
 import requests
-from sqlalchemy import update
+from sqlalchemy import case, func, update
 
 from app.config import settings
 from app.database import SessionLocal
-from app.models import DailyActivity, RoadmapState, User, UserEngagement
+from app.models import DailyActivity, NudgeLog, RoadmapState, User, UserEngagement
 from app.services import engagement, push_service
 from app.services.email_service import email_configured, send_nudge_email
 
@@ -146,6 +151,80 @@ def nudge_kind(eng: UserEngagement, local_now: datetime.datetime, done_today: bo
     return "streak" if eng.current_streak > 0 else "gentle"
 
 
+BANDIT_WINDOW_DAYS = 90
+PRIOR_STRENGTH = 20  # everyone's results count like at most 20 of the learner's own
+
+
+def candidate_variants(eng: UserEngagement) -> list[str]:
+    """Wordings that make sense for this learner today."""
+    out = ["tiny", "quests"]
+    if eng.current_streak > 0:
+        out.append("streak")
+    lvl = engagement.level_for(eng.xp_total)
+    if lvl["xp_for_next"] - lvl["xp_into_level"] <= 40:
+        out.append("level")
+    return out
+
+
+def choose_variant(db, eng: UserEngagement, candidates: list[str], rng=random) -> str:
+    """Thompson sampling. Each wording's success rate (studied the same day)
+    starts from everyone's results (capped at PRIOR_STRENGTH observations) and
+    is updated with this learner's own; the highest sampled rate wins."""
+    since = engagement._now().replace(tzinfo=None) - datetime.timedelta(days=BANDIT_WINDOW_DAYS)
+
+    def counts(*extra):
+        rows = (db.query(NudgeLog.variant, func.count(NudgeLog.id),
+                         func.sum(case((NudgeLog.returned.is_(True), 1), else_=0)))
+                .filter(NudgeLog.sent_at >= since, NudgeLog.variant.in_(candidates), *extra)
+                .group_by(NudgeLog.variant).all())
+        return {v: (int(n), int(r or 0)) for v, n, r in rows}
+
+    everyone = counts()
+    mine = counts(NudgeLog.user_id == eng.user_id)
+    best, best_draw = candidates[0], -1.0
+    for v in candidates:
+        n, r = everyone.get(v, (0, 0))
+        rate = (r + 1) / (n + 2)
+        strength = min(PRIOR_STRENGTH, n)
+        un, ur = mine.get(v, (0, 0))
+        draw = rng.betavariate(1 + rate * strength + ur, 1 + (1 - rate) * strength + (un - ur))
+        if draw > best_draw:
+            best, best_draw = v, draw
+    return best
+
+
+def message_for(variant: str, db, eng: UserEngagement, first: str, today: datetime.date) -> dict:
+    """Subject, heading, line and push text for a wording. Warm, no guilt."""
+    if variant == "streak":
+        n = eng.current_streak
+        return {"subject": f"{first}, 5 minutes keeps your {n}-day streak going",
+                "heading": f"You're on a {n}-day streak.",
+                "line": "Today's Quick 5 takes about five minutes. That's all it takes to keep it going.",
+                "push_title": f"Keep your {n}-day streak going",
+                "push_body": "Five questions, about five minutes. Start whenever you're ready."}
+    if variant == "quests":
+        from app.services import quests
+        first_quest = quests.QUESTS[quests.todays_quests(db, eng.user_id, today)[0]]
+        return {"subject": f"{first}, today's quests are ready",
+                "heading": "Three small quests today.",
+                "line": f"Start with: {first_quest}. Finish all three for a +{quests.QUEST_BONUS_XP} XP bonus.",
+                "push_title": "Today's quests are ready",
+                "push_body": f"Start with: {first_quest}."}
+    if variant == "level":
+        lvl = engagement.level_for(eng.xp_total)
+        left = lvl["xp_for_next"] - lvl["xp_into_level"]
+        return {"subject": f"{first}, you're {left} XP from Level {lvl['level'] + 1}",
+                "heading": f"{left} XP to Level {lvl['level'] + 1}.",
+                "line": "One short session today gets you most of the way there.",
+                "push_title": f"{left} XP to Level {lvl['level'] + 1}",
+                "push_body": "One short session gets you most of the way."}
+    return {"subject": f"{first}, got five minutes?",
+            "heading": "Five minutes, five questions.",
+            "line": "A short review today makes tomorrow easier. Start whenever you're ready.",
+            "push_title": "Got five minutes?",
+            "push_body": "Your Quick 5 is ready whenever you are."}
+
+
 def _claim(db, user_id: str, today: datetime.date) -> bool:
     """Atomically mark this learner as nudged today. True only for the first caller."""
     result = db.execute(
@@ -187,6 +266,9 @@ def run_daily_reminders(force: bool = False) -> dict:
             pending = _pending_tasks(db, user, roadmap)[0] if (user and roadmap) else []
             open_url = f"{settings.FRONTEND_URL.rstrip('/')}/today"
             delivered = False
+            first = ((user.name if user else "") or "there").split()[0]
+            variant = "fresh_start" if kind == "fresh_start" else choose_variant(db, eng, candidate_variants(eng))
+            message = None if kind == "fresh_start" else message_for(variant, db, eng, first, today)
 
             if eng.reminder_channel in ("email", "both") and user:
                 email = _resolve_email(db, user)
@@ -197,16 +279,19 @@ def run_daily_reminders(force: bool = False) -> dict:
                     delivered |= send_nudge_email(
                         to_email=email, user_name=user.name or email.split("@")[0],
                         streak=eng.current_streak, pending_tasks=pending,
-                        fresh_start=kind == "fresh_start", open_url=open_url, unsubscribe_url=unsub)
+                        fresh_start=kind == "fresh_start", open_url=open_url, unsubscribe_url=unsub,
+                        message=message)
 
             if eng.reminder_channel in ("push", "both"):
-                title = (f"Keep your {eng.current_streak}-day streak going"
-                         if kind == "streak" else "Your Quick 5 is ready")
-                body = "Five questions, about five minutes. Start whenever you're ready."
+                if message:
+                    title, body = message["push_title"], message["push_body"]
+                else:
+                    title, body = "A fresh week", "No catching up needed. Five minutes is a great restart."
                 delivered |= push_service.send_to_user(db, eng.user_id, title, body, open_url) > 0
 
             if delivered:
                 eng.ignored_nudges = (eng.ignored_nudges or 0) + 1
+                db.add(NudgeLog(id=str(uuid.uuid4()), user_id=eng.user_id, local_date=today, variant=variant))
                 db.commit()
                 sent += 1
             else:

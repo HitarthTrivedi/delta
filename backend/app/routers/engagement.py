@@ -107,6 +107,35 @@ def get_badges(user_id: str, db: Session = Depends(get_db), _: str = Depends(req
     return {"badges": badges.listing(db, eng)}
 
 
+class ReferralPayload(BaseModel):
+    code: str = Field(min_length=4, max_length=16)
+
+
+@router.get("/{user_id}/referrals")
+def get_referrals(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    from app.services import referrals
+    return referrals.overview(db, user_id)
+
+
+@router.get("/{user_id}/referrals/preview/{code}")
+@limiter.limit("30/minute")
+def preview_referral(request: Request, user_id: str, code: str, db: Session = Depends(get_db),
+                     _: str = Depends(require_owner)):
+    from app.services import referrals
+    return referrals.preview(db, user_id, code)
+
+
+@router.post("/{user_id}/referrals/claim")
+@limiter.limit("10/minute")
+def claim_referral(request: Request, user_id: str, payload: ReferralPayload, db: Session = Depends(get_db),
+                   _: str = Depends(require_owner)):
+    from app.services import referrals
+    try:
+        return referrals.claim(db, user_id, payload.code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 class LeaguePayload(BaseModel):
     enabled: bool
 

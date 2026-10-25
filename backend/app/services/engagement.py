@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.career_os import RoadmapState
-from app.models.engagement import DailyActivity, UserEngagement, XpEvent
+from app.models.engagement import DailyActivity, NudgeLog, UserEngagement, XpEvent
 from app.models.recommendation import Recommendation
 from app.models.sandbox_session import SandboxSession
 
@@ -53,6 +53,8 @@ REPAIR_GOAL_DAYS = 2             # ...by meeting the daily goal on 2 days
 TASK_REAWARD_DAYS = 7            # one award per plan task per week
 CONSISTENT_DAYS = 20             # "Consistent learner": studied on 20+...
 CONSISTENT_WINDOW_DAYS = 30      # ...of the last 30 days
+SUGGEST_MIN_DAYS = 5             # suggest a study time after 5 days of real data...
+SUGGEST_MIN_GAP_MINUTES = 90     # ...when it is 90+ minutes from the chosen time
 
 # Cumulative XP needed for each level; beyond the table, +800 XP per level.
 LEVEL_XP = [0, 50, 150, 300, 500, 800, 1200, 1700, 2300, 3000]
@@ -219,6 +221,20 @@ def _completed_session(db: Session, user_id: str, session_id: str | None, kind: 
 
 # ── recording ────────────────────────────────────────────────────────────────
 
+def book_bonus(db: Session, eng: UserEngagement, kind: str, source_id: str, amount: int) -> bool:
+    """Book a bonus (goal, quests, challenge, circle goal, referral) at most once,
+    on the learner's own local day. Bonuses add XP but are not learning actions,
+    so they never extend a streak. Caller commits."""
+    if db.query(XpEvent).filter_by(user_id=eng.user_id, source_type=kind, source_id=source_id).first():
+        return False
+    today = local_today(eng)
+    db.add(XpEvent(id=str(uuid.uuid4()), user_id=eng.user_id, source_type=kind, source_id=source_id,
+                   xp=amount, local_date=today))
+    _day(db, eng.user_id, today).xp += amount
+    eng.xp_total += amount
+    return True
+
+
 def record_activity(db: Session, user_id: str, source_type: str, source_id: str,
                     repeat_key: str | None = None, bonus_xp: int = 0) -> dict:
     """Award XP once for a verified learning action and extend the streak.
@@ -247,14 +263,7 @@ def record_activity(db: Session, user_id: str, source_type: str, source_id: str,
     _extend_streak(eng, today)
 
     def award(kind: str, sid: str, amount: int) -> bool:
-        """Book a bonus (goal, quests, weekly challenge) at most once."""
-        if db.query(XpEvent).filter_by(user_id=user_id, source_type=kind, source_id=sid).first():
-            return False
-        db.add(XpEvent(id=str(uuid.uuid4()), user_id=user_id, source_type=kind, source_id=sid,
-                       xp=amount, local_date=today))
-        day.xp += amount
-        eng.xp_total += amount
-        return True
+        return book_bonus(db, eng, kind, sid, amount)
 
     goal_just_met = False
 
@@ -265,13 +274,20 @@ def record_activity(db: Session, user_id: str, source_type: str, source_id: str,
             award("daily_goal", today.isoformat(), XP_TABLE["daily_goal"])
             _on_goal_met(eng, today)
 
-    from app.services import badges, quests
+    from app.services import badges, circles, quests, referrals
     check_goal()
     db.flush()
     quest = quests.evaluate(db, eng, today, award)
-    check_goal()  # the quest bonus can complete the goal
+    db.flush()
+    circle_goals = circles.claim_rewards(db, eng, today, award)
+    referral_rewarded = referrals.check(db, eng, award)
+    check_goal()  # a bonus can complete the goal
     db.flush()
     new_badges = badges.check(db, eng)
+    # A reminder sent earlier today worked: the learner came back and studied.
+    (db.query(NudgeLog).filter(NudgeLog.user_id == user_id, NudgeLog.local_date == today,
+                               NudgeLog.returned.is_(False))
+     .update({NudgeLog.returned: True}, synchronize_session=False))
     db.commit()
 
     if eng.leagues_opt_in:
@@ -291,6 +307,8 @@ def record_activity(db: Session, user_id: str, source_type: str, source_id: str,
         "quests_done": quest["quests_done"],
         "challenge_won": quest["challenge_won"],
         "badges": new_badges,
+        "circle_goals": circle_goals,
+        "referral_rewarded": referral_rewarded,
     }
 
 
@@ -408,6 +426,7 @@ def summary(db: Session, user_id: str, timezone: str | None = None) -> dict:
         "quests": quests.state(db, eng, today),
         "badges": badges.overview(db, user_id),
         "leagues_opt_in": eng.leagues_opt_in,
+        "suggested_study_time": suggested_study_time(db, eng),
     }
 
 
@@ -536,6 +555,33 @@ def consistent_learners(db: Session, user_ids) -> set[str]:
             .group_by(DailyActivity.user_id)
             .having(func.count(DailyActivity.local_date) >= CONSISTENT_DAYS).all())
     return {r[0] for r in rows}
+
+
+def suggested_study_time(db: Session, eng: UserEngagement) -> str | None:
+    """When the learner actually starts studying (median over the last 3 weeks),
+    if that is well away from the reminder time they picked. Only a suggestion:
+    the time changes only if they accept it."""
+    if not eng.study_time or not _valid_hhmm(eng.study_time):
+        return None
+    since = local_today(eng) - datetime.timedelta(days=21)
+    rows = (db.query(XpEvent.local_date, func.min(XpEvent.created_at))
+            .filter(XpEvent.user_id == eng.user_id, XpEvent.local_date >= since)
+            .group_by(XpEvent.local_date).all())
+    if len(rows) < SUGGEST_MIN_DAYS:
+        return None
+    tz = _tz(eng.timezone)
+    minutes = sorted(
+        (lambda t: t.hour * 60 + t.minute)(first.replace(tzinfo=datetime.timezone.utc).astimezone(tz))
+        for _, first in rows if first)
+    if len(minutes) < SUGGEST_MIN_DAYS:
+        return None
+    usual = minutes[len(minutes) // 2]
+    usual = (usual + 15) // 30 * 30 % (24 * 60)  # nearest half hour
+    h, m = map(int, eng.study_time.split(":"))
+    gap = abs(usual - (h * 60 + m))
+    if min(gap, 24 * 60 - gap) < SUGGEST_MIN_GAP_MINUTES:
+        return None
+    return f"{usual // 60:02d}:{usual % 60:02d}"
 
 
 def _valid_hhmm(value: str) -> bool:
