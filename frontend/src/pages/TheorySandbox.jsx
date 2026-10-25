@@ -5,14 +5,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sandboxTheoryAPI } from '../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { refreshEngagement } from '../hooks/useEngagement';
 import { useAuthStore } from '../store/authStore';
 
 const panelStyle = {
-  background: '#050505',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'var(--paper)',
+  border: '1px solid rgb(var(--ink-rgb) / 0.1)',
   borderRadius: 8,
 };
-const muted = 'rgba(255,255,255,0.5)';
+const muted = 'rgb(var(--ink-rgb) / 0.5)';
 
 const LAST_TEST_KEY = 'delta_theory_last';
 const QUESTION_COUNTS = [5, 10, 15];
@@ -34,9 +36,9 @@ function Choice({ active, onClick, children, style }) {
       onClick={onClick}
       aria-pressed={active}
       style={{
-        padding: '10px 14px', borderRadius: 8, color: '#fff', fontWeight: 650, fontSize: 13.5, cursor: 'pointer', textAlign: 'left',
-        background: active ? 'rgba(255,255,255,0.1)' : '#0a0a0a',
-        border: `1px solid ${active ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.1)'}`,
+        padding: '10px 14px', borderRadius: 8, color: 'var(--ink)', fontWeight: 650, fontSize: 13.5, cursor: 'pointer', textAlign: 'left',
+        background: active ? 'rgb(var(--ink-rgb) / 0.1)' : 'var(--paper)',
+        border: `1px solid ${active ? 'rgb(var(--ink-rgb) / 0.32)' : 'rgb(var(--ink-rgb) / 0.1)'}`,
         ...style,
       }}
     >
@@ -48,6 +50,7 @@ function Choice({ active, onClick, children, style }) {
 export default function TheorySandbox() {
   const userId = useAuthStore((state) => state.userId);
   const [params, setParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
   const [stage, setStage] = useState('setup'); // setup | test | result
   const [category, setCategory] = useState('technical');
@@ -55,7 +58,7 @@ export default function TheorySandbox() {
   const [area, setArea] = useState('quantitative');
   const [difficulty, setDifficulty] = useState('medium');
   const [numQuestions, setNumQuestions] = useState(10);
-  const [timed, setTimed] = useState(true);
+  const [timed, setTimed] = useState(false); // practice is untimed unless you pick exam mode
   const [starting, setStarting] = useState(false);
   const [history, setHistory] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -83,6 +86,7 @@ export default function TheorySandbox() {
     setSubmitting(true);
     try {
       const data = await sandboxTheoryAPI.submit(userId, sessionId, answers);
+      refreshEngagement(queryClient, userId);
       deadlineRef.current = null;
       setTimeLeft(null);
       setResult(data.result);
@@ -93,7 +97,7 @@ export default function TheorySandbox() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, userId, sessionId, answers]);
+  }, [submitting, userId, sessionId, answers, queryClient]);
 
   // Countdown for timed tests; auto-submits at zero.
   const submitRef = useRef(submitTest);
@@ -146,7 +150,7 @@ export default function TheorySandbox() {
     setParams({}, { replace: true });
     let last = null;
     try { last = JSON.parse(localStorage.getItem(LAST_TEST_KEY)); } catch { /* ignore */ }
-    startRef.current(last || { topic: null, num_questions: 10, difficulty: 'medium', category: 'technical', area: null, timed: true });
+    startRef.current(last || { topic: null, num_questions: 10, difficulty: 'medium', category: 'technical', area: null, timed: false });
   }, [userId, params, setParams]);
 
   const openPast = async (id) => {
@@ -177,20 +181,20 @@ export default function TheorySandbox() {
   const q = questions[current];
 
   return (
-    <main style={{ minHeight: '100vh', background: '#000', color: '#fff', padding: '5.5rem 1.5rem 3rem' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--bone)', color: 'var(--ink)', padding: '5.5rem 1.5rem 3rem' }}>
       <div style={{ maxWidth: 780, margin: '0 auto' }}>
 
         {stage === 'setup' && (
           <>
             <header style={{ marginBottom: 24 }}>
               <p style={{ color: muted, fontSize: 13, fontWeight: 650, margin: '0 0 10px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <ListChecks size={15} style={{ color: '#4ade80' }} /> Knowledge & Aptitude Tests
+                <ListChecks size={15} style={{ color: '#15803d' }} /> Knowledge & Aptitude Tests
               </p>
               <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.2rem)', lineHeight: 1.08, letterSpacing: 0, margin: 0 }}>
                 Check what you actually know.
               </h1>
               <p style={{ margin: '14px 0 0', color: muted, fontSize: 15, lineHeight: 1.55 }}>
-                Timed, placement-style tests with a per-skill breakdown and an explanation for every answer.
+                Placement-style tests at your own pace, with a per-skill breakdown and an explanation for every answer.
               </p>
             </header>
 
@@ -213,7 +217,7 @@ export default function TheorySandbox() {
                     onChange={(e) => setTopic(e.target.value)}
                     placeholder="e.g. Taxation, Pharmacology, Contract Law, DBMS — empty uses your target role"
                     maxLength={120}
-                    style={{ width: '100%', background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: 13, color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', background: 'var(--paper)', border: '1px solid rgb(var(--ink-rgb) / 0.12)', borderRadius: 8, padding: 13, color: 'var(--ink)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                   />
                   {suggestions.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
@@ -222,7 +226,7 @@ export default function TheorySandbox() {
                           key={s.topic}
                           onClick={() => setTopic(s.topic)}
                           title={s.reason}
-                          style={{ fontSize: 12.5, padding: '5px 10px', borderRadius: 999, cursor: 'pointer', color: topic === s.topic ? '#000' : '#fff', background: topic === s.topic ? '#4ade80' : 'rgba(255,255,255,0.06)', border: `1px solid ${s.reason === 'weak spot' ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.12)'}` }}
+                          style={{ fontSize: 12.5, padding: '5px 10px', borderRadius: 999, cursor: 'pointer', color: topic === s.topic ? 'var(--paper)' : 'var(--ink)', background: topic === s.topic ? '#15803d' : 'rgb(var(--ink-rgb) / 0.06)', border: `1px solid ${s.reason === 'weak spot' ? 'rgba(180,83,9,0.5)' : 'rgb(var(--ink-rgb) / 0.12)'}` }}
                         >
                           {s.topic}{s.reason === 'weak spot' ? ' · weak spot' : ''}
                         </button>
@@ -268,7 +272,7 @@ export default function TheorySandbox() {
                 onClick={() => startTest()}
                 disabled={starting}
                 style={{
-                  width: '100%', background: '#fff', color: '#000', border: 'none', borderRadius: 8,
+                  width: '100%', background: 'var(--ink)', color: 'var(--paper)', border: 'none', borderRadius: 8,
                   padding: 14, fontWeight: 800, fontSize: 15, cursor: starting ? 'wait' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
@@ -283,8 +287,8 @@ export default function TheorySandbox() {
                 <h2 style={{ margin: '0 0 10px', fontSize: 13, color: muted, fontWeight: 650 }}>Recent tests</h2>
                 <div style={{ display: 'grid', gap: 8 }}>
                   {history.map((h) => (
-                    <button key={h.id} onClick={() => openPast(h.id)} style={{ ...panelStyle, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, color: '#fff', cursor: 'pointer', textAlign: 'left' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.78)', fontSize: 13.5 }}>{h.title}</span>
+                    <button key={h.id} onClick={() => openPast(h.id)} style={{ ...panelStyle, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, color: 'var(--ink)', cursor: 'pointer', textAlign: 'left' }}>
+                      <span style={{ color: 'rgb(var(--ink-rgb) / 0.78)', fontSize: 13.5 }}>{h.title}</span>
                       <span style={{ fontSize: 13.5, fontWeight: 700 }}>{h.score}/100</span>
                     </button>
                   ))}
@@ -301,7 +305,7 @@ export default function TheorySandbox() {
                 {testTopic} · Question {current + 1} of {questions.length}
               </span>
               {timeLeft != null ? (
-                <span aria-live="off" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 14, color: timeLeft <= 60 ? '#f87171' : '#fff' }}>
+                <span aria-live="off" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 14, color: timeLeft <= 60 ? '#b45309' : 'var(--ink)' }}>
                   <Timer size={14} /> {fmt(timeLeft)}
                 </span>
               ) : (
@@ -318,9 +322,9 @@ export default function TheorySandbox() {
                   aria-label={`Question ${i + 1}${answers[i] !== null ? ', answered' : ''}`}
                   style={{
                     width: 30, height: 30, borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    color: i === current ? '#000' : '#fff',
-                    background: i === current ? '#fff' : answers[i] !== null ? 'rgba(74,222,128,0.2)' : '#0a0a0a',
-                    border: `1px solid ${answers[i] !== null ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.12)'}`,
+                    color: i === current ? 'var(--paper)' : 'var(--ink)',
+                    background: i === current ? 'var(--ink)' : answers[i] !== null ? 'rgba(21,128,61,0.2)' : 'var(--paper)',
+                    border: `1px solid ${answers[i] !== null ? 'rgba(21,128,61,0.45)' : 'rgb(var(--ink-rgb) / 0.12)'}`,
                   }}
                 >
                   {i + 1}
@@ -329,7 +333,7 @@ export default function TheorySandbox() {
             </div>
 
             <section style={{ ...panelStyle, padding: 24, marginBottom: 16 }}>
-              <p style={{ margin: '0 0 6px', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{q.skill}</p>
+              <p style={{ margin: '0 0 6px', color: 'rgb(var(--ink-rgb) / 0.4)', fontSize: 12 }}>{q.skill}</p>
               <p style={{ margin: 0, fontSize: 18, lineHeight: 1.5, fontWeight: 600, whiteSpace: 'pre-wrap' }}>{q.question}</p>
             </section>
 
@@ -344,12 +348,12 @@ export default function TheorySandbox() {
                     onClick={() => choose(i)}
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left', cursor: 'pointer',
-                      background: selected ? 'rgba(255,255,255,0.1)' : '#0a0a0a',
-                      border: `1px solid ${selected ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
-                      borderRadius: 8, padding: '14px 16px', color: '#fff', fontSize: 14.5, lineHeight: 1.5,
+                      background: selected ? 'rgb(var(--ink-rgb) / 0.1)' : 'var(--paper)',
+                      border: `1px solid ${selected ? 'rgb(var(--ink-rgb) / 0.35)' : 'rgb(var(--ink-rgb) / 0.1)'}`,
+                      borderRadius: 8, padding: '14px 16px', color: 'var(--ink)', fontSize: 14.5, lineHeight: 1.5,
                     }}
                   >
-                    <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 700, minWidth: 16 }}>{String.fromCharCode(65 + i)}</span>
+                    <span style={{ color: 'rgb(var(--ink-rgb) / 0.45)', fontWeight: 700, minWidth: 16 }}>{String.fromCharCode(65 + i)}</span>
                     <span style={{ whiteSpace: 'pre-wrap' }}>{opt}</span>
                   </button>
                 );
@@ -361,9 +365,9 @@ export default function TheorySandbox() {
                 onClick={() => setCurrent((c) => c - 1)}
                 disabled={current === 0}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(255,255,255,0.07)',
-                  border: '1px solid rgba(255,255,255,0.14)', borderRadius: 8, padding: '10px 16px',
-                  color: current === 0 ? 'rgba(255,255,255,0.3)' : '#fff', fontSize: 13, fontWeight: 600,
+                  display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgb(var(--ink-rgb) / 0.07)',
+                  border: '1px solid rgb(var(--ink-rgb) / 0.14)', borderRadius: 8, padding: '10px 16px',
+                  color: current === 0 ? 'rgb(var(--ink-rgb) / 0.3)' : 'var(--ink)', fontSize: 13, fontWeight: 600,
                   cursor: current === 0 ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -375,7 +379,7 @@ export default function TheorySandbox() {
                   onClick={() => submitTest(false)}
                   disabled={submitting}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', color: '#000',
+                    display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--ink)', color: 'var(--paper)',
                     border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, fontSize: 14,
                     cursor: submitting ? 'not-allowed' : 'pointer',
                   }}
@@ -387,7 +391,7 @@ export default function TheorySandbox() {
                 <button
                   onClick={() => setCurrent((c) => c + 1)}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', color: '#000',
+                    display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--ink)', color: 'var(--paper)',
                     border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, fontSize: 14, cursor: 'pointer',
                   }}
                 >
@@ -406,7 +410,7 @@ export default function TheorySandbox() {
               </p>
               <div style={{
                 width: 104, height: 104, borderRadius: '50%', margin: '0 auto 14px',
-                background: 'rgba(255,255,255,0.06)', border: `3px solid ${result.score >= 70 ? '#4ade80' : result.score >= 50 ? '#fbbf24' : '#f87171'}`,
+                background: 'rgb(var(--ink-rgb) / 0.06)', border: `3px solid ${result.score >= 70 ? '#15803d' : result.score >= 50 ? '#b45309' : '#b45309'}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <span style={{ fontSize: 34, fontWeight: 800 }}>{result.score}</span>
@@ -419,18 +423,18 @@ export default function TheorySandbox() {
             </header>
 
             <section style={{ ...panelStyle, padding: 20, marginBottom: 14 }}>
-              <h2 style={{ margin: '0 0 14px', fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>By skill</h2>
+              <h2 style={{ margin: '0 0 14px', fontSize: 14, color: 'rgb(var(--ink-rgb) / 0.6)' }}>By skill</h2>
               <div style={{ display: 'grid', gap: 10 }}>
                 {Object.entries(result.skill_breakdown || {}).map(([skill, s]) => {
                   const pct = Math.round((100 * s.correct) / s.total);
                   return (
                     <div key={skill}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                        <span style={{ color: 'rgba(255,255,255,0.8)' }}>{skill}</span>
+                        <span style={{ color: 'rgb(var(--ink-rgb) / 0.8)' }}>{skill}</span>
                         <span style={{ color: muted }}>{s.correct}/{s.total}</span>
                       </div>
-                      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: pct >= 70 ? '#4ade80' : '#fbbf24' }} />
+                      <div style={{ height: 6, borderRadius: 3, background: 'rgb(var(--ink-rgb) / 0.08)' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: pct >= 70 ? '#15803d' : '#b45309' }} />
                       </div>
                     </div>
                   );
@@ -439,22 +443,22 @@ export default function TheorySandbox() {
             </section>
 
             <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
-              <h2 style={{ margin: '0 0 14px', fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>Review answers</h2>
+              <h2 style={{ margin: '0 0 14px', fontSize: 14, color: 'rgb(var(--ink-rgb) / 0.6)' }}>Review answers</h2>
               <div style={{ display: 'grid', gap: 18 }}>
                 {result.questions.map((r, i) => (
                   <div key={i}>
                     <p style={{ margin: '0 0 8px', fontSize: 13.5, fontWeight: 600, display: 'flex', gap: 8, lineHeight: 1.5 }}>
                       {r.correct
-                        ? <Check size={15} style={{ color: '#4ade80', flexShrink: 0, marginTop: 3 }} aria-label="Correct" />
-                        : <X size={15} style={{ color: '#f87171', flexShrink: 0, marginTop: 3 }} aria-label="Incorrect" />}
+                        ? <Check size={15} style={{ color: '#15803d', flexShrink: 0, marginTop: 3 }} aria-label="Correct" />
+                        : <X size={15} style={{ color: '#b45309', flexShrink: 0, marginTop: 3 }} aria-label="Incorrect" />}
                       <span style={{ whiteSpace: 'pre-wrap' }}>{i + 1}. {r.question}</span>
                     </p>
                     {!r.correct && (
-                      <p style={{ margin: '0 0 4px 23px', color: '#f87171', fontSize: 13 }}>
+                      <p style={{ margin: '0 0 4px 23px', color: '#b45309', fontSize: 13 }}>
                         Your answer: {r.chosen_index === null ? 'not answered' : r.options[r.chosen_index]}
                       </p>
                     )}
-                    <p style={{ margin: '0 0 4px 23px', color: '#4ade80', fontSize: 13 }}>
+                    <p style={{ margin: '0 0 4px 23px', color: '#15803d', fontSize: 13 }}>
                       Correct: {r.options[r.answer_index]}
                     </p>
                     {r.explanation && (
@@ -468,7 +472,7 @@ export default function TheorySandbox() {
             <button
               onClick={startOver}
               style={{
-                width: '100%', background: '#fff', color: '#000', border: 'none', borderRadius: 8,
+                width: '100%', background: 'var(--ink)', color: 'var(--paper)', border: 'none', borderRadius: 8,
                 padding: 14, fontWeight: 700, fontSize: 15, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}

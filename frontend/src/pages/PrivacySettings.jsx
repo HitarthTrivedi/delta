@@ -69,6 +69,20 @@ export default function PrivacySettings() {
     }
   };
 
+  const setReminders = async (granted) => {
+    setBusy('reminders');
+    try {
+      const next = await privacyAPI.setConsent(userId, { purpose: 'learning_reminders', granted });
+      setConsent(next);
+      queryClient.invalidateQueries({ queryKey: ['engagement', userId] });
+      toast.success(granted ? 'Study reminders on.' : 'Study reminders off.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not update this setting.');
+    } finally {
+      setBusy('');
+    }
+  };
+
   const downloadData = async () => {
     setBusy('export');
     try {
@@ -185,6 +199,28 @@ export default function PrivacySettings() {
                 </button>
               </>
             )}
+          </div>
+        </section>
+
+        {/* Study reminders (opt-in) */}
+        <section className={sectionClass}>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className={h2Class}>Study reminders</h2>
+              <p className={pClass}>
+                {consent.learning_reminders
+                  ? 'On. At most one reminder a day, at your study time, only on days you have not studied yet.'
+                  : 'Off. Delta will not send you study reminders.'}
+              </p>
+            </div>
+            <button
+              onClick={() => setReminders(!consent.learning_reminders)}
+              disabled={busy === 'reminders'}
+              className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer hover:border-oxblood hover:text-oxblood`}
+            >
+              {busy === 'reminders' ? <Loader2 size={14} className="animate-spin" /> : null}
+              {consent.learning_reminders ? 'Turn off' : 'Turn on'}
+            </button>
           </div>
         </section>
 

@@ -1,20 +1,22 @@
-"""Daily reminder sweep + in-process scheduler.
+"""Study reminders: opt-in, one gentle nudge a day, at the learner's own time.
 
-Railway cron proved unreliable, so reminders are driven by a daemon thread inside
-the API process instead of an external trigger. The thread wakes periodically and
-runs the sweep once the configured UTC hour arrives; a per-user `last_reminded_on`
-date makes the sweep idempotent, so container restarts (frequent on Railway) and
-multiple replicas can never double-send.
+Rules (Duolingo "protect the channel" + India's CCPA dark-pattern guidelines):
+- Only learners who switched reminders on (a recorded `learning_reminders`
+  consent) get anything, by email and/or browser push.
+- At most one nudge a day, at the study time the learner picked (or
+  REMINDER_HOUR_LOCAL), and only if they haven't studied yet that day.
+- Back off when ignored: after 3 ignored nudges, every other day; after 14,
+  one "fresh week" note on a Monday, then silence until they come back.
+- No guilt, no false urgency; every email has a one-click unsubscribe.
 
-Each email answers three things for the user:
-  1. what Delta wants done TODAY (day-plan users only),
-  2. what is still pending for the WEEK,
-  3. whether their own recurring commitments happened today.
+A daemon thread checks every REMINDER_CHECK_INTERVAL_SECONDS, and real user
+traffic also triggers a check (a sleeping host would miss the thread). A
+per-learner atomic claim on `last_nudged_on` guarantees one nudge per day even
+across restarts and replicas.
 """
 from __future__ import annotations
 
 import datetime
-import json
 import logging
 import threading
 import time
@@ -24,37 +26,11 @@ from sqlalchemy import update
 
 from app.config import settings
 from app.database import SessionLocal
-from app.models import RoadmapState, User
-from app.services.email_service import send_reminder_email
+from app.models import DailyActivity, RoadmapState, User, UserEngagement
+from app.services import engagement, push_service
+from app.services.email_service import email_configured, send_nudge_email
 
 logger = logging.getLogger("delta.reminders")
-
-
-def _local_now() -> datetime.datetime:
-    """Current time in the reminder timezone.
-
-    Everything day-related uses this, not the server clock: on Railway the server
-    runs UTC, where 'today' would roll over at 5:30am IST — mid-morning for the
-    users this is meant to serve.
-    """
-    try:
-        from zoneinfo import ZoneInfo
-        return datetime.datetime.now(ZoneInfo(settings.REMINDER_TIMEZONE))
-    except Exception:
-        # Bad tz name or missing tzdata — degrade to UTC rather than break sending.
-        logger.warning(
-            "REMINDER_TIMEZONE '%s' unusable — falling back to UTC.",
-            settings.REMINDER_TIMEZONE,
-        )
-        return datetime.datetime.now(datetime.timezone.utc)
-
-
-def _local_today() -> datetime.date:
-    return _local_now().date()
-
-
-def _past_send_hour() -> bool:
-    return _local_now().hour >= settings.REMINDER_HOUR_LOCAL
 
 
 # Synthetic addresses the app stamps on auto-created rows before a real email is
@@ -128,17 +104,6 @@ def _resolve_email(db, user: User) -> str | None:
     return None
 
 
-def _as_json(value, fallback):
-    if value is None:
-        return fallback
-    if isinstance(value, (dict, list)):
-        return value
-    try:
-        return json.loads(value)
-    except Exception:
-        return fallback
-
-
 def _pending_tasks(db, user: User, roadmap: RoadmapState) -> tuple[list[str], int]:
     """Titles of Delta tasks NOT yet completed or skipped, plus the week number.
 
@@ -156,179 +121,126 @@ def _pending_tasks(db, user: User, roadmap: RoadmapState) -> tuple[list[str], in
     return titles, status["week_number"]
 
 
-def _todays_delta_tasks(roadmap: RoadmapState) -> list[str]:
-    """For day-plan users: the Delta work scheduled for TODAY that is still undone.
-
-    Returns [] for week-style users (no day_plan) so the email simply omits the
-    section rather than inventing a daily split the user never asked for.
-    """
-    if (getattr(roadmap, "plan_style", None) or "week") != "day":
-        return []
-    plan = _as_json(getattr(roadmap, "day_plan", None), {}) or {}
-    today = _local_today().isoformat()
-    for day in plan.get("days") or []:
-        if day.get("date") != today:
-            continue
-        out = []
-        for task in day.get("delta_tasks") or []:
-            if task.get("done"):
-                continue
-            title = task.get("title") or "Task"
-            note = task.get("note")
-            out.append(f"{title} — {note}" if note and note != title else title)
-        return out
-    return []
+def _default_send_time() -> str:
+    return f"{max(0, min(23, settings.REMINDER_HOUR_LOCAL)):02d}:00"
 
 
-def _personal_tasks_today(roadmap: RoadmapState) -> list[str]:
-    """The user's own commitments scheduled for today (German class, work, …).
-
-    Never tracked as Delta progress — the email only asks whether they happened,
-    keeping the daily habit visible alongside the Delta work.
-    """
-    from app.services.day_planner import _WEEKDAYS, _cadence_days
-
-    schedule = _as_json(getattr(roadmap, "day_schedule", None), {}) or {}
-    today_key = _WEEKDAYS[_local_today().weekday()]
-    labels: list[str] = []
-
-    def _add(label: str) -> None:
-        label = (label or "").strip()
-        if label and label not in labels:
-            labels.append(label)
-
-    for item in schedule.get("fixed") or []:
-        days = [str(d).strip().lower() for d in (item.get("days") or [])]
-        if today_key in days:
-            _add(item.get("label"))
-    for item in schedule.get("recurring") or []:
-        # Unclear cadence => assume a daily habit, matching the day planner.
-        target = _cadence_days(item.get("cadence") or "") or list(_WEEKDAYS)
-        if today_key in target:
-            _add(item.get("label"))
-    return labels
+def nudge_kind(eng: UserEngagement, local_now: datetime.datetime, done_today: bool) -> str | None:
+    """What to send this learner right now: "streak", "gentle", "fresh_start" or None."""
+    today = local_now.date()
+    if not eng.reminders_opt_in or done_today:
+        return None
+    if eng.break_until and today <= eng.break_until:
+        return None
+    if eng.last_nudged_on == today:
+        return None
+    if local_now.strftime("%H:%M") < (eng.study_time or _default_send_time()):
+        return None
+    ignored = eng.ignored_nudges or 0
+    if ignored >= 15:
+        return None  # silent until they come back (studying resets the count)
+    if ignored == 14:
+        return "fresh_start" if today.weekday() == 0 else None
+    if ignored >= 3 and eng.last_nudged_on and (today - eng.last_nudged_on).days < 2:
+        return None
+    return "streak" if eng.current_streak > 0 else "gentle"
 
 
-def _claim_user_for_today(db, user_id: str, today: datetime.date) -> bool:
-    """Atomically mark this user as reminded today. Returns True if WE claimed it.
-
-    The conditional UPDATE is what makes the sweep safe to run repeatedly and from
-    more than one replica — only the first caller of the day gets a True back.
-    """
+def _claim(db, user_id: str, today: datetime.date) -> bool:
+    """Atomically mark this learner as nudged today. True only for the first caller."""
     result = db.execute(
-        update(User)
-        .where(User.id == user_id)
-        .where((User.last_reminded_on.is_(None)) | (User.last_reminded_on != today))
-        .values(last_reminded_on=today)
+        update(UserEngagement)
+        .where(UserEngagement.user_id == user_id)
+        .where((UserEngagement.last_nudged_on.is_(None)) | (UserEngagement.last_nudged_on != today))
+        .values(last_nudged_on=today)
     )
     db.commit()
     return (result.rowcount or 0) > 0
 
 
 def run_daily_reminders(force: bool = False) -> dict:
-    """Send today's reminder to every eligible user. Idempotent per user per day.
+    """Nudge every opted-in learner who is due. Safe to call as often as you like.
 
-    `force=True` bypasses the once-a-day claim — used by the manual test endpoint.
+    `force=True` (manual test endpoint) ignores the time of day and the daily claim,
+    but still only reaches opted-in learners who haven't studied today.
     """
     db = SessionLocal()
-    today = _local_today()
     sent = skipped = failed = 0
     try:
-        users = db.query(User).all()
-        logger.info("Reminder sweep started: %d users", len(users))
-
-        for user in users:
-            # Real users still carry a user_<id>@delta.local placeholder in our table;
-            # resolve their actual address from Supabase auth (cached back after the
-            # first lookup). Skip only if we genuinely can't find a deliverable one —
-            # emailing a placeholder just bounces to the sender.
-            email = _resolve_email(db, user)
-            if not email:
+        learners = db.query(UserEngagement).filter(UserEngagement.reminders_opt_in.is_(True)).all()
+        for eng in learners:
+            local_now = engagement._now().astimezone(engagement._tz(eng.timezone))
+            today = local_now.date()
+            engagement.roll_forward(db, eng, today)
+            db.commit()
+            day = db.get(DailyActivity, (eng.user_id, today))
+            done_today = bool(day and day.actions > 0)
+            kind = nudge_kind(eng, local_now, done_today)
+            if force and kind is None and not done_today:
+                kind = "streak" if eng.current_streak > 0 else "gentle"
+            if kind is None or (not force and not _claim(db, eng.user_id, today)):
                 skipped += 1
                 continue
 
-            roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
-            if not roadmap:
-                skipped += 1
-                continue
+            user = db.get(User, eng.user_id)
+            roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == eng.user_id).first()
+            pending = _pending_tasks(db, user, roadmap)[0] if (user and roadmap) else []
+            open_url = f"{settings.FRONTEND_URL.rstrip('/')}/today"
+            delivered = False
 
-            pending, week_number = _pending_tasks(db, user, roadmap)
-            today_tasks = _todays_delta_tasks(roadmap)
-            personal = _personal_tasks_today(roadmap)
+            if eng.reminder_channel in ("email", "both") and user:
+                email = _resolve_email(db, user)
+                if email:
+                    token = engagement.unsubscribe_token(eng.user_id)
+                    unsub = (f"{settings.FRONTEND_URL.rstrip('/')}/unsubscribe?u={eng.user_id}&t={token}"
+                             if token else None)
+                    delivered |= send_nudge_email(
+                        to_email=email, user_name=user.name or email.split("@")[0],
+                        streak=eng.current_streak, pending_tasks=pending,
+                        fresh_start=kind == "fresh_start", open_url=open_url, unsubscribe_url=unsub)
 
-            # Nothing to chase and nothing to ask about — don't email at all.
-            if not pending and not today_tasks and not personal:
-                skipped += 1
-                continue
+            if eng.reminder_channel in ("push", "both"):
+                title = (f"Keep your {eng.current_streak}-day streak going"
+                         if kind == "streak" else "Your Quick 5 is ready")
+                body = "Five questions, about five minutes. Start whenever you're ready."
+                delivered |= push_service.send_to_user(db, eng.user_id, title, body, open_url) > 0
 
-            if not force and not _claim_user_for_today(db, user.id, today):
-                skipped += 1  # already reminded today
-                continue
-
-            ok = send_reminder_email(
-                to_email=email,
-                user_name=user.name or email.split("@")[0],
-                pending_tasks=pending,
-                week_number=week_number,
-                personal_tasks=personal,
-                today_tasks=today_tasks,
-            )
-            if ok:
+            if delivered:
+                eng.ignored_nudges = (eng.ignored_nudges or 0) + 1
+                db.commit()
                 sent += 1
             else:
-                failed += 1
-                if not force:
-                    # Let a failed send be retried on the next pass today.
-                    db.execute(
-                        update(User).where(User.id == user.id).values(last_reminded_on=None)
-                    )
-                    db.commit()
+                failed += 1  # no reachable channel today; the claim stops retry spam
     except Exception as exc:
         logger.error("Reminder sweep failed: %s", exc, exc_info=True)
     finally:
         db.close()
-
-    logger.info("Reminder sweep complete: sent=%d skipped=%d failed=%d", sent, skipped, failed)
+    logger.info("Reminder sweep: sent=%d skipped=%d failed=%d", sent, skipped, failed)
     return {"sent": sent, "skipped": skipped, "failed": failed}
 
 
-# ── Activity-triggered sweep ─────────────────────────────────────────────────
-# The scheduler thread only fires while the process is alive, so a sleeping or
-# restarting container can miss the window entirely. This hook closes that gap:
-# the first real request of the day (someone opening the app) also wakes the
-# server, and that request kicks off the sweep for everyone.
-#
-# Correctness does not depend on this in-memory date — the per-user
-# `last_reminded_on` claim is what guarantees one email per user per day, even
-# across restarts and replicas. The date is only a cheap way to avoid rescanning
-# every user on every request.
+# ── Triggers ──────────────────────────────────────────────────────────────────
+# Learners pick their own times, so the sweep runs every check interval. The
+# in-memory timestamp only avoids rescanning on every request; the per-learner
+# claim is what guarantees one nudge a day.
 _sweep_lock = threading.Lock()
-_last_sweep_date: datetime.date | None = None
+_last_sweep_at = 0.0
 
 
 def maybe_run_daily_sweep() -> None:
-    """Fire today's sweep if it hasn't run yet. Cheap and never blocks the caller."""
-    global _last_sweep_date
-
+    """Run a reminder check if the interval has passed. Never blocks the caller."""
+    global _last_sweep_at
     if not settings.REMINDERS_ENABLED:
         return
-    today = _local_today()
-    if _last_sweep_date == today:
-        return  # fast path — no lock, no DB
-    # Don't blast everyone at 3am because one night owl opened the app; wait for
-    # the intended send hour, then let the first activity after it trigger.
-    if not _past_send_hour():
+    interval = max(60, settings.REMINDER_CHECK_INTERVAL_SECONDS)
+    now = time.monotonic()
+    if _last_sweep_at and now - _last_sweep_at < interval:
         return
-
     with _sweep_lock:
-        if _last_sweep_date == today:
-            return  # another request won the race
-        _last_sweep_date = today
-
-    logger.info("Daily reminder sweep triggered by user activity.")
-    threading.Thread(
-        target=run_daily_reminders, name="delta-reminders-activity", daemon=True
-    ).start()
+        if _last_sweep_at and now - _last_sweep_at < interval:
+            return
+        _last_sweep_at = now
+    threading.Thread(target=run_daily_reminders, name="delta-reminders-check", daemon=True).start()
 
 
 def _scheduler_loop() -> None:
@@ -338,10 +250,7 @@ def _scheduler_loop() -> None:
     paths share one definition of "has today's sweep already run".
     """
     interval = max(60, settings.REMINDER_CHECK_INTERVAL_SECONDS)
-    logger.info(
-        "Reminder scheduler running (from %02d:00 %s, checking every %ds)",
-        settings.REMINDER_HOUR_LOCAL, settings.REMINDER_TIMEZONE, interval,
-    )
+    logger.info("Reminder scheduler running (checking every %ds)", interval)
     while True:
         try:
             maybe_run_daily_sweep()
@@ -355,10 +264,7 @@ def start_reminder_scheduler() -> None:
     if not settings.REMINDERS_ENABLED:
         logger.info("Reminder scheduler disabled (REMINDERS_ENABLED=false).")
         return
-    from app.services.email_service import email_configured, gmail_configured
-
-    if not email_configured():
-        logger.warning("Reminder scheduler not started — no email transport configured.")
+    if not email_configured() and not push_service.push_configured():
+        logger.warning("Reminder scheduler not started — no email transport or push keys configured.")
         return
-    logger.info("Reminder transport: %s", "Gmail API" if gmail_configured() else "Brevo")
     threading.Thread(target=_scheduler_loop, name="delta-reminders", daemon=True).start()

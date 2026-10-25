@@ -11,7 +11,6 @@ over HTTPS/443 instead.
 from __future__ import annotations
 
 import base64
-import datetime
 import logging
 import threading
 import time
@@ -152,144 +151,65 @@ def _dispatch(to_email: str, to_name: str, subject: str, html: str) -> bool:
     return False
 
 
-def send_reminder_email(
+def send_nudge_email(
     to_email: str,
     user_name: str,
+    streak: int,
     pending_tasks: list[str],
-    week_number: int,
-    personal_tasks: list[str] | None = None,
-    today_tasks: list[str] | None = None,
+    fresh_start: bool,
+    open_url: str,
+    unsubscribe_url: str | None,
 ) -> bool:
-    """Send a daily reminder via Brevo: what Delta wants done today (day-plan users),
-    what is still pending this week, and a check-in on the user's own daily
-    commitments. Returns True on success."""
+    """The opt-in study reminder: one short, friendly nudge, sent at the time the
+    learner chose and only on days they haven't studied yet. Copy rules: no guilt,
+    no false urgency, easy to turn off (CCPA dark-pattern guidelines)."""
     if not email_configured():
-        logger.warning("No email transport configured — skipping reminder email.")
         return False
-
-    personal_tasks = personal_tasks or []
-    today_tasks = today_tasks or []
-
-    first_name = escape(str(user_name).split()[0]) if user_name else "there"
-
-    if today_tasks:
-        n = len(today_tasks)
-        subject = f"{first_name}, your {n} move{'s' if n != 1 else ''} for today 🎯"
-    elif pending_tasks:
-        n = len(pending_tasks)
-        subject = f"{first_name}, {n} task{'s' if n != 1 else ''} between you and a stronger week"
+    first = escape(str(user_name).split()[0]) if user_name else "there"
+    if fresh_start:
+        subject = f"A fresh week, {first}. Want to pick it back up?"
+        heading = "New week, clean slate."
+        line = "No catching up needed. Five minutes today is a great restart."
+    elif streak > 0:
+        subject = f"{first}, 5 minutes keeps your {streak}-day streak going"
+        heading = f"You're on a {streak}-day streak."
+        line = "Today's Quick 5 takes about five minutes. That's all it takes to keep it going."
     else:
-        subject = f"Nice work, {first_name} — you're all clear. Keep the streak?"
-
-    # One rotating line of encouragement so the daily email never reads the same
-    # twice. Deterministic by date: everyone gets the same line on a given day,
-    # and it changes tomorrow — no LLM call, no per-user state.
-    _LINES = [
-        "Small reps, compounded weekly, are how careers actually get built.",
-        "You don't have to finish it all today. You just have to start.",
-        "The person you're becoming is built on ordinary days exactly like this one.",
-        "One task done beats three tasks planned. Pick one and go.",
-        "Momentum is a decision you make in the next five minutes.",
-        "Consistency isn't intensity — it's just showing up today.",
-        "Future-you is watching what you do right now. Make them proud.",
-    ]
-    motivation = _LINES[datetime.date.today().toordinal() % len(_LINES)]
-
-    def _rows(items: list[str]) -> str:
-        return "".join(
-            f'<tr><td style="padding:10px 0;border-bottom:1px solid #1a1a1a;'
-            f'color:#cccccc;font-size:14px;line-height:1.5;">{escape(str(item))}</td></tr>'
-            for item in items
-        )
-
-    # Day-plan users lead with today's slice; the weekly list then acts as context.
-    today_section = f"""
-        <tr><td style="padding:24px 36px 0;">
-          <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.08em;
-                    text-transform:uppercase;color:#8b5a5a;">On today's plan</p>
-          <table width="100%" cellpadding="0" cellspacing="0">{_rows(today_tasks)}</table>
-        </td></tr>""" if today_tasks else ""
-
-    if pending_tasks:
-        heading = "Also pending this week" if today_tasks else "Pending this week"
-        delta_section = f"""
-        <tr><td style="padding:24px 36px;">
-          <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.08em;
-                    text-transform:uppercase;color:#444;">{heading}</p>
-          <table width="100%" cellpadding="0" cellspacing="0">{_rows(pending_tasks)}</table>
-        </td></tr>"""
-    else:
-        delta_section = """
-        <tr><td style="padding:24px 36px;">
-          <p style="margin:0;font-size:14px;color:#cccccc;line-height:1.6;">
-            No Delta tasks pending — you've cleared this week's plan. Nice work.
-          </p>
-        </td></tr>"""
-
-    personal_section = f"""
-        <tr><td style="padding:0 36px 24px;">
-          <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.08em;
-                    text-transform:uppercase;color:#444;">Your own tasks today &mdash; did these happen?</p>
-          <table width="100%" cellpadding="0" cellspacing="0">{_rows(personal_tasks)}</table>
-          <p style="margin:14px 0 0;font-size:13px;color:#444;line-height:1.6;">
-            These are yours, not Delta's &mdash; they're never scored or carried over.
-            Keeping them visible is what keeps the week realistic.
-          </p>
-        </td></tr>""" if personal_tasks else ""
-
+        subject = f"{first}, your Quick 5 is ready"
+        heading = "Five minutes, five questions."
+        line = "A short review today makes tomorrow easier. Start whenever you're ready."
+    tasks = "".join(
+        f'<li style="margin:0 0 6px;color:#3d3b37;font-size:14px;line-height:1.5;">{escape(t)}</li>'
+        for t in pending_tasks[:3]
+    )
+    tasks_block = (f'<p style="margin:22px 0 8px;font-size:13px;color:#66645e;">Also on your plan this week:</p>'
+                   f'<ul style="margin:0;padding-left:18px;">{tasks}</ul>') if tasks else ""
+    off = (f'<a href="{escape(unsubscribe_url)}" style="color:#66645e;">Turn off reminders</a>'
+           if unsubscribe_url else "Turn reminders off any time in Delta, under Today &rarr; Reminders")
     html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#000;font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#000;padding:40px 20px;">
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f7f5f0;font-family:-apple-system,BlinkMacSystemFont,'Manrope',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f5f0;padding:32px 16px;">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0"
-             style="background:#0a0a0a;border:1px solid #1f1f1f;border-radius:8px;max-width:560px;width:100%;">
-
-        <tr><td style="padding:32px 36px 22px;border-bottom:1px solid #1a1a1a;">
-          <p style="margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.1em;
-                    text-transform:uppercase;color:#8b5a5a;">Delta &middot; Week {week_number}</p>
-          <h1 style="margin:0 0 12px;font-size:25px;font-weight:800;color:#fff;line-height:1.25;">
-            Morning, {first_name}. Let's make today count.
-          </h1>
-          <p style="margin:0;font-size:15px;color:#b8b8b8;line-height:1.6;font-style:italic;">
-            {motivation}
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e6e4df;max-width:520px;width:100%;">
+        <tr><td style="padding:30px 32px 8px;">
+          <p style="margin:0 0 10px;font-size:13px;color:#7d252b;font-weight:700;">Delta &middot; Aria</p>
+          <h1 style="margin:0 0 10px;font-size:24px;line-height:1.3;color:#1a1918;font-family:Georgia,serif;font-weight:600;">{heading}</h1>
+          <p style="margin:0;font-size:15px;line-height:1.6;color:#3d3b37;">Hi {first}! {line}</p>
+          {tasks_block}
+        </td></tr>
+        <tr><td style="padding:24px 32px 30px;">
+          <a href="{escape(open_url)}" style="display:inline-block;background:#1a1918;color:#ffffff;font-size:15px;font-weight:700;padding:13px 28px;text-decoration:none;">Start today's 5 minutes</a>
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #e6e4df;">
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#66645e;">
+            You're getting this because you turned on study reminders, at the time you chose. {off}.
           </p>
         </td></tr>
-{today_section}
-{delta_section}
-{personal_section}
-
-        <tr><td style="padding:28px 36px 8px;" align="center">
-          <a href="{settings.FRONTEND_URL}"
-             style="display:inline-block;background:#fff;color:#000;font-size:15px;
-                    font-weight:800;padding:15px 40px;border-radius:8px;text-decoration:none;">
-            Open Delta &amp; get started &rarr;
-          </a>
-        </td></tr>
-
-        <tr><td style="padding:14px 36px 30px;" align="center">
-          <p style="margin:0;font-size:13px;color:#666;line-height:1.6;">
-            Knock these out and you're a full day ahead of where you were.<br>
-            Agent 2 is tracking your pace — one task is enough to keep the streak alive.
-          </p>
-        </td></tr>
-
-        <tr><td style="padding:20px 36px;border-top:1px solid #1a1a1a;" align="center">
-          <p style="margin:0 0 4px;font-size:12px;color:#555;">
-            Sent by Delta &middot; Alpha.Kore
-          </p>
-          <p style="margin:0;font-size:11px;color:#333;">
-            <a href="{settings.FRONTEND_URL}" style="color:#555;text-decoration:underline;">delta-kappa-pink.vercel.app</a>
-          </p>
-        </td></tr>
-
       </table>
     </td></tr>
   </table>
-</body>
-</html>"""
-
+</body></html>"""
     return _dispatch(to_email, user_name, subject, html)
 
 

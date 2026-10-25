@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated:** 23 October 2026 · **Policy version:** 2026-10-23
+**Last updated:** 24 October 2026 · **Policy version:** 2026-10-24
 
 This Privacy Policy explains how Delta collects, uses, shares and protects your personal data. It is written to comply with India's **Digital Personal Data Protection Act, 2023** (the "DPDP Act") and the rules made under it, and, where applicable, the Information Technology Act, 2000.
 
@@ -46,7 +46,7 @@ Text and details **extracted** from a résumé you upload. We do not keep the or
 What you write to Delta's AI agents (intake, weekly planning, mock interviews), and notes derived from those conversations, so that Delta remembers your context between sessions.
 
 ### 3.5 Learning activity
-Your roadmap, weekly tasks, completions, progress history, reminders and your Delta Score.
+Your roadmap, weekly tasks, completions, progress history and your Delta Score. For the daily habit features: the days you studied, your streak, XP and level, your daily goal and the study time you chose, your answers in the daily Quick 5 review (to decide when each question comes back), and, if you turn reminders on, your reminder settings and the browser push address of each device you allowed. **XP and streaks are never shown to recruiters and never change your test or interview scores.**
 
 ### 3.6 Practice and assessment data
 Your answers and results from the technical tests, the code you submit in the coding sandbox, your mock-interview transcripts, and the resulting scores, including a per-skill breakdown.
@@ -77,12 +77,12 @@ We process your data **only with your consent**, for these specific purposes:
 | **Run your learning plan** | Build and adapt your roadmap and weekly tasks from your goals and progress. |
 | **AI features** | Generate plans, answers, tests, interview questions, feedback and résumé suggestions. |
 | **Practice and scoring** | Run tests and code, grade them, and show your results and skill levels. |
-| **Progress and reminders** | Track your progress and send task reminders you've turned on. |
+| **Progress, daily habit and reminders** | Track your progress, streaks and XP, and (only if you switch them on, a separate consent you can withdraw any time) send you at most one study reminder a day by email or browser notification. |
 | **Recruiter visibility** (separate, optional consent) | Show your candidate profile to verified recruiters, **only if you switch this on** (Section 6). |
 | **Recruiter accounts** | Verify recruiters and let approved ones search opted-in candidates. |
 | **Delta for School** (parental consent) | Show a child the reviewed lessons for their class, and record quiz scores so the child and parent can see progress. Nothing else. |
 | **Security** | Authenticate you, stop one user from reaching another's data, prevent abuse, fix errors. |
-| **Improving Delta** | Understand how features are used, in **aggregated or de-identified** form wherever possible. |
+| **Improving Delta** | Understand how features are used from our **own** records (for example, how many learners come back after a week), in **aggregated** form. We use no third-party analytics or tracking tools. |
 
 **We do not sell your personal data, show you ads, or let our AI providers train their models on your data** (Section 7).
 
@@ -129,7 +129,8 @@ We share data only with the providers needed to run Delta. They may use it only 
 | **Groq** | AI generation | Same as above, for requests routed to Groq-hosted models |
 | **Google (Cloud Text-to-Speech)** | The AI interviewer's voice | The interviewer's question text only |
 | **JDoodle** | Running code in the coding sandbox | The code you submit and its input |
-| **Google (Gmail API)** / **Brevo** | Sending reminder emails | Your email address and task titles |
+| **Google (Gmail API)** / **Brevo** | Sending reminder emails you turned on | Your email address, first name, streak and task titles |
+| **Your browser's push service** (Google, Mozilla, Apple or Microsoft, depending on your browser) | Delivering browser reminders you turned on | An encrypted message (only your device can read it) and the device's push address |
 | **Tavily / Serper** | Web search for market and role information | Search terms about roles and skills (no account data) |
 | **Cloudflare** / **Vercel** | Website hosting | Standard web request logs |
 | **Railway** | Backend hosting | Data passing through our API; server logs |
@@ -232,7 +233,7 @@ Under Section 15 of the DPDP Act, you must give **accurate** information, not im
 
 ## 16. Cookies and local storage
 
-We use only **functional** browser storage to keep you signed in and remember preferences (such as theme). There are **no advertising or third-party tracking cookies**.
+We use only **functional** browser storage to keep you signed in and remember preferences (such as theme and your last practice settings). If you turn on browser reminders, a small service worker is installed only to show those reminders; it does not track you. There are **no advertising or third-party tracking cookies**.
 
 ---
 

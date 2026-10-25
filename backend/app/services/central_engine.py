@@ -1755,6 +1755,15 @@ def log_journey_event(
     db.add(event)
     db.commit()
     db.refresh(event)
+
+    # Daily habit (streak/XP). Only verified learning actions count, and a
+    # failure here must never lose the journey event itself.
+    try:
+        from app.services.engagement import on_journey_event
+        on_journey_event(db, user_id, event_type, evidence or {}, impact or {})
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logging.getLogger("delta.engagement").warning("engagement update failed for %s: %s", user_id, exc)
     return event
 
 

@@ -14,6 +14,7 @@ import { useReminder, requestNotificationPermission } from '../lib/useReminder';
 import { useAuthStore } from '../store/authStore';
 import { useAgent2Chat } from '../store/agent2ChatStore';
 import { careerContextKey, seedCareerContext } from '../hooks/useCareerOS';
+import { refreshEngagement } from '../hooks/useEngagement';
 
 const panelStyle = {
   background: 'var(--paper)',
@@ -34,9 +35,9 @@ const monoLabel = {
 };
 
 const fallbackActions = [
-  { title: 'Confirm this week\'s availability', detail: 'Tell Agent 2 your realistic hours, exam pressure, and blocked days before it assigns heavy work.' },
+  { title: 'Confirm this week\'s availability', detail: 'Tell Aria your realistic hours, exam pressure, and blocked days before it assigns heavy work.' },
   { title: 'Pick one proof task', detail: 'Choose a small project, course module, paper, or revision block that can be finished this week.' },
-  { title: 'Report pace at week end', detail: 'Mark what was completed so Agent 2 can decide whether to increase, repeat, or pause next week.' },
+  { title: 'Report pace at week end', detail: 'Mark what was completed so Aria can decide whether to increase, repeat, or pause next week.' },
 ];
 
 const SUGGESTIONS = [
@@ -447,7 +448,7 @@ export default function WeeklyPlan() {
       const data = await careerOSAPI.getContext(userId);
       applyContext(data);
       seedCareerContext(queryClient, userId, data);
-      if (regenerate) toast.success('Agent 2 loaded your first weekly plan.');
+      if (regenerate) toast.success('Aria loaded your first weekly plan.');
     } catch (err) {
       console.error(err);
       // Only show the error toast for real failures, not timeouts/slow generation
@@ -576,8 +577,9 @@ export default function WeeklyPlan() {
         evidence: actions[idx],
         impact: { weekly_plan_adjustment_needed: true },
       });
+      refreshEngagement(queryClient, userId, { size: shouldCheck ? 'small' : 'none' });
     } catch { /* saved locally; sync will retry on reload */ }
-  }, [actions, checked, userId]);
+  }, [actions, checked, userId, queryClient]);
 
   const toggleDaySlice = useCallback(async (dIdx, sIdx) => {
     if (advancing || !dayPlan?.days) return;
@@ -693,6 +695,7 @@ export default function WeeklyPlan() {
         evidence: action,
         impact: { weekly_plan_adjustment_needed: true },
       });
+      refreshEngagement(queryClient, userId, { size: nextValue ? 'small' : 'none' });
     } catch (err) {
       console.error(err);
       setChecked(prev => ({ ...prev, [index]: !nextValue }));
@@ -886,7 +889,7 @@ export default function WeeklyPlan() {
       setSkipped(progress.skippedByIndex);
       loadContextDocs(); // fulfilled one-week requests are consumed on advance
       resetAgent2Chat('New week loaded. Tell me if anything has changed — exams, pace, priorities.');
-      toast.success('Next week loaded — Agent 2 has updated your tasks.');
+      toast.success('Next week loaded — Aria has updated your tasks.');
     } catch (err) {
       console.error(err);
       const detail = err?.response?.data?.detail || err?.message || 'Something went wrong. Try again in a moment.';
@@ -926,7 +929,7 @@ export default function WeeklyPlan() {
   const nextWeekCTA = allTasksResolved ? (
     <div style={{ marginTop: 20, padding: 16, borderRadius: 0, background: 'var(--accent-surface)', border: '1px solid var(--accent-surface)' }}>
       <p style={{ margin: '0 0 12px', color: 'var(--ink)', fontSize: 14, lineHeight: 1.5 }}>
-        <strong>All current tasks are checked.</strong> Request the next week only after you have genuinely finished the work and proof.
+        <strong>Every task this week is done. Great work!</strong> Ready for the next week whenever you are.
       </p>
       <button
         className="wp-btn wp-btn-primary"
@@ -950,7 +953,7 @@ export default function WeeklyPlan() {
               {studentName}'s week, adjusted to your pace.
             </h1>
             <p style={{ margin: '8px 0 0', color: 'var(--ink-soft)', fontSize: 14.5, lineHeight: 1.5 }}>
-              Week {context?.week_number || 1} — Agent 2 plans one week at a time around your real availability.
+              Week {context?.week_number || 1}. Aria plans one week at a time, around your real availability.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
@@ -959,7 +962,7 @@ export default function WeeklyPlan() {
                 <Bell size={13} /> Reminders
               </button>
             )}
-            <button className="wp-btn wp-btn-primary" onClick={refreshWeek} disabled={refreshing || advancing}>
+            <button className="wp-btn wp-btn-ghost" onClick={refreshWeek} disabled={refreshing || advancing}>
               {refreshing || advancing
                 ? <Loader2 size={13} className="wp-spin" style={{ animation: 'spin 1s linear infinite' }} />
                 : <RefreshCw size={13} />}
@@ -968,8 +971,8 @@ export default function WeeklyPlan() {
           </div>
         </header>
 
-        {/* Stats bar */}
-        <section style={{
+        {/* Stats bar (hidden on phones so the first task is above the fold) */}
+        <section className="wp-stats" style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: 1, background: 'var(--rule)', border: '1px solid var(--rule)', marginBottom: 20,
         }}>
@@ -991,9 +994,9 @@ export default function WeeklyPlan() {
 
         {/* Plan style toggle */}
         <section style={{ ...panelStyle, padding: '14px 18px', display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>How do you want this week laid out?</p>
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-soft)' }}>Week view lists all tasks together. Day view spreads them across your 7 days around your commitments.</p>
+          <div title="Week view lists all tasks together. Day view spreads them across your 7 days.">
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Layout</p>
+            <p className="wp-layout-hint" style={{ margin: 0, fontSize: 12, color: 'var(--ink-soft)' }}>Week view lists all tasks together. Day view spreads them across your 7 days around your commitments.</p>
           </div>
           <div style={{ display: 'inline-flex', border: '1px solid var(--rule)' }}>
             {[{ k: 'week', label: 'Week' }, { k: 'day', label: 'Day' }].map(opt => (
@@ -1021,7 +1024,7 @@ export default function WeeklyPlan() {
             {advancing ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 0' }}>
                 <Loader2 size={16} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
-                <span style={{ fontSize: 14, color: 'var(--ink)' }}>Agent 2 is preparing your next week…</span>
+                <span style={{ fontSize: 14, color: 'var(--ink)' }}>Aria is preparing your next week…</span>
               </div>
             ) : (
               <DayView
@@ -1047,7 +1050,7 @@ export default function WeeklyPlan() {
             <div>
               <h2 style={{ margin: '0 0 6px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Tasks for this week</h2>
               <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13.5, lineHeight: 1.55 }}>
-                Agent 2 should only assign new work after these are completed or after you say the plan needs to change.
+                One step at a time. Tick a task when it's done, or tell Aria if the plan needs to change.
               </p>
             </div>
             {loading && <Loader2 size={18} className="wp-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--ink-soft)' }} />}
@@ -1058,7 +1061,7 @@ export default function WeeklyPlan() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 0' }}>
               <Loader2 size={16} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
               <span style={{ fontSize: 14, color: 'var(--ink)' }}>
-                Agent 2 is preparing your next week — reviewing what you completed, skipped, and any preferences you saved.
+                Aria is preparing your next week — reviewing what you completed, skipped, and any preferences you saved.
               </span>
             </div>
           )}
@@ -1071,7 +1074,7 @@ export default function WeeklyPlan() {
                   <Loader2 size={16} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
                   <span style={{ fontSize: 14, color: 'var(--ink)' }}>
                     {new URLSearchParams(location.search).get('from') === 'intake'
-                      ? 'Agent 2 is building your first week from your profile. This can take up to a minute the first time.'
+                      ? 'Aria is building your first week from your profile. This can take up to a minute the first time.'
                       : 'Loading your week…'}
                   </span>
                 </>
@@ -1234,7 +1237,7 @@ export default function WeeklyPlan() {
             <div>
               <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Task controls</h2>
               <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
-                Edit tasks manually or give Agent 2 feedback on this week's selection
+                Edit tasks manually or give Aria feedback on this week's selection
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -1258,7 +1261,7 @@ export default function WeeklyPlan() {
           {feedbackOpen && (
             <div style={{ marginTop: 14 }}>
               <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--ink-soft)' }}>
-                What's wrong with this week's tasks? Agent 2 will adjust based on your feedback.
+                What's wrong with this week's tasks? Aria will adjust based on your feedback.
               </p>
               <textarea
                 value={feedbackText}
@@ -1269,7 +1272,7 @@ export default function WeeklyPlan() {
               />
               <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
                 <button onClick={() => setFeedbackOpen(false)} style={{ background: 'none', border: '1px solid var(--rule)', borderRadius: 0, padding: '8px 14px', color: 'var(--ink-soft)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={submitFeedback} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Send to Agent 2</button>
+                <button onClick={submitFeedback} style={{ background: 'var(--ink)', color: 'var(--bone)', border: 'none', borderRadius: 0, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Send to Aria</button>
               </div>
             </div>
           )}
@@ -1323,13 +1326,13 @@ export default function WeeklyPlan() {
         <section style={{ ...panelStyle, padding: '20px 22px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Agent 2</h2>
+              <h2 style={{ margin: '0 0 4px', fontFamily: serif, fontSize: 21, fontWeight: 600, lineHeight: 1.2 }}>Aria</h2>
               <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 13 }}>
-                Chat resets each week · DB keeps last 2 weeks for context
+                Your coach for this week's plan. Ask anything.
               </p>
             </div>
             <button className="wp-btn wp-btn-primary" onClick={() => setChatOpen(true)}>
-              <MessageSquare size={13} /> Talk to Agent 2
+              <MessageSquare size={13} /> Talk to Aria
             </button>
           </div>
           <p style={{ margin: '0 0 12px', color: 'var(--ink-soft)', fontSize: 13 }}>Things you can ask:</p>
@@ -1438,7 +1441,7 @@ export default function WeeklyPlan() {
             <div style={{ borderTop: '1px solid var(--rule)', paddingTop: 14 }}>
               <p style={{ ...monoLabel, margin: '0 0 10px' }}>Next week requests</p>
               {contextDocs.next_week.length === 0 && (
-                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No requests yet. Add one below or tell Agent 2.</p>
+                <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-soft)' }}>No requests yet. Add one below or tell Aria.</p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                 {contextDocs.next_week.map((item, i) => {
@@ -1500,7 +1503,7 @@ export default function WeeklyPlan() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button onClick={() => confirmSkip('next_week')} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '12px 16px', color: 'var(--ink)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>Move to next week</span>
-                <span style={{ color: 'var(--ink-soft)', display: 'block', fontSize: 12, marginTop: 2 }}>Agent 2 will include it in your next weekly plan</span>
+                <span style={{ color: 'var(--ink-soft)', display: 'block', fontSize: 12, marginTop: 2 }}>Aria will include it in your next weekly plan</span>
               </button>
               <button onClick={() => confirmSkip('remove')} style={{ background: 'var(--accent-surface)', border: '1px solid var(--rule)', borderRadius: 0, padding: '12px 16px', color: 'var(--ink)', cursor: 'pointer', textAlign: 'left', fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>Permanently remove</span>
@@ -1530,7 +1533,7 @@ export default function WeeklyPlan() {
               padding: '16px 20px', borderBottom: '1px solid var(--accent-surface)',
             }}>
               <div>
-                <p style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Agent 2</p>
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Aria</p>
                 <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 12 }}>
                   Week {context?.week_number || 1} · chat resets on new week
                 </p>
@@ -1590,7 +1593,7 @@ export default function WeeklyPlan() {
               })}
               {sending && (
                 <div style={{ color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Agent 2 is replying...
+                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Aria is replying...
                 </div>
               )}
               <div ref={bottomRef} />
@@ -1638,7 +1641,7 @@ export default function WeeklyPlan() {
       {expiredOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,25,24,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
           <div style={{ ...panelStyle, background: 'var(--bone)', padding: 24, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>This week's time is up</h2>
+            <h2 style={{ margin: '0 0 6px', fontSize: 20 }}>A new week is here</h2>
             <p style={{ margin: '0 0 16px', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.5 }}>
               These tasks weren't marked done. Delta is moving you to a fresh week — pick any you want carried over.
             </p>
@@ -1669,6 +1672,7 @@ export default function WeeklyPlan() {
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @media (max-width: 640px) { .wp-stats, .wp-layout-hint { display: none !important; } }
         .wp-btn {
           font-family: 'IBM Plex Mono', ui-monospace, monospace;
           font-size: 11px;
@@ -1701,7 +1705,7 @@ export default function WeeklyPlan() {
           grid-template-areas: "aside center bside";
         }
         .wp-center { grid-area: center; display: grid; gap: 20px; min-width: 0; }
-        .wp-aside { grid-area: aside; display: grid; gap: 20px; min-width: 0; align-content: start; }
+        .wp-aside { grid-area: aside; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; align-content: start; }
         .wp-bside { grid-area: bside; display: grid; gap: 20px; min-width: 0; align-content: start; }
         @media (max-width: 1180px) {
           .wp-main {

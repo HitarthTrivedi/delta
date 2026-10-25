@@ -87,6 +87,14 @@ This module has two sides.
 | Production | CI (tests on SQLite + Postgres, migration check, pip-audit, frontend build) | Built | `.github/workflows/ci.yml` |
 | Production | Monitoring: Sentry (optional `SENTRY_DSN`), `/health` checks the DB | Built, **needs DSN + UptimeRobot** | `backend/app/main.py` |
 | Production | Ops runbook (setup, deploy, migrations, backups, incidents) | Built | `docs/OPERATIONS.md` |
+| Retention | Daily habit engine: streaks (freezes, break mode, repair), XP + levels, daily goal; XP only for server-verified learning actions, never affects scores | Built (Phase 1) | `services/engagement.py`, `routers/engagement.py`, `models/engagement.py` |
+| Retention | Today home (one next step, Aria guide, habit at a glance) + celebrations | Built (Phase 1) | `pages/Today.jsx`, `components/engage/*`, `hooks/useEngagement.js`, `lib/celebrate.js` |
+| Retention | Quick 5: daily 5-question spaced review from a shared, profile-free question bank | Built (Phase 1) | `services/quick_practice.py`, `routers/practice.py`, `pages/QuickPractice.jsx` |
+| Retention | Opt-in study reminders (email + Web Push), per-learner time, backoff, one-click unsubscribe | Built (Phase 1), **needs VAPID keys + EMAIL_LINK_SECRET** | `services/reminder_service.py`, `services/push_service.py`, `public/sw.js` |
+| Retention | Admin retention metrics (cohorts, DAU/WAU, streaks, reminders) | Built | `services/engagement_metrics.py` |
+| Retention | De-intimidation pass (light practice pages, no-fear copy, Rewards + No-Fear design rules) | Built | `DESIGN.md`, practice pages |
+| Retention | Phase 2: daily quests, automatic badges + share cards, opt-in leagues, progress path, "Consistent learner" recruiter badge | Not started | — |
+| Retention | Phase 3: study circles / friend streaks, referrals (freeze for both), personalised reminder timing | Not started | — |
 
 ## 4. Build order
 
@@ -191,6 +199,20 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 8. ✅ **Backups:** nightly encrypted off-site dump (`db-backup.yml`) + `restore_backup.sh`; set the secrets and run the monthly restore drill (`docs/OPERATIONS.md`).
 9. **Anti-cheating** for sandbox scores recruiters rely on.
 10. **Legal:** lawyer review of `frontend/public/legal/*.md`; update the Data Fiduciary name once the company is registered.
+
+**Gamification and retention** (research and plan: Duolingo's published streak, league and notification results; spaced retrieval; implementation intentions; CCPA dark-pattern rules; DPDP §9):
+- Phase 1 is built (see Status). The design rules are in `DESIGN.md` (Rewards exception, No-Fear rule) and `PRODUCT.md`.
+- Phase 2, once Phase 1 data exists:
+  - daily quests and a weekly challenge;
+  - automatic badges, with share cards for LinkedIn/WhatsApp;
+  - opt-in weekly leagues: about 20 learners per cohort in the same field, ranked by XP only, needing a `leaderboard_visibility` consent;
+  - a progress path for the roadmap;
+  - a "Consistent learner" badge for recruiters (opted-in students only; update the Privacy Policy §6 list).
+- Phase 3:
+  - study circles and friend streaks;
+  - referrals (a freeze for both);
+  - bandit-style reminder timing.
+- Children (School) get content stars only: no streaks, XP history, reminders or leagues.
 
 **Week 1 after the v1 beta launch** (deliberately not done before it):
 - Frontend: move from Create React App (deprecated; its build tooling carries most `npm audit` findings) to Vite; remove unused dependencies (all `@radix-ui/*`, `cmdk`, `vaul`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `react-hook-form`, `zod`, `date-fns`, `motion`, `cra-template`) and the unused `components/ui/*`, `CareerChat.jsx`, `mockData.js`, `plugins/health-check`; self-host Monaco (today loaded from jsdelivr).

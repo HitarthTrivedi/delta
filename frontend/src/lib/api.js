@@ -254,6 +254,27 @@ export const sandboxInterviewAPI = {
 };
 
 // ── Technical Theory Test Sandbox API ──
+// ── Daily habit: streak, XP, goal, break mode, reminders ──
+export const engagementAPI = {
+  // tz: the browser's timezone, used the first time to set up the account.
+  get: (userId, tz) => api.get(`/engagement/${userId}`, { params: tz ? { tz } : {} }).then(r => r.data),
+  update: (userId, data) => api.put(`/engagement/${userId}`, data).then(r => r.data),
+  startBreak: (userId, days) => api.post(`/engagement/${userId}/break`, { days }).then(r => r.data),
+  endBreak: (userId) => api.delete(`/engagement/${userId}/break`).then(r => r.data),
+  setReminders: (userId, enabled, channel) => api.put(`/engagement/${userId}/reminders`, { enabled, channel }).then(r => r.data),
+  pushKey: () => api.get('/engagement/push/public-key').then(r => r.data),
+  addPush: (userId, subscription) => api.post(`/engagement/${userId}/push`, subscription).then(r => r.data),
+  removePush: (userId, endpoint) => api.delete(`/engagement/${userId}/push`, { data: { endpoint } }).then(r => r.data),
+  unsubscribe: (u, t) => api.post('/engagement/unsubscribe', { u, t }).then(r => r.data),
+};
+
+// ── Quick 5: the daily 5-question spaced review ──
+export const quickPracticeAPI = {
+  // The first set for a new topic may be written by the model: allow time.
+  get: (userId) => api.get(`/practice/quick/${userId}`, { timeout: 90000 }).then(r => r.data),
+  answer: (userId, itemId, choice) => api.post(`/practice/quick/${userId}/answer`, { item_id: itemId, choice }).then(r => r.data),
+};
+
 export const sandboxTheoryAPI = {
   // opts: { topic, num_questions, difficulty, category, area, timed }
   start: (userId, opts) => api.post(`/sandbox/theory/${userId}/start`, opts, { timeout: 90000 }).then(r => r.data),

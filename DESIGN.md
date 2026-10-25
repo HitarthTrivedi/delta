@@ -99,6 +99,10 @@ A warm paper palette with one saturated accent; a parallel dark "ink" variant ex
 ### Named Rules
 **The One Accent Rule.** Oxblood is the only saturated color in the system. If a screen needs a second meaning-bearing color (success/warning), desaturate it toward the neutral ramp rather than introducing a new hue family.
 
+**The Rewards Exception.** The daily-habit layer (streaks, XP, levels, celebrations) may use one extra warm color, **Reward** (`--reward`, `#b7791f` light / `#e0a84a` dark), plus soft rounded shapes (pills, rings, the celebration card) and short celebratory motion. It is spent **only on things the learner earned** (a streak day, XP, a goal met, a level). It is never used for scores, verdicts, recruiter-facing data or errors, and every animation has a `prefers-reduced-motion` alternative. Practice pages use the same bone/paper theme as the rest of the app; the interview's video tiles are the one dark surface, because they imitate a real video call.
+
+**The No-Fear Rule.** Practice is for learning, not judgement. Red is reserved for real errors (a failed request, a runtime error, ending a call). A wrong answer or a low score is shown in amber or neutral ink with an explanation of what to do next. Timers are off unless the learner picks exam mode.
+
 ## 3. Typography
 
 **Display Font:** Cormorant Garamond (with Georgia, serif fallback)
@@ -162,4 +166,4 @@ Agent 2's chat renders markdown through a components map (not raw HTML): paragra
 - **Don't** use gradient text or `background-clip: text` for emphasis — use weight or the oxblood accent instead.
 - **Don't** use `border-left`/`border-right` as a colored accent stripe on cards or list rows.
 - **Don't** add drop shadows for elevation — this system is flat by design.
-- **Don't** round any corner — a single rounded button or card breaks the square-corner rule immediately.
+- **Don't** round any corner — a single rounded button or card breaks the square-corner rule immediately. (Exception: the Rewards layer, see The Rewards Exception.)
