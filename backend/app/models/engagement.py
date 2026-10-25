@@ -99,11 +99,14 @@ class DailyActivity(Base):
 class UserBadge(Base):
     """An earned achievement badge; `tier` rises 1 -> 3 as the learner keeps going."""
     __tablename__ = "user_badges"
+    __table_args__ = (UniqueConstraint("share_token", name="uq_user_badges_share_token"),)
 
     user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     badge_key = Column(String, primary_key=True)
     tier = Column(Integer, nullable=False, default=1)
     earned_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)  # when this tier was reached
+    # Public "verify this badge" link, only when the learner shares it (revocable).
+    share_token = Column(String, nullable=True)
 
 
 class LeagueCohort(Base):

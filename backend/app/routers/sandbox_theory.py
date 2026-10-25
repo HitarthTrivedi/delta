@@ -5,6 +5,8 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from app.services import integrity
+from app.services.integrity import IntegrityPayload
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -36,6 +38,7 @@ class StartPayload(BaseModel):
 
 class SubmitPayload(BaseModel):
     answers: list[Optional[int]]
+    integrity: Optional[IntegrityPayload] = None
 
 
 def _session_or_404(db: Session, user_id: str, session_id: str) -> SandboxSession:
@@ -160,8 +163,10 @@ def submit_test(
     session.completed_at = datetime.datetime.utcnow()
     data["answers"] = payload.answers
     data["result"] = result
+    integrity.record(data, payload.integrity)
     session.data = json.dumps(data)
     db.commit()
+    result["integrity"] = integrity.notes(session)
 
     for skill_name, stats in skill_breakdown.items():
         if stats["correct"] / stats["total"] >= SKILL_PASS_RATIO:

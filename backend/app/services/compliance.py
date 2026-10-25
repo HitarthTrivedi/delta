@@ -1,7 +1,8 @@
 """DPDP compliance helpers: consent state, data export, account erasure.
 
-POLICY_VERSION must match the "Last updated" date of the published Privacy
-Policy / Terms (frontend/public/legal/*.md). Bumping it makes every user
+POLICY_VERSION must match the "Policy version" of the published Privacy
+Policy (frontend/public/legal/privacy-policy.md): its "Last updated" date, plus
+".2", ".3"... for a second change on the same day. Bumping it makes every user
 re-accept on their next visit — do that for any material change.
 """
 from __future__ import annotations
@@ -22,7 +23,7 @@ from app.services.reminder_service import _supabase_base_url
 
 logger = logging.getLogger("delta.compliance")
 
-POLICY_VERSION = "2026-10-25"
+POLICY_VERSION = "2026-10-25.2"
 
 TERMS = "terms_privacy"
 RECRUITER_VISIBILITY = "recruiter_visibility"

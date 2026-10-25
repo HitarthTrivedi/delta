@@ -8,6 +8,7 @@ is kept.
 from __future__ import annotations
 
 import datetime
+import secrets
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -98,10 +99,51 @@ def listing(db: Session, eng: UserEngagement) -> list[dict]:
             "max_tier": len(tiers),
             **_info(key, tier),
             "earned_at": row.earned_at.isoformat() if row else None,
+            "share_token": row.share_token if row else None,
             "progress": progress[key],
             "next": {"at": tiers[tier][0], **_info(key, tier + 1)} if tier < len(tiers) else None,
         })
     return out
+
+
+def share(db: Session, user_id: str, key: str) -> str:
+    """Create (or reuse) the public verify link for an earned badge."""
+    row = db.get(UserBadge, (user_id, key))
+    if not row:
+        raise LookupError("Earn this badge first, then you can share it.")
+    if not row.share_token:
+        row.share_token = secrets.token_urlsafe(12)
+        db.commit()
+    return row.share_token
+
+
+def unshare(db: Session, user_id: str, key: str) -> None:
+    """Stop sharing: the link stops working at once."""
+    row = db.get(UserBadge, (user_id, key))
+    if row and row.share_token:
+        row.share_token = None
+        db.commit()
+
+
+def public_view(db: Session, token: str) -> dict | None:
+    """What anyone with a verify link sees: first name and last initial, the
+    badge, when it was earned, and that it came from activity Delta recorded."""
+    from app.models.user import User
+    from app.services.leagues import display_name
+    if not token or len(token) > 64:
+        return None
+    row = db.query(UserBadge).filter(UserBadge.share_token == token).first()
+    if not row or row.badge_key not in BADGES:
+        return None
+    user = db.get(User, row.user_id)
+    return {
+        "name": display_name(user.name if user else None),
+        "key": row.badge_key,
+        "tier": row.tier,
+        "max_tier": len(BADGES[row.badge_key]),
+        **_info(row.badge_key, row.tier),
+        "earned_on": row.earned_at.date().isoformat(),
+    }
 
 
 def overview(db: Session, user_id: str) -> dict:

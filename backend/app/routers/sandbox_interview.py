@@ -8,6 +8,8 @@ from xml.sax.saxutils import escape
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from app.services import integrity
+from app.services.integrity import IntegrityPayload
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -155,12 +157,17 @@ def respond(
     }
 
 
+class FinishPayload(BaseModel):
+    integrity: Optional[IntegrityPayload] = None
+
+
 @router.post("/{user_id}/sessions/{session_id}/finish")
 @limiter.limit("10/minute")
 def finish_interview(
     request: Request,
     user_id: str,
     session_id: str,
+    payload: Optional[FinishPayload] = None,
     db: Session = Depends(get_db),
     _: str = Depends(require_owner),
 ):
@@ -186,6 +193,7 @@ def finish_interview(
     session.completed_at = datetime.datetime.utcnow()
     data["settings"] = settings
     data["feedback"] = feedback
+    integrity.record(data, payload.integrity if payload else None)
     session.data = json.dumps(data)
     db.commit()
 
@@ -202,7 +210,8 @@ def finish_interview(
         impact={"sandbox_session_id": session.id, "score": feedback["overall_score"]},
     )
 
-    return {"session_id": session.id, "feedback": feedback, "settings": settings, "transcript": transcript}
+    return {"session_id": session.id, "feedback": feedback, "settings": settings, "transcript": transcript,
+            "integrity": integrity.notes(session)}
 
 
 @router.get("/{user_id}/avatar")
