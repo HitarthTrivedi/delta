@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, Dumbbell, LogOut, Menu, X, Shield, School, Sun, ChevronDown, Medal } from 'lucide-react';
+import { ClipboardList, FileText, Map, BarChart3, Trophy, Briefcase, Dumbbell, LogOut, Menu, X, Shield, School, Sun, ChevronDown, Medal, Users } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useEngagement } from '../../hooks/useEngagement';
 import { StreakFlame } from '../engage/EngageWidgets';
@@ -19,6 +19,7 @@ const moreItems = [
   { label: 'Resume', path: '/resume', icon: FileText },
   { label: 'Achievements', path: '/achievements', icon: Trophy },
   { label: 'League', path: '/league', icon: Medal },
+  { label: 'Study circles', path: '/circles', icon: Users },
   { label: 'School (for parents)', path: '/school', icon: School },
 ];
 

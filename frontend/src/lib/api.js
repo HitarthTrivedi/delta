@@ -269,6 +269,20 @@ export const engagementAPI = {
   badges: (userId) => api.get(`/engagement/${userId}/badges`).then(r => r.data),
   league: (userId) => api.get(`/engagement/${userId}/league`).then(r => r.data),
   setLeague: (userId, enabled) => api.put(`/engagement/${userId}/league`, { enabled }).then(r => r.data),
+  referrals: (userId) => api.get(`/engagement/${userId}/referrals`).then(r => r.data),
+  referralPreview: (userId, code) => api.get(`/engagement/${userId}/referrals/preview/${encodeURIComponent(code)}`).then(r => r.data),
+  claimReferral: (userId, code) => api.post(`/engagement/${userId}/referrals/claim`, { code }).then(r => r.data),
+};
+
+// ── Study circles (opt-in private groups) ──
+export const circlesAPI = {
+  list: (userId) => api.get(`/circles/${userId}`).then(r => r.data),
+  create: (userId, name) => api.post(`/circles/${userId}`, { name }).then(r => r.data),
+  preview: (userId, code) => api.get(`/circles/${userId}/preview/${encodeURIComponent(code)}`).then(r => r.data),
+  join: (userId, code) => api.post(`/circles/${userId}/join`, { code }).then(r => r.data),
+  leave: (userId, circleId) => api.delete(`/circles/${userId}/${circleId}`).then(r => r.data),
+  removeMember: (userId, circleId, memberId) => api.delete(`/circles/${userId}/${circleId}/members/${memberId}`).then(r => r.data),
+  newCode: (userId, circleId) => api.post(`/circles/${userId}/${circleId}/new-code`).then(r => r.data),
 };
 
 // ── Quick 5: the daily 5-question spaced review ──

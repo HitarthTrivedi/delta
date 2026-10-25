@@ -16,6 +16,8 @@ const PURPOSE_LABEL = {
   account_deleted: 'Account deleted',
   learning_reminders: 'Study reminders',
   leaderboard_visibility: 'Weekly leagues',
+  study_circles: 'Study circles',
+  referral_link: 'Linked to the friend who invited you',
   recruiter_habit_badge: '"Consistent learner" badge for recruiters',
 };
 
@@ -95,6 +97,8 @@ export default function PrivacySettings() {
       setConsent(next);
       queryClient.invalidateQueries({ queryKey: ['engagement', userId] });
       queryClient.invalidateQueries({ queryKey: ['league', userId] });
+      queryClient.invalidateQueries({ queryKey: ['circles', userId] });
+      queryClient.invalidateQueries({ queryKey: ['referrals', userId] });
       toast.success(granted ? onText : offText);
     } catch (err) {
       toast.error(err?.response?.data?.detail || 'Could not update this setting.');
@@ -261,6 +265,41 @@ export default function PrivacySettings() {
               {consent.learning_reminders ? 'Turn off' : 'Turn on'}
             </button>
           </div>
+        </section>
+
+        {/* Study circles and invites (opt-in) */}
+        <section className={sectionClass}>
+          <h2 className={h2Class}>Study circles and invites</h2>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <p className={`${pClass} max-w-[520px]`}>
+              {consent.study_circles
+                ? `You are in ${consent.study_circles} circle${consent.study_circles > 1 ? 's' : ''}. Members see your first name, last initial, whether you studied today and your study days this week.`
+                : 'You are not in any study circle.'}
+            </p>
+            {consent.study_circles > 0 && (
+              <button
+                onClick={() => setExtra('study_circles', false, '', 'You left all your circles.')}
+                disabled={busy === 'study_circles'}
+                className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer hover:border-oxblood hover:text-oxblood`}
+              >
+                {busy === 'study_circles' ? <Loader2 size={14} className="animate-spin" /> : null} Leave all circles
+              </button>
+            )}
+          </div>
+          {consent.referral_link && (
+            <div className="mt-4 pt-4 border-t border-rule flex items-start justify-between gap-4 flex-wrap">
+              <p className={`${pClass} max-w-[520px]`}>
+                Your account is linked to the friend who invited you. They see your first name, last initial and whether you both earned the invite reward.
+              </p>
+              <button
+                onClick={() => setExtra('referral_link', false, '', 'Unlinked. Rewards you already earned stay.')}
+                disabled={busy === 'referral_link'}
+                className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer hover:border-oxblood hover:text-oxblood`}
+              >
+                {busy === 'referral_link' ? <Loader2 size={14} className="animate-spin" /> : null} Unlink
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Weekly leagues (opt-in) */}
