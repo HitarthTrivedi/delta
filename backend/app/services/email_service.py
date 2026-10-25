@@ -159,6 +159,7 @@ def send_nudge_email(
     fresh_start: bool,
     open_url: str,
     unsubscribe_url: str | None,
+    message: dict | None = None,
 ) -> bool:
     """The opt-in study reminder: one short, friendly nudge, sent at the time the
     learner chose and only on days they haven't studied yet. Copy rules: no guilt,
@@ -166,7 +167,11 @@ def send_nudge_email(
     if not email_configured():
         return False
     first = escape(str(user_name).split()[0]) if user_name else "there"
-    if fresh_start:
+    if message and not fresh_start:  # wording picked by the reminder bandit
+        subject = message["subject"]
+        heading = escape(message["heading"])
+        line = escape(message["line"])
+    elif fresh_start:
         subject = f"A fresh week, {first}. Want to pick it back up?"
         heading = "New week, clean slate."
         line = "No catching up needed. Five minutes today is a great restart."

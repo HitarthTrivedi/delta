@@ -12,12 +12,16 @@ from app.database import get_db
 from app.limiter import limiter
 from app.dependencies.auth import require_owner, GUEST_ID
 from app.models.compliance import ConsentRecord, Recruiter, RecruiterProfileView
+from app.models.engagement import CircleMember, Referral
 from app.services import compliance
 
 router = APIRouter(prefix="/api/privacy", tags=["privacy"])
 
 CONSENTABLE = {compliance.TERMS, compliance.RECRUITER_VISIBILITY, compliance.LEARNING_REMINDERS,
-               compliance.LEADERBOARD_VISIBILITY, compliance.RECRUITER_HABIT_BADGE}
+               compliance.LEADERBOARD_VISIBILITY, compliance.RECRUITER_HABIT_BADGE,
+               compliance.STUDY_CIRCLES, compliance.REFERRAL_LINK}
+# Granted only through their own flows (they need an invite code); here they can only be withdrawn.
+WITHDRAW_ONLY = {compliance.STUDY_CIRCLES, compliance.REFERRAL_LINK}
 
 
 def _not_guest(user_id: str) -> None:
@@ -53,6 +57,8 @@ def _consent_state(db: Session, user_id: str) -> dict:
         "learning_reminders": bool(reminders and reminders.action == "granted"),
         "leaderboard_visibility": bool(leagues and leagues.action == "granted"),
         "recruiter_habit_badge": bool(habit_badge and habit_badge.action == "granted"),
+        "study_circles": db.query(CircleMember).filter(CircleMember.user_id == user_id).count(),
+        "referral_link": db.get(Referral, user_id) is not None,
         "is_recruiter": db.query(Recruiter).filter(Recruiter.id == user_id).first() is not None,
         "history": [
             {"purpose": h.purpose, "action": h.action, "policy_version": h.policy_version,
@@ -79,6 +85,8 @@ def set_consent(
     _not_guest(user_id)
     if payload.purpose not in CONSENTABLE:
         raise HTTPException(status_code=400, detail="Unknown consent purpose.")
+    if payload.purpose in WITHDRAW_ONLY and payload.granted:
+        raise HTTPException(status_code=400, detail="Join a circle or use an invite link to switch this on.")
 
     if payload.purpose == compliance.TERMS:
         if not payload.granted:
@@ -96,6 +104,12 @@ def set_consent(
         # Records the consent and switches reminders on/off in one place.
         from app.services import engagement
         engagement.set_reminders(db, user_id, payload.granted)
+    elif payload.purpose == compliance.STUDY_CIRCLES:
+        from app.services import circles
+        circles.leave_all(db, user_id)
+    elif payload.purpose == compliance.REFERRAL_LINK:
+        from app.services import referrals
+        referrals.unlink(db, user_id)
     elif payload.purpose == compliance.LEADERBOARD_VISIBILITY:
         # Records the consent and joins/leaves leagues in one place.
         from app.services import leagues

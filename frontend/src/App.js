@@ -1,6 +1,7 @@
 import React, { useEffect, Suspense, lazy } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { rememberReferralFromUrl } from "./lib/referral";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { ThemeProvider, useTheme } from "next-themes";
@@ -48,6 +49,8 @@ const ProgressReport = lazy(() => import("./pages/ProgressReport"));
 const ResumePage = lazy(() => import("./pages/ResumePage"));
 const TrophyCabinet = lazy(() => import("./pages/TrophyCabinet"));
 const League = lazy(() => import("./pages/League"));
+const Circles = lazy(() => import("./pages/Circles"));
+const CircleJoin = lazy(() => import("./pages/CircleJoin"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const PracticeHub = lazy(() => import("./pages/PracticeHub"));
 const CodingSandbox = lazy(() => import("./pages/CodingSandbox"));
@@ -132,13 +135,16 @@ function LayoutWrapper({ children }) {
 function RequireAuth({ children }) {
   const userId = useAuthStore((state) => state.userId);
   const loading = useAuthStore((state) => state.loading);
+  const location = useLocation();
 
   if (loading) {
     return <PageLoader />;
   }
 
   if (!userId) {
-    return <Navigate to="/login" replace />;
+    // Circle invite links come back to the invite after signing in.
+    const next = location.pathname.startsWith('/circles/join/') ? `?next=${encodeURIComponent(location.pathname)}` : '';
+    return <Navigate to={`/login${next}`} replace />;
   }
 
   // Student app: nothing is usable until the current Terms/Privacy are accepted.
@@ -214,6 +220,8 @@ function AppContent() {
         <Route path="/resume" element={<RequireAuth><ProtectedRoute><ResumePage /></ProtectedRoute></RequireAuth>} />
         <Route path="/achievements" element={<RequireAuth><ProtectedRoute><TrophyCabinet /></ProtectedRoute></RequireAuth>} />
         <Route path="/league" element={<RequireAuth><ProtectedRoute><League /></ProtectedRoute></RequireAuth>} />
+        <Route path="/circles" element={<RequireAuth><ProtectedRoute><Circles /></ProtectedRoute></RequireAuth>} />
+        <Route path="/circles/join/:code" element={<RequireAuth><ProtectedRoute><CircleJoin /></ProtectedRoute></RequireAuth>} />
         <Route path="/opportunities" element={<RequireAuth><ProtectedRoute><Opportunities /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice" element={<RequireAuth><ProtectedRoute><PracticeHub /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/coding" element={<RequireAuth><ProtectedRoute><CodingSandbox /></ProtectedRoute></RequireAuth>} />
@@ -252,6 +260,10 @@ function App() {
     // Sync initial session and listen to changes
     initializeAuth();
   }, [initializeAuth]);
+
+  useEffect(() => {
+    rememberReferralFromUrl();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

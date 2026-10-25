@@ -1,14 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Bell, CalendarClock, CheckCircle2, Coffee, Loader2, Medal, PauseCircle, Snowflake, Sparkles } from 'lucide-react';
+import { ArrowRight, Bell, CalendarClock, CheckCircle2, Clock, Coffee, Flame, Gift, Loader2, Medal, PauseCircle, Snowflake, Sparkles, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '../store/authStore';
 import { useUserWithSkills } from '../hooks/useUser';
 import { engagementKey, useEngagement } from '../hooks/useEngagement';
 import { useCareerContext } from '../hooks/useCareerOS';
 import { getTaskProgress } from '../lib/taskProgress';
-import { engagementAPI } from '../lib/api';
+import { circlesAPI, engagementAPI } from '../lib/api';
+import { clearReferral, pendingReferral } from '../lib/referral';
 import { enablePush, pushSupported } from '../lib/push';
 import InterviewerAvatar from '../components/interview/InterviewerAvatar';
 import { DailyGoalRing, LevelBar, StreakFlame, WeekStrip, daysLeftText } from '../components/engage/EngageWidgets';
@@ -18,6 +19,7 @@ import { DailyGoalRing, LevelBar, StreakFlame, WeekStrip, daysLeftText } from '.
 
 const card = 'rounded-2xl border border-rule bg-paper';
 const LEAGUE_OFFER_KEY = 'delta_league_offer_dismissed';
+const TIME_HINT_KEY = 'delta_time_hint_dismissed';
 const QUEST_ACTION = {
   quick5: { to: '/today/quick', label: 'Start' },
   plan_task: { to: '/roadmap', label: 'Open plan' },
@@ -242,6 +244,115 @@ function LeagueCard({ userId, e }) {
   );
 }
 
+function ReferralCard({ userId }) {
+  const queryClient = useQueryClient();
+  const [code, setCode] = useState(() => pendingReferral());
+  const [busy, setBusy] = useState(false);
+  const { data } = useQuery({
+    queryKey: ['referral-preview', code],
+    queryFn: () => engagementAPI.referralPreview(userId, code),
+    enabled: !!userId && !!code,
+    retry: false,
+  });
+  const done = () => { clearReferral(); setCode(null); };
+  useEffect(() => {
+    if (data && !data.eligible) { clearReferral(); setCode(null); } // own link, old account, already linked...
+  }, [data]);
+  if (!code || !data || !data.eligible) return null;
+  const link = async () => {
+    setBusy(true);
+    try {
+      await engagementAPI.claimReferral(userId, code);
+      queryClient.invalidateQueries({ queryKey: ['referrals', userId] });
+      toast.success(`Linked with ${data.inviter}. Study on ${data.days_needed} days and you both get a streak freeze.`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not link up.');
+    } finally {
+      setBusy(false);
+      done();
+    }
+  };
+  return (
+    <section className={`${card} p-4`}>
+      <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Gift size={16} className="text-reward" aria-hidden="true" /> {data.inviter} invited you to Delta</p>
+      <p className="mt-1 text-sm text-ink-soft">
+        Link up and you both get a streak freeze once you've studied on {data.days_needed} days.
+        {' '}{data.inviter} will see your first name and last initial, and when you both earn it.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button onClick={link} disabled={busy}
+          className="inline-flex items-center gap-2 rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-paper hover:opacity-90 disabled:opacity-60">
+          {busy && <Loader2 size={14} className="animate-spin" />} Link up
+        </button>
+        <button onClick={done} className="rounded-full px-4 py-1.5 text-sm text-ink-soft hover:text-ink">No thanks</button>
+      </div>
+    </section>
+  );
+}
+
+function FriendsCard({ userId }) {
+  const { data } = useQuery({ queryKey: ['circles', userId], queryFn: () => circlesAPI.list(userId), enabled: !!userId, staleTime: 60 * 1000 });
+  if (!data) return null;
+  const c = data.circles[0];
+  return (
+    <Link to="/circles" className={`${card} flex items-center justify-between gap-3 p-4 hover:border-ink-soft`}>
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-reward/15 text-reward"><Users size={18} aria-hidden="true" /></span>
+        {c ? (
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-ink">{c.name}</span>
+            <span className="flex items-center gap-1 text-xs text-ink-soft">
+              {c.streak > 0 && <><Flame size={12} className="text-reward" aria-hidden="true" /> {c.streak}-day circle streak · </>}
+              {c.week.done}/{c.week.target} study days together this week
+            </span>
+          </span>
+        ) : (
+          <span>
+            <span className="block text-sm font-semibold text-ink">Learn with friends</span>
+            <span className="block text-xs text-ink-soft">Start a study circle, or invite a friend and you both get a streak freeze.</span>
+          </span>
+        )}
+      </span>
+      <ArrowRight size={18} className="shrink-0 text-ink-soft" aria-hidden="true" />
+    </Link>
+  );
+}
+
+function StudyTimeHint({ userId, e, onChange }) {
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(TIME_HINT_KEY); } catch { return null; }
+  });
+  const [busy, setBusy] = useState(false);
+  const hint = e.suggested_study_time;
+  if (!hint || !e.study_time || dismissed === hint) return null;
+  const keep = () => {
+    try { localStorage.setItem(TIME_HINT_KEY, hint); } catch { /* just hide it for now */ }
+    setDismissed(hint);
+  };
+  const move = async () => {
+    setBusy(true);
+    try {
+      onChange(await engagementAPI.update(userId, { study_time: hint }));
+      toast.success(`Your study time is now ${hint}.`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not change your study time.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className={`${card} flex flex-wrap items-center justify-between gap-3 p-4`}>
+      <span className="flex items-center gap-2 text-sm text-ink">
+        <Clock size={16} className="text-ink-soft" aria-hidden="true" /> You usually start around {hint}. Move your study time there?
+      </span>
+      <span className="flex gap-2">
+        <button onClick={move} disabled={busy} className="rounded-full border border-ink px-4 py-1.5 text-sm font-semibold text-ink">Move to {hint}</button>
+        <button onClick={keep} className="rounded-full px-3 py-1.5 text-sm text-ink-soft hover:text-ink">Keep {e.study_time}</button>
+      </span>
+    </section>
+  );
+}
+
 export default function Today() {
   const userId = useAuthStore((s) => s.userId);
   const navigate = useNavigate();
@@ -323,6 +434,8 @@ export default function Today() {
           </section>
         )}
 
+        <ReferralCard userId={userId} />
+
         {!e.study_time && !setupDone && (
           <HabitSetup userId={userId} e={e} onDone={() => { setSetupDone(true); queryClient.invalidateQueries({ queryKey: engagementKey(userId) }); }} />
         )}
@@ -359,6 +472,7 @@ export default function Today() {
         )}
 
         <LeagueCard userId={userId} e={e} />
+        <FriendsCard userId={userId} />
 
         {/* From the plan (at most 2) */}
         <section className={`${card} p-5 sm:p-6`}>
@@ -381,6 +495,8 @@ export default function Today() {
             <CalendarClock size={14} /> See this week's plan
           </Link>
         </section>
+
+        <StudyTimeHint userId={userId} e={e} onChange={setSummary} />
 
         {e.study_time && !e.reminders_opt_in && (
           <section className={`${card} flex flex-wrap items-center justify-between gap-3 p-4`}>

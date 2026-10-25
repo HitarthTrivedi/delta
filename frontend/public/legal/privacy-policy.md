@@ -46,7 +46,7 @@ Text and details **extracted** from a résumé you upload. We do not keep the or
 What you write to Delta's AI agents (intake, weekly planning, mock interviews), and notes derived from those conversations, so that Delta remembers your context between sessions.
 
 ### 3.5 Learning activity
-Your roadmap, weekly tasks, completions, progress history and your Delta Score. For the daily habit features: the days you studied, your streak, XP and level, your daily goal and the study time you chose, your answers in the daily Quick 5 review (to decide when each question comes back), your daily quests and the badges you earn, if you join weekly leagues your league and weekly XP, and, if you turn reminders on, your reminder settings and the browser push address of each device you allowed. **XP, streaks, badges and leagues never change your test or interview scores, and recruiters never see them.** The one exception is optional: if you turn on the "Consistent learner" badge, recruiters who can already see you also see a yes/no badge when you studied on 20 or more of the last 30 days (Section 6).
+Your roadmap, weekly tasks, completions, progress history and your Delta Score. For the daily habit features: the days you studied, your streak, XP and level, your daily goal and the study time you chose, your answers in the daily Quick 5 review (to decide when each question comes back), your daily quests and the badges you earn, if you join weekly leagues your league and weekly XP, if you join study circles the circles you are in, if you joined with a friend's invite link who invited you, and, if you turn reminders on, your reminder settings, the browser push address of each device you allowed, and for each reminder which wording we used and whether you studied that day (to learn which wording helps most). **XP, streaks, badges and leagues never change your test or interview scores, and recruiters never see them.** The one exception is optional: if you turn on the "Consistent learner" badge, recruiters who can already see you also see a yes/no badge when you studied on 20 or more of the last 30 days (Section 6).
 
 ### 3.6 Practice and assessment data
 Your answers and results from the technical tests, the code you submit in the coding sandbox, your mock-interview transcripts, and the resulting scores, including a per-skill breakdown.
@@ -83,6 +83,8 @@ We process your data **only with your consent**, for these specific purposes:
 | **Recruiter accounts** | Verify recruiters and let approved ones search opted-in candidates. |
 | **Delta for School** (parental consent) | Show a child the reviewed lessons for their class, and record quiz scores so the child and parent can see progress. Nothing else. |
 | **Security** | Authenticate you, stop one user from reaching another's data, prevent abuse, fix errors. |
+| **Study circles** (separate, optional consent) | Let you study with a few friends you invite (up to 6). Other members see only your first name, last initial, whether you studied today and your study days this week. **Only if you start or join a circle**; leaving removes you straight away. |
+| **Invite a friend** (optional) | Give you a personal invite link. If a friend joins with it and links up (their own choice), you see their first name and last initial and when you both earn the reward (a streak freeze each). |
 | **Improving Delta** | Understand how features are used from our **own** records (for example, how many learners come back after a week), in **aggregated** form. We use no third-party analytics or tracking tools. |
 
 **We do not sell your personal data, show you ads, or let our AI providers train their models on your data** (Section 7).
@@ -210,7 +212,7 @@ If a breach affects your data, we will inform **you** and the **Data Protection 
 | **Access / copy of your data** | Privacy settings → **Download my data** (instant, JSON file). |
 | **Correction** | Edit your details on the Intake page, or email us. |
 | **Erasure** | Privacy settings → **Delete account** (instant). |
-| **Withdraw consent** | Recruiter visibility, the "Consistent learner" badge, study reminders and weekly leagues: one switch each in Privacy settings. Core consent: deleting your account withdraws it and erases your data. Withdrawal doesn't affect processing done before it. |
+| **Withdraw consent** | Recruiter visibility, the "Consistent learner" badge, study reminders, weekly leagues, study circles and the link to the friend who invited you: one switch each in Privacy settings. Core consent: deleting your account withdraws it and erases your data. Withdrawal doesn't affect processing done before it. |
 | **See who viewed you** | Privacy settings → **Who viewed your profile**. |
 | **Nominate** | Email us to nominate someone to exercise your rights if you die or become incapacitated. |
 | **Grievance** | Email our Grievance Officer (Section 14). |

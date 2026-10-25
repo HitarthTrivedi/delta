@@ -31,6 +31,8 @@ ACCOUNT_DELETED = "account_deleted"
 PARENTAL_CONSENT = "parental_consent"
 LEARNING_REMINDERS = "learning_reminders"  # opt-in study reminders (email / browser push)
 LEADERBOARD_VISIBILITY = "leaderboard_visibility"  # opt-in weekly leagues
+STUDY_CIRCLES = "study_circles"  # opt-in private study groups
+REFERRAL_LINK = "referral_link"  # invited learner agrees to be linked to their inviter
 RECRUITER_HABIT_BADGE = "recruiter_habit_badge"  # opt-in "Consistent learner" badge for recruiters
 
 # Tables that are deliberately kept (pseudonymous) after erasure, or handled separately.
@@ -179,6 +181,9 @@ def delete_auth_user(user_id: str) -> bool:
 
 
 def _erase_user_rows(db: Session, user_id: str) -> None:
+    from app.models.engagement import Referral
+    # The one row keyed to another learner: invitations this user sent.
+    db.query(Referral).filter(Referral.referrer_id == user_id).delete()
     for table in reversed(_user_tables()):  # dependents before parents
         db.execute(table.delete().where(table.c.user_id == user_id))
     db.query(User).filter(User.id == user_id).delete()

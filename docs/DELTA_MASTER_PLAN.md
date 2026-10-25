@@ -98,7 +98,10 @@ This module has two sides.
 | Retention | Opt-in weekly leagues (5 tiers, groups of 20, XP-ranked, forgiving demotion, `leaderboard_visibility` consent) | Built (Phase 2) | `services/leagues.py`, `pages/League.jsx` |
 | Retention | Progress path (roadmap phases as a path with "You are here") | Built (Phase 2) | `components/engage/ProgressPath.jsx` (Progress page) |
 | Retention | "Consistent learner" recruiter badge (own `recruiter_habit_badge` consent; 20+ active days of 30; yes/no only) | Built (Phase 2) | `engagement.consistent_learners`, `routers/recruiter.py` |
-| Retention | Phase 3: study circles / friend streaks, referrals (freeze for both), personalised reminder timing | Not started | — |
+| Retention | Study circles (up to 6, invite link, circle streak, shared weekly goal, `study_circles` consent) | Built (Phase 3) | `services/circles.py`, `routers/circles.py`, `pages/Circles.jsx`, `pages/CircleJoin.jsx` |
+| Retention | Referrals (invite link; both get a streak freeze after the friend's 3 study days; `referral_link` consent; 5 rewards/month cap) | Built (Phase 3) | `services/referrals.py`, `lib/referral.js` |
+| Retention | Personalised reminders: wording picked by a Thompson-sampling bandit (`nudge_log`), suggested study time from when the learner actually studies | Built (Phase 3) | `services/reminder_service.py`, `engagement.suggested_study_time` |
+| Retention | WhatsApp reminders | Not planned (decision: email + browser push only) | — |
 
 ## 4. Build order
 
@@ -205,16 +208,16 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 10. **Legal:** lawyer review of `frontend/public/legal/*.md`; update the Data Fiduciary name once the company is registered.
 
 **Gamification and retention** (research and plan: Duolingo's published streak, league and notification results; spaced retrieval; implementation intentions; CCPA dark-pattern rules; DPDP §9):
-- Phases 1 and 2 are built (see Status). The design rules are in `DESIGN.md` (Rewards exception, No-Fear rule) and `PRODUCT.md`.
+- Phases 1, 2 and 3 are built (see Status). The design rules are in `DESIGN.md` (Rewards exception, No-Fear rule) and `PRODUCT.md`.
 - Phase 2 decisions worth knowing:
   - leagues prefer a same-field group but join any group at the tier with room, so early leagues aren't groups of one; revisit once there are enough learners per field;
   - the "Consistent learner" badge has its own consent on top of recruiter visibility, because the Privacy Policy promised recruiters never see habit data;
   - share cards are images made in the browser; a public "verify this badge" page is not built.
 - Next for Phase 2, once there is data: tune quest rotation, league size and the challenge target from the retention numbers (`docs/OPERATIONS.md` §7).
-- Phase 3:
-  - study circles and friend streaks;
-  - referrals (a freeze for both);
-  - bandit-style reminder timing.
+- Phase 3 decisions worth knowing:
+  - a circle streak needs every member to keep the day (a freeze or break counts), so it is a friend streak for 2 people and a team streak for more;
+  - the reminder *time* is never moved automatically: the learner's chosen time is a plan they made, so Today only suggests a new time;
+  - the policy text was updated without a version bump, because circles and referral links each ask for their own consent with a notice at the point of use; bump `POLICY_VERSION` if a lawyer prefers re-acceptance.
 - Children (School) get content stars only: no streaks, XP history, reminders or leagues.
 
 **Week 1 after the v1 beta launch** (deliberately not done before it):
