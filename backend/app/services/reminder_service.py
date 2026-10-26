@@ -155,8 +155,11 @@ BANDIT_WINDOW_DAYS = 90
 PRIOR_STRENGTH = 20  # everyone's results count like at most 20 of the learner's own
 
 
-def candidate_variants(eng: UserEngagement) -> list[str]:
-    """Wordings that make sense for this learner today."""
+def candidate_variants(eng: UserEngagement, minor: bool = False) -> list[str]:
+    """Wordings that make sense for this learner today. Under-18s get one
+    fixed wording: no learning from their behaviour (DPDP §9)."""
+    if minor:
+        return ["tiny"]
     out = ["tiny", "quests"]
     if eng.current_streak > 0:
         out.append("streak")
@@ -246,6 +249,13 @@ def run_daily_reminders(force: bool = False) -> dict:
     db = SessionLocal()
     sent = skipped = failed = 0
     try:
+        # Seats at colleges whose licence ended become "expired" (access already stops at once).
+        from app.services.college import expire_ended_licences
+        expire_ended_licences(db)
+    except Exception as exc:
+        logger.warning("College licence sweep failed: %s", exc)
+        db.rollback()
+    try:
         learners = db.query(UserEngagement).filter(UserEngagement.reminders_opt_in.is_(True)).all()
         for eng in learners:
             local_now = engagement._now().astimezone(engagement._tz(eng.timezone))
@@ -267,7 +277,10 @@ def run_daily_reminders(force: bool = False) -> dict:
             open_url = f"{settings.FRONTEND_URL.rstrip('/')}/today"
             delivered = False
             first = ((user.name if user else "") or "there").split()[0]
-            variant = "fresh_start" if kind == "fresh_start" else choose_variant(db, eng, candidate_variants(eng))
+            from app.services.compliance import is_minor
+            minor = is_minor(user)
+            variant = ("fresh_start" if kind == "fresh_start"
+                       else "tiny" if minor else choose_variant(db, eng, candidate_variants(eng)))
             message = None if kind == "fresh_start" else message_for(variant, db, eng, first, today)
 
             if eng.reminder_channel in ("email", "both") and user:

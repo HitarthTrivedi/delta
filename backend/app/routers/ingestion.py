@@ -18,7 +18,9 @@ from app.services.ingestion_engine_v2 import engine
 from app.services.profile_store import load_profile, save_profile, profile_as_context_string, clear_profile
 from app.dependencies.auth import require_owner, verify_resource_owner
 
-router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
+from app.dependencies.auth import block_minor_ai  # noqa: E402
+
+router = APIRouter(prefix="/api/ingestion", tags=["ingestion"], dependencies=[Depends(block_minor_ai)])
 
 
 def _sanitize_text(raw: str, max_length: int = 8000) -> str:

@@ -17,6 +17,9 @@ class User(Base):
     profile_data = Column(Text, nullable=True)      # JSON blob of onboarding intake profile
     agent2_memory_data = Column(Text, nullable=True) # JSON blob for Agent 2 chat memory/context
     last_reminded_on = Column(Date, nullable=True)  # date of the last reminder email sent
+    # Only collected for under-18 college students (parental consent path); NULL means
+    # the user confirmed they are 18+. Never writable through profile_data.
+    date_of_birth = Column(Date, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

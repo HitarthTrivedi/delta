@@ -4,7 +4,9 @@ Consent (give / withdraw recruiter visibility), access (export), erasure
 (delete account) and transparency (which recruiters viewed my profile).
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+import datetime
+
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/api/privacy", tags=["privacy"])
 
 CONSENTABLE = {compliance.TERMS, compliance.RECRUITER_VISIBILITY, compliance.LEARNING_REMINDERS,
                compliance.LEADERBOARD_VISIBILITY, compliance.RECRUITER_HABIT_BADGE,
-               compliance.STUDY_CIRCLES, compliance.REFERRAL_LINK}
+               compliance.STUDY_CIRCLES, compliance.REFERRAL_LINK, compliance.ADULT_RECONSENT}
 # Granted only through their own flows (they need an invite code); here they can only be withdrawn.
 WITHDRAW_ONLY = {compliance.STUDY_CIRCLES, compliance.REFERRAL_LINK}
 
@@ -41,6 +43,26 @@ class DeletePayload(BaseModel):
     confirm: str
 
 
+class MinorStartPayload(BaseModel):
+    dob: datetime.date
+    code: str = Field(min_length=4, max_length=16)
+    roll_no: Optional[str] = Field(default=None, max_length=40)
+    parent_name: Optional[str] = Field(default=None, max_length=120)
+    parent_email: Optional[str] = Field(default=None, max_length=200)
+    policy_version: Optional[str] = None
+    assent: bool = False
+
+
+# Why a learner can't opt in to recruiters (shown as-is).
+POOL_REASONS = {
+    "professional": "Working professionals aren't shown to recruiters on Delta.",
+    "minor": "Recruiters can see you once you turn 18.",
+    "college_pending": "Your college still has to confirm your seat.",
+    "staff": "Staff and recruiter accounts aren't shown to recruiters.",
+    "no_account": "Finish setting up your profile first.",
+}
+
+
 def _consent_state(db: Session, user_id: str) -> dict:
     terms = compliance.latest_consent(db, user_id, compliance.TERMS)
     vis = compliance.latest_consent(db, user_id, compliance.RECRUITER_VISIBILITY)
@@ -49,7 +71,21 @@ def _consent_state(db: Session, user_id: str) -> dict:
     habit_badge = compliance.latest_consent(db, user_id, compliance.RECRUITER_HABIT_BADGE)
     history = db.query(ConsentRecord).filter(ConsentRecord.user_id == user_id) \
         .order_by(ConsentRecord.created_at.desc()).limit(50).all()
+    from app.config import settings
+    from app.models.user import User
+    from app.services import college, minors
+    user = db.get(User, user_id)
+    pool, reason = compliance.recruiter_pool_for(db, user_id)
     return {
+        "recruiter_pool": pool,
+        "recruiter_pool_reason": None if pool else POOL_REASONS.get(reason),
+        "college": college.student_state(db, user_id, None)["membership"],
+        "is_college_admin": college.is_staff(db, user_id),
+        "is_minor": compliance.is_minor(user),
+        "parental_consent": minors.status(db, user_id),
+        "needs_adult_reconsent": bool(user and compliance.needs_adult_reconsent(db, user)),
+        "access_ok": compliance.access_ok(db, user) if user else compliance.has_current_terms_consent(db, user_id),
+        "minor_accounts_enabled": bool(settings.MINOR_ACCOUNTS_ENABLED),
         "current_policy_version": compliance.POLICY_VERSION,
         "terms_accepted": compliance.has_current_terms_consent(db, user_id),
         "terms_accepted_version": terms.policy_version if terms and terms.action == "granted" else None,
@@ -99,8 +135,18 @@ def set_consent(
             raise HTTPException(status_code=400, detail="Delta is currently available only to users aged 18 or older.")
     elif payload.granted and not compliance.has_current_terms_consent(db, user_id):
         raise HTTPException(status_code=400, detail="Accept the Terms of Use and Privacy Policy first.")
+    if payload.granted and payload.purpose in (compliance.RECRUITER_VISIBILITY, compliance.RECRUITER_HABIT_BADGE):
+        pool, reason = compliance.recruiter_pool_for(db, user_id)
+        if pool is None:
+            raise HTTPException(status_code=400, detail=POOL_REASONS.get(reason, "Not available for your account."))
 
-    if payload.purpose == compliance.LEARNING_REMINDERS:
+    if payload.purpose == compliance.ADULT_RECONSENT:
+        from app.services import minors
+        try:
+            minors.reconsent(db, user_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    elif payload.purpose == compliance.LEARNING_REMINDERS:
         # Records the consent and switches reminders on/off in one place.
         from app.services import engagement
         engagement.set_reminders(db, user_id, payload.granted)
@@ -116,6 +162,36 @@ def set_consent(
         leagues.set_opt_in(db, user_id, payload.granted)
     else:
         compliance.record_consent(db, user_id, payload.purpose, payload.granted)
+    return _consent_state(db, user_id)
+
+
+@router.post("/{user_id}/minor-start")
+@limiter.limit("5/minute")
+def minor_start(request: Request, user_id: str, payload: MinorStartPayload, db: Session = Depends(get_db),
+                _: str = Depends(require_owner)):
+    """Under-18 college student: date of birth + college code + parent's email (or the college's attestation)."""
+    _not_guest(user_id)
+    if not payload.assent:
+        raise HTTPException(status_code=400, detail="Please confirm you've read what Delta does and agree to use it.")
+    from app.services import minors
+    try:
+        minors.start(db, user_id, dob=payload.dob, code=payload.code, roll_no=payload.roll_no,
+                     parent_name=payload.parent_name, parent_email=payload.parent_email,
+                     policy_version=payload.policy_version)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _consent_state(db, user_id)
+
+
+@router.post("/{user_id}/parent-consent/resend")
+@limiter.limit("5/minute")
+def resend_parent_consent(request: Request, user_id: str, db: Session = Depends(get_db),
+                          _: str = Depends(require_owner)):
+    from app.services import minors
+    try:
+        minors.resend(db, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _consent_state(db, user_id)
 
 

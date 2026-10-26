@@ -50,8 +50,10 @@ def _memberships(db: Session, user_id: str) -> list[CircleMember]:
 
 def _consent(db: Session, user_id: str) -> None:
     from app.services import compliance
+    from app.services.minors import assert_adult
     if not compliance.has_current_terms_consent(db, user_id):
         raise ValueError("Accept the Terms of Use and Privacy Policy first.")
+    assert_adult(db, user_id)
     rec = compliance.latest_consent(db, user_id, compliance.STUDY_CIRCLES)
     if not rec or rec.action != "granted":
         compliance.record_consent(db, user_id, compliance.STUDY_CIRCLES, True)

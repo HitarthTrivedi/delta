@@ -97,12 +97,13 @@ def verify_resource_owner(
 def authenticated_identity(
     x_user_id: str | None = None,
     authorization: str | None = None,
+    x_user_email: str | None = None,
 ) -> tuple[str, str | None]:
     """
     Return (user_id, email) for the caller. Identity is proven by a verified
-    Supabase JWT (`sub` / `email` claims). The unverified X-User-Id header is
-    accepted ONLY when ALLOW_HEADER_AUTH is enabled (local development), and
-    carries no email.
+    Supabase JWT (`sub` / `email` claims). The unverified X-User-Id (and the
+    optional X-User-Email) headers are accepted ONLY when ALLOW_HEADER_AUTH is
+    enabled (local development).
     """
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ", 1)[1]
@@ -129,7 +130,7 @@ def authenticated_identity(
     if settings.ALLOW_HEADER_AUTH:
         if not x_user_id:
             raise HTTPException(status_code=401, detail="Authentication required.")
-        return x_user_id, None
+        return x_user_id, (x_user_email or "").strip().lower() or None
 
     raise HTTPException(status_code=401, detail="Authentication required: a valid Bearer token is missing.")
 
@@ -146,10 +147,36 @@ def require_owner(
     return verify_resource_owner(user_id, x_user_id=x_user_id, authorization=authorization)
 
 
+def block_minor_ai(
+    x_user_id: Annotated[Optional[str], Header()] = None,
+    authorization: Annotated[Optional[str], Header()] = None,
+) -> None:
+    """Under-18 learners never reach AI features that process their own data
+    (chat, AI intake, interviews, resume, planner AI). Topic-only generation
+    (practice banks, coding problems) stays open. Anonymous/guest callers pass
+    through to the route's own auth."""
+    try:
+        caller, _ = authenticated_identity(x_user_id=x_user_id, authorization=authorization)
+    except HTTPException:
+        return
+    from app.database import SessionLocal
+    from app.models.user import User
+    from app.services.compliance import is_minor
+    db = SessionLocal()
+    try:
+        minor = is_minor(db.get(User, caller))
+    finally:
+        db.close()
+    if minor:
+        raise HTTPException(status_code=403, detail="This AI feature opens up when you turn 18. Your plan, "
+                                                    "practice tests and coding problems are all available.")
+
+
 def current_identity(
     x_user_id: Annotated[Optional[str], Header(description="Authenticated user ID from frontend")] = None,
     authorization: Annotated[Optional[str], Header(description="Bearer <JWT> token from Supabase")] = None,
+    x_user_email: Annotated[Optional[str], Header(description="Dev only (ALLOW_HEADER_AUTH): caller's email")] = None,
 ) -> tuple[str, str | None]:
     """Dependency for routes with no user_id path param (e.g. the recruiter
     portal): returns the verified caller's (user_id, email)."""
-    return authenticated_identity(x_user_id=x_user_id, authorization=authorization)
+    return authenticated_identity(x_user_id=x_user_id, authorization=authorization, x_user_email=x_user_email)

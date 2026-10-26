@@ -42,7 +42,9 @@ from app.services.agent2_memory import (
 from app.limiter import limiter
 from app.dependencies.auth import current_identity, require_owner, verify_resource_owner
 
-router = APIRouter(prefix="/api/chat", tags=["chat"])
+from app.dependencies.auth import block_minor_ai  # noqa: E402
+
+router = APIRouter(prefix="/api/chat", tags=["chat"], dependencies=[Depends(block_minor_ai)])
 
 WEEKDAY_INDEX = {
     "monday": 0,

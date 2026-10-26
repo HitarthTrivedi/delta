@@ -134,6 +134,9 @@ def set_opt_in(db: Session, user_id: str, enabled: bool) -> dict:
     from app.services.engagement import get_or_create
     if enabled and not compliance.has_current_terms_consent(db, user_id):
         raise ValueError("Accept the Terms of Use and Privacy Policy first.")
+    if enabled:
+        from app.services.minors import assert_adult
+        assert_adult(db, user_id)
     eng = get_or_create(db, user_id)
     if bool(eng.leagues_opt_in) != bool(enabled):
         compliance.record_consent(db, user_id, compliance.LEADERBOARD_VISIBILITY, enabled)
