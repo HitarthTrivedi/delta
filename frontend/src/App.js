@@ -46,6 +46,10 @@ const Today = lazy(() => import("./pages/Today"));
 const QuickPractice = lazy(() => import("./pages/QuickPractice"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const VerifyBadge = lazy(() => import("./pages/VerifyBadge"));
+const CollegePortal = lazy(() => import("./pages/college/CollegePortal"));
+const CollegeConsole = lazy(() => import("./pages/college/CollegeConsole"));
+const CollegeJoin = lazy(() => import("./pages/CollegeJoin"));
+const ParentConsent = lazy(() => import("./pages/ParentConsent"));
 const JobMatch = lazy(() => import("./pages/JobMatch"));
 const ProgressReport = lazy(() => import("./pages/ProgressReport"));
 const ResumePage = lazy(() => import("./pages/ResumePage"));
@@ -109,7 +113,9 @@ function LayoutWrapper({ children }) {
   const userId = useAuthStore((state) => state.userId);
   // Recruiter pages have their own header and must not auto-create a student profile.
   const isRecruiterArea = location.pathname.startsWith("/recruiter");
-  const { data: user } = useUserWithSkills(isRecruiterArea ? null : userId);
+  // College staff (TPO/faculty) have their own portal, like recruiters: no student profile, no navbar.
+  const isCollegeArea = location.pathname === "/college" || location.pathname.startsWith("/college/");
+  const { data: user } = useUserWithSkills(isRecruiterArea || isCollegeArea ? null : userId);
 
   // Delta for School child mode: the whole app is locked to the child's learning
   // page until the parent's PIN is entered there.
@@ -120,7 +126,7 @@ function LayoutWrapper({ children }) {
   }
 
   const isLanding = location.pathname === "/";
-  const isLogin = location.pathname === "/login" || location.pathname === "/unsubscribe" || location.pathname.startsWith("/v/") || isRecruiterArea || location.pathname.startsWith("/school/learn");
+  const isLogin = location.pathname === "/login" || location.pathname === "/unsubscribe" || location.pathname.startsWith("/v/") || location.pathname.startsWith("/parent-consent/") || isRecruiterArea || isCollegeArea || location.pathname.startsWith("/school/learn");
   const isPublicPage = ["/about", "/careers", "/contact", "/partners", "/investors", "/early-access"].includes(location.pathname);
 
   return (
@@ -145,7 +151,8 @@ function RequireAuth({ children }) {
 
   if (!userId) {
     // Circle invite links come back to the invite after signing in.
-    const next = location.pathname.startsWith('/circles/join/') ? `?next=${encodeURIComponent(location.pathname)}` : '';
+    const next = location.pathname.startsWith('/circles/join/') || location.pathname.startsWith('/join-college')
+      ? `?next=${encodeURIComponent(location.pathname)}` : '';
     return <Navigate to={`/login${next}`} replace />;
   }
 
@@ -202,6 +209,12 @@ function AppContent() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/v/:token" element={<VerifyBadge />} />
+        <Route path="/parent-consent/:token" element={<ParentConsent />} />
+        <Route path="/college/login" element={<LoginPage variant="college" />} />
+        <Route path="/college" element={<RequireSignedIn loginPath="/college/login"><CollegePortal /></RequireSignedIn>} />
+        <Route path="/college/admin" element={<RequireSignedIn loginPath="/college/login"><CollegeConsole /></RequireSignedIn>} />
+        <Route path="/join-college" element={<RequireAuth><CollegeJoin /></RequireAuth>} />
+        <Route path="/join-college/:code" element={<RequireAuth><CollegeJoin /></RequireAuth>} />
         <Route path="/recruiter/login" element={<LoginPage variant="recruiter" />} />
         <Route path="/recruiter" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterPortal /></RequireSignedIn>} />
         <Route path="/recruiter/admin" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterAdmin /></RequireSignedIn>} />

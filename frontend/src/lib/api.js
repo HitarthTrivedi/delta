@@ -22,6 +22,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
+  // Local dev mode only: the backend's header auth carries no email, so pass it
+  // (college staff invites are matched by email). Ignored unless ALLOW_HEADER_AUTH.
+  const email = useAuthStore.getState().user?.email;
+  if (DEV_AUTH && email) {
+    config.headers['X-User-Email'] = email;
+  }
   return config;
 });
 
@@ -290,6 +296,8 @@ export const jobsAPI = {
 // ── Public, no-login pages ──
 export const publicAPI = {
   badge: (token) => api.get(`/public/badges/${encodeURIComponent(token)}`).then(r => r.data),
+  parentConsent: (token) => api.get(`/public/parent-consent/${encodeURIComponent(token)}`).then(r => r.data),
+  parentRespond: (token, grant, isGuardian) => api.post(`/public/parent-consent/${encodeURIComponent(token)}`, { grant, is_guardian: isGuardian }).then(r => r.data),
 };
 
 // ── Study circles (opt-in private groups) ──
@@ -326,6 +334,8 @@ export const sandboxReportAPI = {
 
 // ── Privacy / DPDP API (student's own consent + data rights) ──
 export const privacyAPI = {
+  minorStart: (userId, payload) => api.post(`/privacy/${userId}/minor-start`, payload).then(r => r.data),
+  resendParentConsent: (userId) => api.post(`/privacy/${userId}/parent-consent/resend`).then(r => r.data),
   getConsent: (userId) => api.get(`/privacy/${userId}/consent`).then(r => r.data),
   setConsent: (userId, payload) => api.post(`/privacy/${userId}/consent`, payload).then(r => r.data),
   getProfileViews: (userId) => api.get(`/privacy/${userId}/profile-views`).then(r => r.data),
@@ -342,7 +352,38 @@ export const recruiterAPI = {
   candidate: (studentId) => api.get(`/recruiter/candidates/${studentId}`).then(r => r.data),
   deleteAccount: () => api.delete('/recruiter/me').then(r => r.data),
   adminList: (status = 'pending') => api.get('/recruiter/admin/recruiters', { params: { status } }).then(r => r.data),
-  adminReview: (recruiterId, approve) => api.post(`/recruiter/admin/recruiters/${recruiterId}/review`, { approve }).then(r => r.data),
+  adminReview: (recruiterId, approve, pool) => api.post(`/recruiter/admin/recruiters/${recruiterId}/review`, { approve, pool }).then(r => r.data),
+};
+
+// ── Delta for College: platform admin, college staff, and the student side ──
+export const collegeAPI = {
+  // platform admin (ADMIN_EMAILS)
+  adminList: () => api.get('/college/admin/colleges').then(r => r.data),
+  adminCreate: (payload) => api.post('/college/admin/colleges', payload).then(r => r.data),
+  adminUpdate: (id, payload) => api.patch(`/college/admin/colleges/${id}`, payload).then(r => r.data),
+  // staff
+  me: () => api.get('/college/me').then(r => r.data),
+  accept: (policy_version) => api.post('/college/me/accept', { policy_version }).then(r => r.data),
+  get: (cid) => api.get(`/college/${cid}`).then(r => r.data),
+  team: (cid) => api.get(`/college/${cid}/admins`).then(r => r.data),
+  invite: (cid, email, role) => api.post(`/college/${cid}/admins`, { email, role }).then(r => r.data),
+  removeStaff: (cid, id) => api.delete(`/college/${cid}/admins/${id}`).then(r => r.data),
+  batches: (cid) => api.get(`/college/${cid}/batches`).then(r => r.data),
+  createBatch: (cid, payload) => api.post(`/college/${cid}/batches`, payload).then(r => r.data),
+  updateBatch: (cid, bid, payload) => api.patch(`/college/${cid}/batches/${bid}`, payload).then(r => r.data),
+  rotateCode: (cid, bid) => api.post(`/college/${cid}/batches/${bid}/join-code`).then(r => r.data),
+  importRoster: (cid, payload) => api.post(`/college/${cid}/roster`, payload, { timeout: 120000 }).then(r => r.data),
+  members: (cid, params) => api.get(`/college/${cid}/members`, { params }).then(r => r.data),
+  approve: (cid, mid) => api.post(`/college/${cid}/members/${mid}/approve`).then(r => r.data),
+  removeMember: (cid, mid) => api.delete(`/college/${cid}/members/${mid}`).then(r => r.data),
+  recruiters: (cid) => api.get(`/college/${cid}/recruiters`).then(r => r.data),
+  linkRecruiter: (cid, email) => api.post(`/college/${cid}/recruiters`, { email }).then(r => r.data),
+  revokeRecruiter: (cid, id) => api.delete(`/college/${cid}/recruiters/${id}`).then(r => r.data),
+  // students
+  studentState: (userId) => api.get(`/college/student/${userId}`).then(r => r.data),
+  preview: (code) => api.get(`/college/join/${encodeURIComponent(code)}/preview`).then(r => r.data),
+  join: (userId, payload) => api.post(`/college/student/${userId}/join`, payload).then(r => r.data),
+  leave: (userId) => api.post(`/college/student/${userId}/leave`).then(r => r.data),
 };
 
 // ── Delta for School API (children live under the parent's account) ──

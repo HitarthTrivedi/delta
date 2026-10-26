@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated:** 25 October 2026 · **Policy version:** 2026-10-25.2
+**Last updated:** 26 October 2026 · **Policy version:** 2026-10-26
 
 This Privacy Policy explains how Delta collects, uses, shares and protects your personal data. It is written to comply with India's **Digital Personal Data Protection Act, 2023** (the "DPDP Act") and the rules made under it, and, where applicable, the Information Technology Act, 2000.
 
@@ -23,9 +23,10 @@ Delta (branded **"Delta by Alpha.Kore"**, "Delta", "we", "us") is an AI-powered 
 
 ## 2. Who this Policy covers
 
-- **Learners**: college students (Delta for College), and working professionals (Delta for Professionals) who use Delta to learn, plan their career and practise for interviews.
+- **Learners**: college students, either on a seat their college bought (**Delta for College**) or on their own, and working professionals (Delta for Professionals) who use Delta to learn, plan their career and practise for interviews.
+- **College staff**: placement officers and faculty who manage their college's seats and see their students' learning progress (Section 6A).
 - **Recruiters**: people who register a recruiter account to find candidates (Section 6 and Section 3.9).
-- **Parents and their children**: parents who set up **Delta for School** for their children, CBSE classes 6–10 (Section 9).
+- **Parents and their children**: parents who set up **Delta for School** for their children, CBSE classes 6–10, and parents of under-18 college students where their college offers it (Section 9).
 
 ---
 
@@ -65,6 +66,15 @@ For recruiters: name, work email, company, designation, company website, saved s
 ### 3.10 Children's data (Delta for School)
 Collected only with a parent's consent (Section 9): the child's **first name**, **class**, the **lessons** they open, and their **quiz answers and scores**. Plus a parent PIN, which we store only in hashed form. Nothing else.
 
+### 3.12 College enrollment data
+If you join through your college: the college's record of you that it uploads to Delta (roll number, name, college email, branch, section, graduation year, CGPA and backlogs, and date of birth only for under-18 students), which batch you are in, and when you joined or left.
+
+### 3.13 College staff accounts
+For placement officers and faculty: name, work email, role, and the college they manage.
+
+### 3.14 Parents of under-18 college students
+The parent's or guardian's name and email, and their consent decision (Section 9).
+
 ### 3.11 What we do not want
 We don't intentionally collect financial, health, biometric, caste, religious or other sensitive data. **Please don't enter it into free-text fields or chats.** If you do, contact us and we'll remove it.
 
@@ -82,7 +92,9 @@ We process your data **only with your consent**, for these specific purposes:
 | **Job match** (only when you use it) | Read a job ad you paste with AI (the ad only, never your profile), compare its skills with yours on our own server, and add tasks to your plan if you choose. |
 | **Progress, daily habit and reminders** | Track your progress, streaks and XP, and (only if you switch them on, a separate consent you can withdraw any time) send you at most one study reminder a day by email or browser notification. |
 | **Weekly leagues** (separate, optional consent) | Place you in a weekly league of up to 20 learners, ranked by the XP earned that week. Other members see only your first name, last initial and weekly XP. **Only if you join**; leaving removes you straight away. |
-| **Recruiter visibility** (separate, optional consent) | Show your candidate profile to verified recruiters, **only if you switch this on** (Section 6). The "Consistent learner" badge is a further optional consent of its own. |
+| **Recruiter visibility** (separate, optional consent) | Show your candidate profile to recruiters, **only if you switch this on** (Section 6): students on a college seat only to the recruiters their college works with; everyone else only to verified off-campus recruiters. Working professionals and under-18s are never shown. The "Consistent learner" badge is a further optional consent of its own. |
+| **College program** (only if you join through your college) | Give you your college's seat, plans and tests, and show your college your learning progress (Section 6A). |
+| **Parental consent for under-18 college students** | Ask a parent or guardian for consent, or rely on the consent your college confirms it holds (Section 9). |
 | **Recruiter accounts** | Verify recruiters and let approved ones search opted-in candidates. |
 | **Delta for School** (parental consent) | Show a child the reviewed lessons for their class, and record quiz scores so the child and parent can see progress. Nothing else. |
 | **Security** | Authenticate you, stop one user from reaching another's data, prevent abuse, fix errors. |
@@ -109,11 +121,14 @@ AI output can be wrong. Check anything important (deadlines, eligibility, salari
 
 Recruiters **cannot see you** unless you turn on **"Visible to recruiters"** in **Privacy settings**. That is a separate, optional consent, and the rest of Delta works the same if you never switch it on.
 
-- **Who can see you:** only recruiters whose accounts Delta has **manually verified and approved**.
+- **Who can see you:** only recruiters whose accounts Delta has **manually verified and approved**, in one of two separate groups that never mix:
+  - **Campus recruiters**: if you are on a college seat, only the recruiters your college has chosen to work with;
+  - **Off-campus recruiters**: if you are not on a college seat, only recruiters hiring off-campus. They never see college students.
+- **Who is never shown:** working professionals, under-18s, and college staff accounts.
+- **Joining or leaving a college** switches visibility off, because the recruiters who could see you change. Switch it on again if you want to.
 - **What they see:**
   - your name;
-  - education (institution, field of study, year);
-  - for working professionals: current job, industry and years of experience;
+  - education (institution, field of study, year); for students on a college seat, the college, branch and graduation year as confirmed by the college;
   - target role;
   - skills and their levels;
   - practice results (technical test, coding and mock-interview scores, with a per-skill breakdown);
@@ -124,6 +139,19 @@ Recruiters **cannot see you** unless you turn on **"Visible to recruiters"** in 
 - **Transparency:** every time a recruiter opens your full profile, we log it. You can see which company viewed you, and when, in Privacy settings.
 - **Recruiters' obligations:** recruiters must agree to use candidate data **only to assess candidates for roles at their own organisation**, not to copy, share or sell it, and to delete it when no longer needed. For data they take away from Delta, the recruiter is responsible as its own Data Fiduciary.
 - **Withdrawing:** switch visibility off at any time. You disappear from search and profiles **immediately**. We can't recall information a recruiter already viewed before you withdrew, but they are bound to delete it when they no longer need it.
+
+---
+
+## 6A. Colleges (Delta for College)
+
+If your college bought seats on Delta and you join with its code or your college email, you are on a **college seat**.
+
+- **Roles.** The college decides what it uploads about its students (its roster) and how it uses the reports it sees: for that, the **college is the Data Fiduciary** and Delta processes the data for it, under a written agreement. For everything else you do on Delta, Delta is the Data Fiduciary.
+- **What your college sees:** your name and roll number (from its own roster), your readiness, practice scores and per-skill results, how many days you were active and when you were last active, and your progress on any plan your college assigns.
+- **What your college never sees:** your conversations with Delta's AI, your résumé text, job matches, study circles, leagues, XP and streaks, whether you are visible to recruiters, and who viewed you.
+- **Leaving.** You can leave your college on Delta at any time (Privacy settings). Your college can also remove your seat. You keep your account as an individual learner.
+- **When a college's contract ends**, its seats end. The college can export its reports for 30 days; then we delete its roster and reports. Your own account stays.
+- Reports a college downloads are the college's responsibility.
 
 ---
 
@@ -160,11 +188,17 @@ Several providers above store or process data **outside India**. The DPDP Act al
 
 ---
 
-## 9. Children (Delta for School)
+## 9. Children (Delta for School and under-18 college students)
 
 Under the DPDP Act, anyone **under 18** is a child.
 
-- **Children cannot create accounts.** Delta accounts are for people aged 18 or over, who confirm this before using Delta.
+- **Children cannot create accounts on their own.** Delta accounts are for people aged 18 or over, who confirm this before using Delta. The one exception, only where we have switched it on and the college allows it, is an **under-18 college student on a college seat**:
+  - before the account opens, a parent or guardian gives **verifiable consent** through a one-time email link, or the college confirms it holds that consent (we record which, with the date);
+  - we collect their date of birth, only to know when they turn 18;
+  - their personal data is **never sent to AI providers**: no AI chat, AI intake or AI mock interviews; their plan, practice tests and coding problems work without it;
+  - **no recruiters, leagues, study circles, invite links or public badge links**, and reminders use one fixed wording;
+  - when they turn 18 they give their own consent, and only then can they choose recruiter visibility;
+  - a parent can withdraw consent by writing to us; the account is then deleted.
 - **Parent-managed profiles.** A parent or legal guardian, signed in to their own adult account, may add a child profile for Delta for School. Before we process anything about the child, the parent must confirm they are the child's parent or guardian and give **explicit consent**. We record that consent with its date and policy version.
 - **How the child uses Delta.** The child learns inside the parent's account in a restricted "child mode" that shows only their lessons. Leaving it needs the parent's PIN. The child has no login, email or contact details of their own on Delta.
 - **What we process:** only what Section 3.10 lists, and only to show lessons and progress (Section 4).
@@ -184,6 +218,7 @@ Under the DPDP Act, anyone **under 18** is a child.
 - We keep your data **while your account is active**.
 - When you **delete your account** (which also withdraws your consent), we erase your personal data **immediately** from our database. Copies in our providers' backups expire on their normal cycles.
 - **Backups.** We take an encrypted backup of the database every night and keep each one for **30 days**, after which it is deleted automatically. So data you delete disappears from every backup within 30 days. Backups are used only to recover from data loss.
+- **College seats** end when you leave, when your college removes you, or when its contract ends; the college's roster and reports are deleted 30 days after its contract ends.
 - We keep a **minimal consent record** (account ID, what was consented to or withdrawn, policy version, date) after deletion. It contains no name or email, and is kept as proof of consent as the law requires.
 - Security and access logs are kept for as long as applicable law requires.
 - Aggregated or de-identified data that can no longer identify you may be kept.
@@ -217,7 +252,7 @@ If a breach affects your data, we will inform **you** and the **Data Protection 
 | **Access / copy of your data** | Privacy settings → **Download my data** (instant, JSON file). |
 | **Correction** | Edit your details on the Intake page, or email us. |
 | **Erasure** | Privacy settings → **Delete account** (instant). |
-| **Withdraw consent** | Recruiter visibility, the "Consistent learner" badge, study reminders, weekly leagues, study circles and the link to the friend who invited you: one switch each in Privacy settings. Core consent: deleting your account withdraws it and erases your data. Withdrawal doesn't affect processing done before it. |
+| **Withdraw consent** | Recruiter visibility, the "Consistent learner" badge, study reminders, weekly leagues, study circles, the link to the friend who invited you, and your college seat: one switch each in Privacy settings. Core consent: deleting your account withdraws it and erases your data. Withdrawal doesn't affect processing done before it. |
 | **See who viewed you** | Privacy settings → **Who viewed your profile**. |
 | **Nominate** | Email us to nominate someone to exercise your rights if you die or become incapacitated. |
 | **Grievance** | Email our Grievance Officer (Section 14). |

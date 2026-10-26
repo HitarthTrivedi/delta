@@ -80,7 +80,13 @@ function Shell({ recruiter, children }) {
                 <ShieldCheck size={13} /> Admin
               </Link>
             )}
-            {recruiter && <span className="hidden sm:inline text-[13px] text-ink-soft">{recruiter.company}</span>}
+            {recruiter && (
+              <span className="hidden sm:inline text-[13px] text-ink-soft">
+                {recruiter.company} · {recruiter.pool === 'campus'
+                  ? (recruiter.linked_colleges?.length ? `Campus: ${recruiter.linked_colleges.join(', ')}` : 'Campus: no colleges linked yet')
+                  : 'Off-campus'}
+              </span>
+            )}
             <button
               onClick={async () => { await logout(); navigate('/recruiter/login'); }}
               aria-label="Sign out"
@@ -320,7 +326,10 @@ function CandidateDetail({ id, onClose }) {
                 Working professional · {[d.work.current_role, d.work.industry, d.work.years_experience && `${d.work.years_experience} yrs experience`].filter(Boolean).join(' · ')}
               </p>
             )}
-            <p className="text-ink-soft text-[13px] m-0 mt-1">{[d.education?.institution, d.education?.major, d.education?.year].filter(Boolean).join(' · ')}</p>
+            <p className="text-ink-soft text-[13px] m-0 mt-1">
+              {[d.education?.institution, d.education?.major, d.education?.year].filter(Boolean).join(' · ')}
+              {d.education?.verified_by_college && <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] px-1.5 py-0.5 border border-ink text-ink">Verified by college</span>}
+            </p>
 
             <div className="mt-5 grid gap-1.5 text-[14px]">
               {d.email && <a href={`mailto:${d.email}`} className="text-oxblood underline">{d.email}</a>}

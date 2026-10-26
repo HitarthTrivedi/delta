@@ -8,6 +8,7 @@ import { DEV_AUTH } from '../lib/devAuth';
 
 export default function LoginPage({ variant = 'student' }) {
   const isRecruiter = variant === 'recruiter';
+  const isCollege = variant === 'college';
   const location = useLocation();
   // Optional ?next=/path (e.g. parents going to Delta for School). Same-site paths only.
   const nextParam = new URLSearchParams(location.search).get('next');
@@ -36,7 +37,7 @@ export default function LoginPage({ variant = 'student' }) {
         const created = await signUp(email, password, name);
         if (created?.devSession) {
           toast.success('Signed in (local dev mode).');
-          navigate(isRecruiter ? '/recruiter' : nextPath || '/today');
+          navigate(isRecruiter ? '/recruiter' : isCollege ? '/college' : nextPath || '/today');
           return;
         }
         toast.success('Account created! Please sign in.');
@@ -50,7 +51,7 @@ export default function LoginPage({ variant = 'student' }) {
         // Send returning users to Today. The route's
         // ProtectedRoute redirects to /onboarding automatically if the profile
         // isn't complete, so incomplete users still land in intake.
-        navigate(isRecruiter ? '/recruiter' : nextPath || '/today');
+        navigate(isRecruiter ? '/recruiter' : isCollege ? '/college' : nextPath || '/today');
       }
     } catch (err) {
       toast.error(err.message || 'Authentication failed');
@@ -65,7 +66,7 @@ export default function LoginPage({ variant = 'student' }) {
       // on return, customStorage reads this flag to pick localStorage vs
       // sessionStorage. Without it Google users were never remembered.
       localStorage.setItem('delta_remember_me', rememberMe ? 'true' : 'false');
-      await loginWithGoogle(nextPath || '/today');
+      await loginWithGoogle(isCollege ? '/college' : nextPath || '/today');
     } catch (err) {
       toast.error(err.message || 'Google Sign-In failed');
     }
@@ -89,7 +90,7 @@ export default function LoginPage({ variant = 'student' }) {
               />
             </div>
             <span className="font-display text-[26px] font-semibold text-ink tracking-tight">Delta</span>
-            <span className="kicker mt-1">{isRecruiter ? 'For Recruiters' : 'Career Intelligence'}</span>
+            <span className="kicker mt-1">{isRecruiter ? 'For Recruiters' : isCollege ? 'For Colleges' : 'Career Intelligence'}</span>
           </div>
 
           {DEV_AUTH && (
@@ -101,7 +102,7 @@ export default function LoginPage({ variant = 'student' }) {
 
           {/* Heading */}
           <h2 className="font-display text-[28px] font-semibold text-oxblood mb-1.5 text-center">
-            {isSignUp ? (isRecruiter ? 'Create a recruiter account' : 'Create your account') : 'Welcome back'}
+            {isSignUp ? (isRecruiter ? 'Create a recruiter account' : isCollege ? 'Create your staff account' : 'Create your account') : 'Welcome back'}
           </h2>
           <p className="text-sm text-ink-soft text-center mb-8">
             {isSignUp ? (

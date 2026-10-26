@@ -1,6 +1,6 @@
 # Terms of Use
 
-**Last updated:** 4 October 2026 · **Version:** 2026-10-04
+**Last updated:** 26 October 2026 · **Version:** 2026-10-26
 
 These Terms of Use ("Terms") govern your use of Delta. Read them together with our [Privacy Policy](/privacy). You accept these Terms by ticking the checkbox in the app before you start. **If you don't agree, don't use Delta.**
 
@@ -25,7 +25,7 @@ Delta helps learners (college students and working professionals) build personal
 
 ## 3. Eligibility and accounts
 
-- **Age.** You must be **18 or older** to have an account. Children under 18 can use Delta for School only through a profile their parent or guardian creates and manages (Section 8).
+- **Age.** You must be **18 or older** to have an account. Children under 18 can use Delta for School only through a profile their parent or guardian creates and manages (Section 8). Where we have switched it on and their college allows it, an under-18 college student may have their own account on a college seat once a parent or guardian has consented (Section 8B).
 - **Accurate information.** Give accurate, current information and keep it updated.
 - **Security.** Keep your login private. You're responsible for activity on your account, and you should tell us promptly about any misuse.
 - **One person, one account.** Don't create an account for someone else. A learner account and a recruiter account must use different email addresses.
@@ -85,6 +85,22 @@ If you add a child profile, you confirm that:
 3. you understand that lessons follow the NCERT syllabus and are reviewed by people, but are **study support, not a replacement for school or the official textbooks**.
 
 You can remove a child profile, and with it all of the child's data, at any time.
+
+---
+
+## 8A. College staff terms
+
+These extra terms apply if your college invites you as its placement officer or faculty. By accepting the invite you agree that:
+
+1. **You act for your college.** The roster you upload is your college's record; you have the right to share it with Delta, and it is accurate.
+2. **Purpose limitation.** You use student reports only for your college's training and placement work, and you don't sell, publish or share them outside your college except as the law requires.
+3. **Under-18 students.** If you upload under-18 students and confirm your college holds their parents' consent, that consent must really exist and be kept on record.
+4. **Recruiters.** You link only recruiters you actually work with for placements.
+5. **Exports.** Reports you download are your college's responsibility.
+
+## 8B. Under-18 college students
+
+If you are under 18 and joined through your college: your parent or guardian has agreed to your use of Delta; some features (AI chat, AI mock interviews, recruiters, leagues, circles, invite links and public badge links) open only when you turn 18; and at 18 you'll be asked to agree to these Terms yourself.
 
 ---
 

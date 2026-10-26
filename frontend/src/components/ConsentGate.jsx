@@ -40,7 +40,10 @@ export default function ConsentGate({ children }) {
   }
 
   if (data.is_recruiter) return <Navigate to="/recruiter" replace />;
+  if (data.is_college_admin) return <Navigate to="/college" replace />;
   if (!data.terms_accepted) return <ConsentScreen consent={data} />;
+  if (data.needs_adult_reconsent) return <AdultReconsent />;
+  if (data.is_minor && !data.access_ok) return <WaitingForParent consent={data} />;
   return children;
 }
 
@@ -51,6 +54,7 @@ function ConsentScreen({ consent }) {
   const queryClient = useQueryClient();
   const [checks, setChecks] = useState({ age: false, terms: false, privacy: false });
   const [saving, setSaving] = useState(false);
+  const [path, setPath] = useState('adult'); // 'adult' | 'minor' (college seat, under 18)
 
   const isUpdate = !!consent.terms_accepted_version;
   const allChecked = checks.age && checks.terms && checks.privacy;
@@ -108,7 +112,15 @@ function ConsentScreen({ consent }) {
             </div>
             <div>
               <dt className="font-semibold text-ink">Recruiters</dt>
-              <dd className="m-0 text-ink-soft">Recruiters can't see you. That only changes if you separately switch on visibility in Privacy settings, and you can switch it off any time.</dd>
+              <dd className="m-0 text-ink-soft">
+                Recruiters can't see you unless you switch it on in Privacy settings, and you can switch it off any time.
+                If you're on a college seat, only recruiters your college works with can see you; otherwise only verified
+                off-campus recruiters. Working professionals and under-18s are never shown.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ink">Colleges</dt>
+              <dd className="m-0 text-ink-soft">If you join through your college, it sees your learning progress and practice results, never your chats with Aria.</dd>
             </div>
             <div>
               <dt className="font-semibold text-ink">Your rights</dt>
@@ -121,6 +133,18 @@ function ConsentScreen({ consent }) {
           </dl>
         </section>
 
+        {consent.minor_accounts_enabled && !isUpdate && (
+          <div className="mb-6 grid sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Your age">
+            {[['adult', "I'm 18 or older"], ['minor', "I'm under 18 and my college gave me a seat"]].map(([key, label]) => (
+              <button key={key} type="button" role="radio" aria-checked={path === key} onClick={() => setPath(key)}
+                className={`px-4 py-3 border text-[14px] text-left cursor-pointer ${path === key ? 'border-oxblood text-oxblood bg-paper' : 'border-rule text-ink bg-transparent'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {path === 'minor' ? <MinorForm consent={consent} onBack={() => setPath('adult')} /> : <>
         <fieldset className="border-0 p-0 m-0 grid gap-3 mb-7">
           <legend className="sr-only">Consent</legend>
           <Check checked={checks.age} onChange={() => toggle('age')}>
@@ -148,6 +172,7 @@ function ConsentScreen({ consent }) {
           {saving && <Loader2 size={16} className="animate-spin" />}
           Agree and continue
         </button>
+        </>}
 
         <p className="text-[13px] text-ink-soft leading-relaxed mt-5 text-center">
           Under 18? You can't have your own account, but a parent can set up Delta for School for you from their account.{' '}
@@ -169,5 +194,132 @@ function Check({ checked, onChange, children }) {
       />
       <span>{children}</span>
     </label>
+  );
+}
+
+function MinorForm({ consent, onBack }) {
+  const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({ dob: '', code: '', roll_no: '', parent_name: '', parent_email: '' });
+  const [assent, setAssent] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const next = await privacyAPI.minorStart(userId, { ...form, roll_no: form.roll_no || null,
+        policy_version: consent.current_policy_version, assent });
+      queryClient.setQueryData(['consent', userId], next);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not continue. Check the details and try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = 'w-full border border-rule bg-paper px-3 py-2 text-[14px] text-ink';
+  return (
+    <form onSubmit={submit} className="grid gap-3 mb-6">
+      <p className="text-[14px] text-ink-soft leading-relaxed m-0">
+        Under-18 students use Delta through their college. A parent or guardian must agree first (or your college confirms it
+        already has their consent). You'll get your plan, practice tests and coding problems. Chat with Aria, AI mock interviews,
+        recruiters, leagues and sharing open up when you turn 18.
+      </p>
+      <label className="text-[13px] font-semibold text-ink">Date of birth<input type="date" required value={form.dob} onChange={set('dob')} className={field} /></label>
+      <label className="text-[13px] font-semibold text-ink">College join code<input required value={form.code} onChange={set('code')} className={`${field} uppercase`} /></label>
+      <label className="text-[13px] font-semibold text-ink">Roll number (if your college gave you one)<input value={form.roll_no} onChange={set('roll_no')} className={field} /></label>
+      <label className="text-[13px] font-semibold text-ink">Parent or guardian's name<input value={form.parent_name} onChange={set('parent_name')} className={field} /></label>
+      <label className="text-[13px] font-semibold text-ink">Parent or guardian's email<input type="email" value={form.parent_email} onChange={set('parent_email')} className={field} /></label>
+      <Check checked={assent} onChange={() => setAssent((v) => !v)}>
+        I've read what Delta does (above) and I want to use it. I understand my parent or guardian has to agree too.
+      </Check>
+      <div className="flex gap-3">
+        <button type="button" onClick={onBack} className="px-4 py-3 border border-rule text-ink-soft bg-transparent font-mono text-xs uppercase tracking-[0.12em] cursor-pointer">Back</button>
+        <button type="submit" disabled={!assent || saving}
+          className={`flex-1 py-3 border font-mono text-xs uppercase tracking-[0.14em] flex items-center justify-center gap-2 ${assent && !saving ? 'bg-oxblood text-bone border-oxblood cursor-pointer' : 'bg-accent-surface text-ink-soft border-rule cursor-not-allowed'}`}>
+          {saving && <Loader2 size={16} className="animate-spin" />} Continue
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function WaitingForParent({ consent }) {
+  const userId = useAuthStore((state) => state.userId);
+  const logout = useAuthStore((state) => state.logout);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const pc = consent.parental_consent || {};
+  const declined = pc.request_status === 'declined';
+
+  const resend = async () => {
+    setBusy(true);
+    try {
+      queryClient.setQueryData(['consent', userId], await privacyAPI.resendParentConsent(userId));
+      toast.success('We sent the email again.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not resend right now.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-bone text-ink px-4 py-20">
+      <div className="max-w-[560px] mx-auto text-center">
+        <h1 className="font-display text-[clamp(1.8rem,5vw,2.4rem)] font-semibold text-oxblood m-0">
+          {declined ? 'Your parent said no for now' : 'Waiting for your parent'}
+        </h1>
+        <p className="text-ink-soft text-[15px] leading-relaxed mt-3">
+          {declined
+            ? 'Without their consent we can\'t open your account. You can ask them again, or use Delta once you turn 18.'
+            : `We emailed ${pc.parent_email || 'your parent or guardian'}. Your account opens as soon as they agree.`}
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          {!declined && <button onClick={resend} disabled={busy} className="px-4 py-2.5 border border-ink text-ink bg-transparent font-mono text-xs uppercase tracking-[0.12em] cursor-pointer">{busy ? 'Sending…' : 'Send the email again'}</button>}
+          <button onClick={() => queryClient.invalidateQueries({ queryKey: ['consent', userId] })} className="px-4 py-2.5 border border-ink text-ink bg-transparent font-mono text-xs uppercase tracking-[0.12em] cursor-pointer">Check again</button>
+          <button onClick={async () => { await logout(); navigate('/login'); }} className="px-4 py-2.5 border border-rule text-ink-soft bg-transparent font-mono text-xs uppercase tracking-[0.12em] cursor-pointer">Sign out</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function AdultReconsent() {
+  const userId = useAuthStore((state) => state.userId);
+  const queryClient = useQueryClient();
+  const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const confirm = async () => {
+    setBusy(true);
+    try {
+      queryClient.setQueryData(['consent', userId], await privacyAPI.setConsent(userId, { purpose: 'adult_reconsent', granted: true }));
+      toast.success('Thanks! Everything on Delta is open to you now.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not save. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="min-h-screen bg-bone text-ink px-4 py-20">
+      <div className="max-w-[560px] mx-auto">
+        <h1 className="font-display text-[clamp(1.8rem,5vw,2.4rem)] font-semibold text-oxblood m-0">You're 18 now. Happy birthday!</h1>
+        <p className="text-ink-soft text-[15px] leading-relaxed mt-3">
+          Until now your parent or college agreed for you. From today it's your call. Read the{' '}
+          <a href="/terms" target="_blank" rel="noreferrer" className="text-oxblood underline">Terms</a> and{' '}
+          <a href="/privacy" target="_blank" rel="noreferrer" className="text-oxblood underline">Privacy Policy</a>, then confirm.
+          Recruiters still can't see you until you switch that on yourself.
+        </p>
+        <div className="mt-5"><Check checked={checked} onChange={() => setChecked((v) => !v)}>I agree to the Terms and consent to the Privacy Policy myself.</Check></div>
+        <button onClick={confirm} disabled={!checked || busy}
+          className={`mt-5 w-full py-3 border font-mono text-xs uppercase tracking-[0.14em] ${checked && !busy ? 'bg-oxblood text-bone border-oxblood cursor-pointer' : 'bg-accent-surface text-ink-soft border-rule cursor-not-allowed'}`}>
+          Confirm and continue
+        </button>
+      </div>
+    </main>
   );
 }
