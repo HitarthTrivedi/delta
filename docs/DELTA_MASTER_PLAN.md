@@ -25,6 +25,12 @@ Because the recruiter side exists, a student's learning gets a concrete goal, an
 
 
 ### Module 2 — Delta for College (main module)
+Sold to colleges **per seat**; the college gives seats to its students. A student on a seat belongs to that college
+(a tenant): the college's placement officer (TPO) manages seats, batches, the roster and which recruiters can see its
+students, and sees their learning progress (never their chats). Students without a seat use the same product as solo
+learners. Two programs: **from first year** (4-year track) and **6-month placement-ready** (final year). See
+`docs/COLLEGE_DATA_NOTES.md` for the data roles.
+
 This module has two sides.
 
 **2a. Student side.** For college students preparing for job interviews or upskilling.
@@ -40,6 +46,7 @@ This module has two sides.
 - A recruiter enters their **preferences**: role, required skills, minimum scores, and other filters such as location/year.
 - Delta **suggests matching students**, ranked by how well their profile fits and by their **sandbox scores** (theory + coding + interview, per skill).
 - Recruiters have **separate accounts** (`/recruiter/login`), are **manually approved** by a Delta admin before they see anyone, and only ever see students who **opted in** (Section 6).
+- **Two pools that never mix:** *campus* recruiters see only opted-in students of colleges that linked them; *open* (off-campus) recruiters see only opted-in solo students. Professionals and under-18s are never shown.
 - Later: company-specific roadmaps, where a company's requirements become a roadmap that students can opt into, plus company-specific assessments.
 
 ### Module 3 — Delta for Professionals
@@ -49,11 +56,11 @@ This module has two sides.
   - intake asks about current job, industry, years of experience and goal type (upskill in current role / switch career / get promoted), instead of college, year or GPA;
   - plans must fit a **tight time budget** (evenings/weekends) and have shorter, outcome-focused milestones;
   - roadmaps lean on job-relevant projects and certifications rather than placements;
-  - recruiter visibility works the same way (opt-in), which is useful for career switchers.
+  - professionals are **not** shown to recruiters (decision, Oct 2026: recruiters are for college students).
 - **How it works:**
   - **Intake:** onboarding first asks "college student or working professional?" and saves `audience` in the profile. For professionals, intake asks job, industry, experience and goal type first (`PROFESSIONAL_RULES` in `ingestion_engine_v2.py`), requires `current_role` instead of education, and suggests job-friendly paces (4 / 6 / 10 h per week).
   - **Roadmap:** the weekly roadmap prompt adds professional planning rules (`brief_generator.py`).
-  - **Recruiters:** professionals who opt in show their current job instead of their college.
+  - **Recruiters:** never shown (`compliance.recruiter_pool_for` returns no pool for `audience=professional`).
 
 ## 3. Status
 
@@ -102,6 +109,10 @@ This module has two sides.
 | Retention | Referrals (invite link; both get a streak freeze after the friend's 3 study days; `referral_link` consent; 5 rewards/month cap) | Built (Phase 3) | `services/referrals.py`, `lib/referral.js` |
 | Retention | Personalised reminders: wording picked by a Thompson-sampling bandit (`nudge_log`), suggested study time from when the learner actually studies | Built (Phase 3) | `services/reminder_service.py`, `engagement.suggested_study_time` |
 | Retention | WhatsApp reminders | Not planned (decision: email + browser push only) | — |
+| College | Delta for College P1: colleges (tenants), seats, TPO/faculty staff, batches + join codes, roster CSV import, join by code/email domain (roster-verified), campus recruiter links, licence expiry | Built | `models/college.py`, `services/college.py`, `routers/college.py`, `pages/college/*`, `pages/CollegeJoin.jsx` |
+| Recruiter | Two recruiter pools (campus / open), computed from consent + membership; professionals and minors never shown | Built | `compliance.recruiter_visible_ids`, `routers/recruiter.py` |
+| Compliance | Under-18 college students (flag `MINOR_ACCOUNTS_ENABLED`, off until legal sign-off): parental consent link or college attestation, no AI on their data, restrictions, re-consent at 18 | Built (off) | `services/minors.py`, `dependencies/auth.block_minor_ai`, `pages/ParentConsent.jsx` |
+| College | P2 TPO analytics + exports; P3 role roadmap templates (placement 6m, SWE Google 12m, product SDE, data analyst, first-year 4y); P4 college-assigned plans and tests | Not started | — |
 | College | Job match: paste a job ad -> skill gaps (code, not AI) -> add up to 3 tasks to this week, or plan the next 4 weeks around it (weekly cycle puts its gap tasks first) | Built | `services/job_match.py`, `routers/jobs.py`, `pages/JobMatch.jsx` |
 | Recruiter | Trustworthy scores: per-session integrity notes (timed, tab switches, pasted code, implausibly fast answers), shown to the learner and to recruiters | Built | `services/integrity.py`, `hooks/useSessionSignals.js`, `components/IntegrityNote.jsx` |
 | Recruiter | Public "verify this badge" links (`/v/:token`), created on share and revocable | Built | `badges.share/public_view`, `routers/public.py`, `pages/VerifyBadge.jsx` |
@@ -155,9 +166,9 @@ Delta is a **Data Fiduciary** under India's DPDP Act, 2023. These rules are buil
 
 - **Consent before processing.** Every student route sits behind `RequireAuth` → `ConsentGate`, which blocks the app until the user ticks: 18+, Terms of Use, Privacy Policy. Each consent event is an append-only row in `consent_records`, with policy version and timestamp.
 - **Changing the legal docs.** Edit `frontend/public/legal/privacy-policy.md` / `terms-of-use.md` (the only copies). For a **material** change, also bump `POLICY_VERSION` in `backend/app/services/compliance.py`, and every user is asked to accept again. Never rely on "continued use = acceptance".
-- **Accounts are 18+ only.** Children never get accounts. They exist only as `child_profiles` under a parent who gave `parental_consent` (recorded with `subject_id` = the child). **Never** send child data to an AI provider, show it to recruiters, or use it for tracking, profiling or ads (DPDP §9). Child tables use the parent's id as `user_id`, so the parent's export and delete cover them.
+- **Accounts are 18+ only**, except under-18 college students on a seat when `MINOR_ACCOUNTS_ENABLED` is on (parental consent first; `block_minor_ai` on every AI route that would process their data; no recruiters, leagues, circles, invite or public links). School children never get accounts. They exist only as `child_profiles` under a parent who gave `parental_consent` (recorded with `subject_id` = the child). **Never** send child data to an AI provider, show it to recruiters, or use it for tracking, profiling or ads (DPDP §9). Child tables use the parent's id as `user_id`, so the parent's export and delete cover them.
 - **School content is human-approved.** Never show a `SchoolLesson` to a child unless `status == 'approved'`. Any edit resets it to draft.
-- **Recruiter visibility is a separate opt-in** (`recruiter_visibility` consent). Recruiters must only ever reach students through `compliance.visible_student_ids()`. If you add a new recruiter-facing field, also update the "Recruiters see" list in `PrivacySettings.jsx` and Section 6 of the Privacy Policy.
+- **Recruiter visibility is a separate opt-in** (`recruiter_visibility` consent). Recruiters must only ever reach students through `compliance.recruiter_visible_ids()` / `can_recruiter_see()` (pool-aware). Joining or leaving a college withdraws visibility. New tables that link a learner to another record without a `user_id` column (like `roster_entries.claimed_user_id`) must be handled explicitly in `_erase_user_rows`. If you add a new recruiter-facing field, also update the "Recruiters see" list in `PrivacySettings.jsx` and Section 6 of the Privacy Policy.
 - **Recruiters are approved by hand.** `status='approved'` is set from `/recruiter/admin` by an email listed in `ADMIN_EMAILS`. Every full-profile view is logged in `recruiter_profile_views` and shown to the student.
 - **Rights are self-serve.** Export (`GET /api/privacy/{id}/export`) and erasure (`DELETE /api/privacy/{id}`) find user data automatically through any table with a `user_id` column. **New tables holding user data must have a `user_id` column**, or export and delete will silently miss them.
 - **New data processors** (a new AI provider, email service, host…) must be added to Section 7 of the Privacy Policy before going live.
