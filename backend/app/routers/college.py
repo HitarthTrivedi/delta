@@ -5,13 +5,14 @@ import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import current_identity, require_owner
 from app.limiter import limiter
-from app.services import college, compliance
+from app.services import college, college_analytics, compliance
 
 router = APIRouter(prefix="/api/college", tags=["college"])
 
@@ -297,3 +298,35 @@ def add_recruiter(request: Request, college_id: str, payload: EmailPayload, iden
 def revoke_recruiter(college_id: str, link_id: str, identity=Depends(current_identity), db: Session = Depends(get_db)):
     _staff(db, identity, college_id, write=True)
     return {"recruiters": _run(college.revoke_recruiter, db, college_id, link_id)}
+
+
+# ── analytics + exports (staff, read-only) ───────────────────────────────────
+
+@router.get("/{college_id}/overview")
+def get_overview(college_id: str, identity=Depends(current_identity), db: Session = Depends(get_db)):
+    _staff(db, identity, college_id)
+    return college_analytics.overview(db, college_id)
+
+
+@router.get("/{college_id}/batches/{batch_id}/dashboard")
+def get_batch_dashboard(college_id: str, batch_id: str, identity=Depends(current_identity),
+                        db: Session = Depends(get_db)):
+    _staff(db, identity, college_id)
+    return _run(college_analytics.batch_dashboard, db, college_id, batch_id)
+
+
+@router.get("/{college_id}/students/{user_id}")
+def get_student(college_id: str, user_id: str, identity=Depends(current_identity), db: Session = Depends(get_db)):
+    _staff(db, identity, college_id)
+    return _run(college_analytics.student_view, db, college_id, user_id)
+
+
+@router.get("/{college_id}/exports/{kind}.csv")
+@limiter.limit("30/minute")
+def export(request: Request, college_id: str, kind: str, batch_id: Optional[str] = None,
+           identity=Depends(current_identity), db: Session = Depends(get_db)):
+    _staff(db, identity, college_id)
+    body = _run(college_analytics.export_csv, db, college_id, kind, batch_id)
+    name = f"{kind}-{datetime.date.today().isoformat()}.csv"
+    return Response(content="﻿" + body, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})

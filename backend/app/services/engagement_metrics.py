@@ -90,3 +90,27 @@ def retention_metrics(db: Session, today: datetime.date | None = None, weeks: in
                       "nudged_last_7d": len(nudged), "studied_within_a_day_after_nudge_pct": _pct(came_back, len(nudged)),
                       "wordings": wordings},
     }
+
+
+def active_dates_by_user(db: Session, user_ids, since: datetime.date) -> dict[str, set[datetime.date]]:
+    """Each learner's active days from `since` on (one query; college dashboards)."""
+    ids = list(user_ids)
+    out: dict[str, set[datetime.date]] = {uid: set() for uid in ids}
+    if ids:
+        for uid, d in (db.query(DailyActivity.user_id, DailyActivity.local_date)
+                       .filter(DailyActivity.user_id.in_(ids), DailyActivity.actions > 0,
+                               DailyActivity.local_date >= since)):
+            out[uid].add(d)
+    return out
+
+
+def last_active_by_user(db: Session, user_ids) -> dict[str, datetime.date | None]:
+    """Each learner's latest active day, or None if never active (one query)."""
+    ids = list(user_ids)
+    out: dict[str, datetime.date | None] = {uid: None for uid in ids}
+    if ids:
+        for uid, d in (db.query(DailyActivity.user_id, func.max(DailyActivity.local_date))
+                       .filter(DailyActivity.user_id.in_(ids), DailyActivity.actions > 0)
+                       .group_by(DailyActivity.user_id)):
+            out[uid] = d
+    return out

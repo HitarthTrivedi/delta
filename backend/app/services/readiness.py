@@ -13,7 +13,8 @@ import json
 from sqlalchemy.orm import Session
 
 from app.models.sandbox_session import SandboxSession
-from app.services.domain_packs import field_for_user
+from app.models.user import User
+from app.services.domain_packs import field_for_user, resolve_field
 
 WEIGHTS = {"theory": 0.35, "coding": 0.35, "interview": 0.30}
 # Fields where coding isn't part of the job: readiness is tests + interview only.
@@ -59,6 +60,30 @@ def _label(score: int | None) -> str:
 def compute_readiness(db: Session, user_id: str) -> dict:
     pack = field_for_user(user_id, db=db)
     sessions = db.query(SandboxSession).filter(SandboxSession.user_id == user_id).all()
+    return readiness_from(sessions, pack)
+
+
+def readiness_bulk(db: Session, user_ids) -> dict[str, dict]:
+    """Readiness for many learners with two queries (college dashboards).
+    Same output as compute_readiness for each learner."""
+    ids = list(user_ids)
+    if not ids:
+        return {}
+    sessions: dict[str, list[SandboxSession]] = {uid: [] for uid in ids}
+    for s in db.query(SandboxSession).filter(SandboxSession.user_id.in_(ids)).all():
+        sessions[s.user_id].append(s)
+    packs = {}
+    for u in db.query(User).filter(User.id.in_(ids)).all():
+        try:
+            profile = json.loads(u.profile_data or "{}")
+        except ValueError:
+            profile = {}
+        packs[u.id] = resolve_field(profile)
+    return {uid: readiness_from(sessions[uid], packs.get(uid) or resolve_field({})) for uid in ids}
+
+
+def readiness_from(sessions: list[SandboxSession], pack: dict) -> dict:
+    """The readiness report from a learner's sandbox sessions and field pack."""
     graded = []
     for s in sessions:
         data = _data(s)
