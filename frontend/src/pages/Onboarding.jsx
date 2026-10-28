@@ -11,6 +11,7 @@ import { useUserWithSkills } from '../hooks/useUser';
 import { useQueryClient } from '@tanstack/react-query';
 import { ingestionAPI } from '../lib/api';
 import { toast } from 'sonner';
+import TemplatePicker from '../components/TemplatePicker';
 
 /* ─── PDF / DOCX / TXT parser ─── */
 const parseFile = async (file) => {
@@ -664,6 +665,12 @@ export default function Onboarding() {
               </div>
             </div>
           </div>
+
+          {/* Optional: follow a predefined role roadmap instead of a fully personal plan */}
+          <section style={{ background: 'var(--paper)', border: '1px solid var(--rule)', padding: '18px 20px', marginBottom: 24 }}>
+            <h2 style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 700, color: 'var(--ink)' }}>How should Delta plan your weeks?</h2>
+            <TemplatePicker userId={userId} />
+          </section>
 
           {/* Action Row */}
           <div className="onboarding-action-row" style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>

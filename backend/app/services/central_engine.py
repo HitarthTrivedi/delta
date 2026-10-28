@@ -21,6 +21,7 @@ from app.models import (
     User,
 )
 from app.services.brief_generator import generate_weekly_brief
+from app.services import roadmap_templates
 from app.services.domain_packs import resolve_field, template_key
 from app.services.market_pulse import get_market_snapshot
 from app.services.memory_graph import MemoryGraph
@@ -1418,6 +1419,7 @@ def run_weekly_career_cycle(
     except Exception as _e:
         logger.warning(f"[ctx_store] end_week failed (non-fatal): {_e}")
 
+    roadmap_templates.advance(db, user_id)
     roadmap = get_or_create_roadmap_state(
         db, user, market, regenerate=True,
         agent2_memory=agent2_memory,
@@ -1612,6 +1614,7 @@ def compile_career_context(db: Session, user_id: str, background_tasks=None) -> 
         "day_schedule": _as_json(roadmap.day_schedule, None) if roadmap else None,
         "week_expired": week_status["expired"],
         "expired_incomplete_tasks": week_status["incomplete_actions"] if week_status["expired"] else [],
+        "template": roadmap_templates.progress(db, roadmap_templates.active_enrollment(db, user_id)),
     }
     # The agent2 memory syncs each read + rewrite the whole agent2_memory_data
     # JSON blob (4 extra DB round trips). Callers on a read path (the context
@@ -1769,10 +1772,7 @@ def log_journey_event(
 
 def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> RoadmapState:
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
-    completed_cycles = db.query(JourneyEvent).filter(
-        JourneyEvent.user_id == user.id,
-        JourneyEvent.event_type == "weekly_cycle_completed",
-    ).count()
+    completed_cycles = len(_valid_weekly_cycle_events(db, user.id))
     # Task 7 — Hybrid cycle_count: max(completed_cycles, weeks_since_signup // 2)
     # Prevents the difficulty curve from stalling for users who skip weeks.
     # Dividing weeks_since_signup by 2 is conservative — a 10-week-old account
@@ -1901,6 +1901,8 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
                 db.refresh(roadmap)
             return roadmap
     skills = _sync_profile_skills_to_db(db, user)
+    # A predefined role roadmap replaces the AI phase call and the task picker.
+    enrollment = roadmap_templates.active_enrollment(db, user.id)
 
     # Gather all completed task titles to pass to the brief generator (no repeats)
     all_completed_events = db.query(JourneyEvent).filter(
@@ -1924,6 +1926,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
 
     should_cycle_break = (
         regenerate
+        and not enrollment
         and not blocking_events
         and break_interval > 0
         and cycle_count > 0
@@ -1940,17 +1943,20 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         except Exception:
             pass
 
-    roadmap_payload = generate_weekly_brief(
-        user, skills, market,
-        agent2_memory=agent2_memory or {},
-        onboarding_profile=onboarding_profile or {},
-        recent_events=recent_events or [],
-        completed_task_titles=completed_task_titles,
-        cycle_count=cycle_count,
-        horizon_months=horizon_months,
-    )
-
-    phases = roadmap_payload.get("phases", [])
+    if enrollment:
+        phases = roadmap_templates.phases(db, enrollment)
+        roadmap_payload = {"phases": phases}
+    else:
+        roadmap_payload = generate_weekly_brief(
+            user, skills, market,
+            agent2_memory=agent2_memory or {},
+            onboarding_profile=onboarding_profile or {},
+            recent_events=recent_events or [],
+            completed_task_titles=completed_task_titles,
+            cycle_count=cycle_count,
+            horizon_months=horizon_months,
+        )
+        phases = roadmap_payload.get("phases", [])
 
     # ── Smart fallback: prefer existing roadmap phases over generic static ones ──
     # When the LLM times out, generate_weekly_brief returns a static fallback with
@@ -1963,14 +1969,24 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         i in STATIC_FALLBACK_IDS or str(i).startswith("fallback-") for i in returned_ids
     )
 
-    if is_generic_fallback and roadmap and roadmap.phases:
+    if not enrollment and is_generic_fallback and roadmap and roadmap.phases:
         stored_phases = _as_json(roadmap.phases, [])
         if stored_phases:
             print("[INFO] LLM returned generic static fallback — using existing personalised roadmap phases from DB.")
+            # Stored statuses are from when the phases were made; re-read them from today's skills.
+            from app.services.brief_generator import _get_node_status
+            skill_map = {s.name.lower(): s.proficiency for s in skills}
+            for phase in stored_phases:
+                for node in phase.get("nodes", []):
+                    node["status"] = _get_node_status(node.get("skill_name") or node.get("label") or "", skill_map)
             phases = stored_phases
             roadmap_payload["phases"] = phases
 
-    active_phase = _select_active_phase(phases)
+    template_progress = roadmap_templates.progress(db, enrollment)
+    if template_progress:
+        active_phase = next((p for p in phases if p["name"] == template_progress["phase"]), phases[0])
+    else:
+        active_phase = _select_active_phase(phases)
 
     destination = {
         "target_role": user.target_role or market.target_role or "Career-ready professional",
@@ -1978,23 +1994,30 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         "planning_horizon_months": _planning_horizon_months(profile),
         "timeline_basis": profile.get("inferred_planning_reason") or "delta inferred a flexible planning horizon from the current profile.",
     }
+    previous_destination = _as_json(roadmap.destination, {}) if roadmap else {}
+    if previous_destination.get("last_break_week_at"):
+        destination["last_break_week_at"] = previous_destination["last_break_week_at"]
     long_plan = _long_horizon_plan(profile, skills, user, market)
     destination["long_horizon_plan"] = long_plan
+    weekly_cap = _capacity_based_task_cap(user, profile)
     weekly_focus = {
         "phase_id": active_phase.get("id") if active_phase else None,
         "phase_name": active_phase.get("name") if active_phase else None,
-        "primary_actions": _derive_weekly_actions(active_phase, cycle_count, skills, market),
+        "primary_actions": (roadmap_templates.weekly_actions(db, enrollment, weekly_cap) if enrollment
+                            else _derive_weekly_actions(active_phase, cycle_count, skills, market)),
         "planning_horizon_months": destination["planning_horizon_months"],
         "long_horizon_lanes": long_plan["lanes"],
         "cycle_count": cycle_count,
     }
-    recurring_actions = _recurring_habit_actions(profile, skills, user, cycle_count, market)
+    if template_progress:
+        weekly_focus["template"] = template_progress
+        weekly_focus["selection_reason"] = f"This week of your roadmap: {template_progress['title']}."
+    recurring_actions = [] if enrollment else _recurring_habit_actions(profile, skills, user, cycle_count, market)
     trend_actions = _trend_response_actions(profile, skills, user, market, cycle_count)
-    weekly_cap = _capacity_based_task_cap(user, profile)
     if recurring_actions:
         weekly_focus["primary_actions"] = _merge_capped_actions(weekly_focus["primary_actions"], recurring_actions, cap=weekly_cap)
         weekly_focus["selection_reason"] = "Includes recurring long-term habit work plus the current roadmap slice."
-    if _has_prior_profile_depth(profile, skills, user):
+    if not enrollment and _has_prior_profile_depth(profile, skills, user):
         proof_actions = _domain_proof_actions(profile, skills, user, db)
         if proof_actions:
             weekly_focus["phase_name"] = "Profile-based proof sprint"
@@ -2011,7 +2034,14 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         weekly_focus["primary_actions"] = _merge_capped_actions(
             job_actions, weekly_focus["primary_actions"], cap=max(weekly_cap, len(job_actions)))
         weekly_focus["selection_reason"] = "Starts with the skills for the job you're aiming at, then your roadmap."
-    if should_cycle_break:
+    if enrollment and regenerate and not blocking_events and roadmap_templates.is_break_week(enrollment):
+        weekly_focus["phase_name"] = "Break week"
+        weekly_focus["is_break_week"] = True
+        weekly_focus["primary_actions"] = _break_week_actions(
+            profile, user, f"A planned break in {template_progress['title']}. Rest, review, and come back fresh.")
+        weekly_focus["selection_reason"] = "A break week built into your roadmap."
+        destination["last_break_week_at"] = datetime.datetime.utcnow().isoformat()
+    elif should_cycle_break:
         # Check we haven't had a break too recently (< 14 days)
         dest_so_far = _as_json(roadmap.destination if roadmap else "{}", {})
         last_break = dest_so_far.get("last_break_week_at")
@@ -2030,7 +2060,7 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             )
             weekly_focus["selection_reason"] = f"Cycle-based break week (every {break_interval} weeks for your {horizon_months}-month plan)."
             destination["last_break_week_at"] = datetime.datetime.utcnow().isoformat()
-    elif regenerate and not blocking_events and _should_assign_break_week(db, user, profile, roadmap):
+    elif regenerate and not enrollment and not blocking_events and _should_assign_break_week(db, user, profile, roadmap):
         weekly_focus["phase_name"] = "Break week"
         weekly_focus["is_break_week"] = True
         weekly_focus["primary_actions"] = _break_week_actions(

@@ -16,6 +16,7 @@ from app.models.school import ChildProfile, SchoolLesson, ChildLessonProgress
 from app.models.job_match import JobDescription, JobTarget
 from app.models.college import (College, CollegeAdmin, Batch, RosterEntry, CollegeMember, CollegeRecruiter,
                                 ParentalConsentRequest)
+from app.models.roadmap_template import RoadmapEnrollment
 from app.models.engagement import (UserEngagement, XpEvent, DailyActivity, UserBadge, LeagueCohort, LeagueMember,
                                    StudyCircle, CircleMember, Referral, NudgeLog)
 from app.models.practice import PracticeItem, UserPracticeState
@@ -31,4 +32,5 @@ __all__ = [
     "UserEngagement", "XpEvent", "DailyActivity", "UserBadge", "LeagueCohort", "LeagueMember",
     "StudyCircle", "CircleMember", "Referral", "NudgeLog", "JobDescription", "JobTarget",
     "College", "CollegeAdmin", "Batch", "RosterEntry", "CollegeMember", "CollegeRecruiter", "ParentalConsentRequest", "PracticeItem", "UserPracticeState",
+    "RoadmapEnrollment",
 ]

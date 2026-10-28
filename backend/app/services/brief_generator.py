@@ -113,7 +113,8 @@ def generate_weekly_brief(user, skills, market_snapshot, agent2_memory: dict = N
 
     # Build onboarding profile context
     constraints = onboarding_profile.get("constraints") or onboarding_profile.get("limitation") or ""
-    planning_horizon = onboarding_profile.get("planning_horizon") or onboarding_profile.get("timeline") or ""
+    planning_horizon = (onboarding_profile.get("planning_horizon") or onboarding_profile.get("timeline")
+                        or f"{horizon_months} months")
     goals = onboarding_profile.get("goals") or onboarding_profile.get("ambitions") or ""
     projects = onboarding_profile.get("projects") or onboarding_profile.get("past_projects") or ""
 
