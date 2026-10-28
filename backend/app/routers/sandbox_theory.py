@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from app.services import integrity
+from app.services import compliance, integrity
 from app.services.integrity import IntegrityPayload
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -70,8 +70,16 @@ def start_test(
     category = "aptitude" if payload.category == "aptitude" else "technical"
     difficulty = payload.difficulty if payload.difficulty in DIFFICULTIES else "medium"
     area = payload.area if payload.area in APTITUDE_AREAS else None
+    from app.models.user import User
+    minor = compliance.is_minor(db.get(User, user_id))
+    if minor and category == "technical" and not (payload.topic or "").strip():
+        raise HTTPException(status_code=400, detail="Pick a topic for your test.")
     try:
-        topic, questions = generate_test(user_id, payload.topic, num_questions, difficulty, category, area)
+        if minor:  # never send an under-18 learner's profile to the model
+            topic, questions = generate_test(None, payload.topic, num_questions, difficulty, category, area,
+                                             personalize=False)
+        else:
+            topic, questions = generate_test(user_id, payload.topic, num_questions, difficulty, category, area)
     except ValueError:
         raise HTTPException(status_code=503, detail="Could not generate a test right now. Try again in a moment.")
 

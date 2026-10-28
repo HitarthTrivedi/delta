@@ -19,7 +19,9 @@ from app.models.opportunity_board import OpportunityBoard
 from app.dependencies.auth import require_owner
 from app.services.opportunity_ai import generate_opportunities, profile_signature
 
-router = APIRouter(prefix="/api/opportunities", tags=["opportunities"])
+from app.dependencies.auth import block_minor_ai  # noqa: E402
+
+router = APIRouter(prefix="/api/opportunities", tags=["opportunities"], dependencies=[Depends(block_minor_ai)])
 
 DEFAULT_PREFERENCES = {
     "location": "",

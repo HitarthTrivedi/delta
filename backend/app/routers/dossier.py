@@ -5,7 +5,9 @@ from app.models import User, SkillNode
 from app.services.dossier_generator import compile_weekly_dossier
 from app.dependencies.auth import require_owner
 
-router = APIRouter(prefix="/api/dossier", tags=["dossier"])
+from app.dependencies.auth import block_minor_ai  # noqa: E402
+
+router = APIRouter(prefix="/api/dossier", tags=["dossier"], dependencies=[Depends(block_minor_ai)])
 
 @router.get("/weekly/{user_id}")
 def get_weekly_dossier(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):

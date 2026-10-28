@@ -28,7 +28,9 @@ from app.dependencies.auth import require_owner, verify_resource_owner
 from app.limiter import limiter
 
 logger = logging.getLogger("delta.resume")
-router = APIRouter(prefix="/api/resume", tags=["resume"])
+from app.dependencies.auth import block_minor_ai  # noqa: E402
+
+router = APIRouter(prefix="/api/resume", tags=["resume"], dependencies=[Depends(block_minor_ai)])
 
 
 # ── Pydantic payloads ──────────────────────────────────────────────────────────

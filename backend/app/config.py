@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     # ALLOW_HEADER_AUTH: when true, trust the unverified X-User-Id header (dev only).
     # MUST stay false in production — a verified Supabase JWT is then required.
     ALLOW_HEADER_AUTH: bool = parse_bool_env("ALLOW_HEADER_AUTH", False)
+    # Under-18 college students (parental consent). Keep off until legal sign-off.
+    MINOR_ACCOUNTS_ENABLED: bool = parse_bool_env("MINOR_ACCOUNTS_ENABLED", False)
     ADMIN_SECRET: str = os.getenv("ADMIN_SECRET", "")
     # Comma-separated emails allowed to approve/reject recruiter accounts.
     ADMIN_EMAILS: str = os.getenv("ADMIN_EMAILS", "")

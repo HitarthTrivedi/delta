@@ -26,7 +26,9 @@ from app.services.domain_packs import get_domain_pack
 from app.services.sandbox_common import bump_skill
 from app.services.central_engine import log_journey_event
 
-router = APIRouter(prefix="/api/sandbox/interview", tags=["sandbox-interview"])
+from app.dependencies.auth import block_minor_ai  # noqa: E402
+
+router = APIRouter(prefix="/api/sandbox/interview", tags=["sandbox-interview"], dependencies=[Depends(block_minor_ai)])
 logger = logging.getLogger("delta.interview")
 
 GOOGLE_TTS_URL = "https://texttospeech.googleapis.com/v1beta1/text:synthesize"

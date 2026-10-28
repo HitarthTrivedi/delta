@@ -2,9 +2,9 @@
 
 Recruiters are separate accounts (table `recruiters`) on the same Supabase
 auth. They see nothing until an admin approves them, and even then only
-students who have opted in (latest `recruiter_visibility` consent = granted,
-on the current policy version). Every full-profile view is logged and shown
-to the student.
+opted-in students in their pool (`compliance.recruiter_visible_ids`):
+campus recruiters see students of colleges that linked them; open recruiters
+see solo students. Every full-profile view is logged and shown to the student.
 """
 import datetime
 import json
@@ -18,6 +18,7 @@ from typing import Optional
 from app.database import get_db
 from app.limiter import limiter
 from app.dependencies.auth import current_identity
+from app.models.college import Batch, College, CollegeAdmin, CollegeMember, CollegeRecruiter
 from app.models.compliance import Recruiter, RecruiterProfileView
 from app.models.sandbox_session import SandboxSession
 from app.models.skill_node import SkillNode
@@ -51,6 +52,7 @@ class Preferences(BaseModel):
 
 class ReviewPayload(BaseModel):
     approve: bool
+    pool: Optional[str] = Field(default=None, pattern="^(open|campus)$")
 
 
 # ── Guards ──────────────────────────────────────────────────────────────────
@@ -75,14 +77,19 @@ def require_admin(identity=Depends(current_identity)) -> str:
     return identity[0]
 
 
-def _recruiter_dict(rec: Recruiter) -> dict:
-    return {
+def _recruiter_dict(rec: Recruiter, db: Session | None = None) -> dict:
+    out = {
         "id": rec.id, "email": rec.email, "name": rec.name, "company": rec.company,
         "designation": rec.designation, "company_website": rec.company_website,
-        "status": rec.status,
+        "status": rec.status, "pool": rec.pool or "open",
         "preferences": json.loads(rec.preferences) if rec.preferences else None,
         "created_at": rec.created_at.isoformat() if rec.created_at else None,
     }
+    if db is not None:
+        out["linked_colleges"] = [c.name for c in db.query(College).join(
+            CollegeRecruiter, CollegeRecruiter.college_id == College.id).filter(
+            CollegeRecruiter.recruiter_id == rec.id, CollegeRecruiter.status == "active").all()]
+    return out
 
 
 # ── Account ─────────────────────────────────────────────────────────────────
@@ -98,6 +105,8 @@ def register(request: Request, payload: RegisterPayload, identity=Depends(curren
     student = db.query(User).filter(User.id == user_id).first()
     if student and student.profile_data:
         raise HTTPException(status_code=409, detail="This login is a student account. Please register as a recruiter with a separate work email.")
+    if db.query(CollegeAdmin).filter(CollegeAdmin.user_id == user_id, CollegeAdmin.status != "removed").first():
+        raise HTTPException(status_code=409, detail="This login is a college staff account. Please use a separate work email.")
 
     rec = Recruiter(
         id=user_id, email=email, name=payload.name.strip(), company=payload.company.strip(),
@@ -115,7 +124,7 @@ def register(request: Request, payload: RegisterPayload, identity=Depends(curren
 @router.get("/me")
 def me(identity=Depends(current_identity), db: Session = Depends(get_db)):
     rec = _recruiter_or_404(db, identity[0])
-    out = _recruiter_dict(rec)
+    out = _recruiter_dict(rec, db)
     out["is_admin"] = compliance.is_admin(identity[1])
     return out
 
@@ -167,8 +176,23 @@ def _overall(summary: dict) -> Optional[int]:
     return round(sum(v["average"] for v in summary.values()) / len(summary))
 
 
-def _public_profile(user: User, profile: dict) -> dict:
-    return {
+def _campus_education(db: Session, ids) -> dict[str, dict]:
+    """College-confirmed education for students on a college seat."""
+    ids = list(ids)
+    if not ids:
+        return {}
+    rows = (db.query(CollegeMember, College, Batch)
+            .join(College, College.id == CollegeMember.college_id)
+            .outerjoin(Batch, Batch.id == CollegeMember.batch_id)
+            .filter(CollegeMember.user_id.in_(ids), CollegeMember.status == "active").all())
+    return {m.user_id: {"institution": c.name, "major": b.branch if b else None,
+                        "year": b.grad_year if b else None, "stage": "College student",
+                        "verified_by_college": bool(m.verified)}
+            for m, c, b in rows}
+
+
+def _public_profile(user: User, profile: dict, campus: dict | None = None) -> dict:
+    out = {
         "id": user.id,
         "name": profile.get("name") or user.name,
         "target_role": profile.get("target_role") or user.target_role,
@@ -186,6 +210,9 @@ def _public_profile(user: User, profile: dict) -> dict:
             "stage": profile.get("education_stage"),
         },
     }
+    if campus:
+        out["education"] = campus
+    return out
 
 
 def _score_candidate(prefs: Preferences, target_role: str, skills: list[SkillNode], summary: dict, theory_skills: dict) -> dict:
@@ -233,12 +260,12 @@ def _score_candidate(prefs: Preferences, target_role: str, skills: list[SkillNod
 @router.post("/search")
 @limiter.limit("30/minute")
 def search(request: Request, prefs: Preferences, rec: Recruiter = Depends(require_approved_recruiter), db: Session = Depends(get_db)):
-    ids = compliance.visible_student_ids(db)
-    ids.discard(rec.id)
+    ids = compliance.recruiter_visible_ids(db, rec)
     if not ids:
         return {"candidates": [], "total_visible": 0}
 
     users = db.query(User).filter(User.id.in_(ids)).all()
+    campus = _campus_education(db, ids)
     skills_by_user: dict[str, list[SkillNode]] = {}
     for sk in db.query(SkillNode).filter(SkillNode.user_id.in_(ids)).all():
         skills_by_user.setdefault(sk.user_id, []).append(sk)
@@ -254,7 +281,7 @@ def search(request: Request, prefs: Preferences, rec: Recruiter = Depends(requir
         except ValueError:
             profile = {}
         summary, theory_skills = _sandbox_summary(sessions_by_user.get(user.id, []))
-        card = _public_profile(user, profile)
+        card = _public_profile(user, profile, campus.get(user.id))
         match = _score_candidate(prefs, card["target_role"], skills_by_user.get(user.id, []), summary, theory_skills)
         overall = match["overall_sandbox_score"]
         if prefs.min_score is not None and (overall is None or overall < prefs.min_score):
@@ -275,7 +302,7 @@ def search(request: Request, prefs: Preferences, rec: Recruiter = Depends(requir
 @router.get("/candidates/{student_id}")
 @limiter.limit("60/minute")
 def candidate_detail(request: Request, student_id: str, rec: Recruiter = Depends(require_approved_recruiter), db: Session = Depends(get_db)):
-    if student_id not in compliance.visible_student_ids(db):
+    if not compliance.can_recruiter_see(db, rec, student_id):
         raise HTTPException(status_code=404, detail="This candidate is not available.")
     user = db.query(User).filter(User.id == student_id).first()
     if not user:
@@ -298,7 +325,7 @@ def candidate_detail(request: Request, student_id: str, rec: Recruiter = Depends
     skills = db.query(SkillNode).filter(SkillNode.user_id == student_id).order_by(SkillNode.proficiency.desc()).all()
 
     return {
-        **_public_profile(user, profile),
+        **_public_profile(user, profile, _campus_education(db, [student_id]).get(student_id)),
         "email": profile.get("email") or _supabase_admin_email(student_id),
         "links": {label: profile.get(key) for label, key in (("LinkedIn", "linkedin_url"), ("GitHub", "github_url"), ("Portfolio", "portfolio_url")) if profile.get(key)},
         "skills": [{"name": s.name, "proficiency": s.proficiency} for s in skills],
@@ -329,6 +356,11 @@ def admin_list(status: str = "pending", _: str = Depends(require_admin), db: Ses
 def admin_review(recruiter_id: str, payload: ReviewPayload, _: str = Depends(require_admin), db: Session = Depends(get_db)):
     rec = _recruiter_or_404(db, recruiter_id)
     rec.status = "approved" if payload.approve else "rejected"
+    if payload.pool:
+        rec.pool = payload.pool
     rec.reviewed_at = datetime.datetime.utcnow()
     db.commit()
-    return _recruiter_dict(rec)
+    if rec.status == "approved":
+        from app.services import college
+        college.activate_recruiter_links(db, rec)
+    return _recruiter_dict(rec, db)

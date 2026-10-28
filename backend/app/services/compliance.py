@@ -23,7 +23,7 @@ from app.services.reminder_service import _supabase_base_url
 
 logger = logging.getLogger("delta.compliance")
 
-POLICY_VERSION = "2026-10-25.2"
+POLICY_VERSION = "2026-10-26"
 
 TERMS = "terms_privacy"
 RECRUITER_VISIBILITY = "recruiter_visibility"
@@ -35,6 +35,14 @@ LEADERBOARD_VISIBILITY = "leaderboard_visibility"  # opt-in weekly leagues
 STUDY_CIRCLES = "study_circles"  # opt-in private study groups
 REFERRAL_LINK = "referral_link"  # invited learner agrees to be linked to their inviter
 RECRUITER_HABIT_BADGE = "recruiter_habit_badge"  # opt-in "Consistent learner" badge for recruiters
+COLLEGE_ENROLLMENT = "college_enrollment"  # student joins a college (subject_id = college id)
+COLLEGE_ADMIN_TERMS = "college_admin_terms"  # college staff accept their duties
+PARENTAL_CONSENT_MINOR = "parental_consent_minor"  # under-18 college student's parent/college consent
+ADULT_RECONSENT = "adult_reconsent"  # a former minor's own consent after turning 18
+
+ADULT_AGE = 18
+# Membership states that tie a student to a college (and keep them out of the open pool).
+IN_COLLEGE_STATES = ("pending", "active")
 
 # Tables that are deliberately kept (pseudonymous) after erasure, or handled separately.
 _RETAINED_TABLES = {"consent_records", "recruiter_profile_views", "users"}
@@ -69,9 +77,10 @@ def has_current_terms_consent(db: Session, user_id: str) -> bool:
     return bool(rec and rec.action == "granted" and rec.policy_version == POLICY_VERSION)
 
 
-def visible_student_ids(db: Session) -> set[str]:
-    """Students whose latest recruiter-visibility event is 'granted' AND who
-    have accepted the current Terms/Privacy version."""
+def opted_in_ids(db: Session) -> set[str]:
+    """Users whose latest recruiter-visibility event is 'granted' AND who have
+    accepted the current Terms/Privacy version. Recruiters never search this
+    directly: they go through `recruiter_visible_ids` (pools)."""
     rows = db.query(ConsentRecord).filter(
         ConsentRecord.purpose.in_([RECRUITER_VISIBILITY, TERMS])
     ).order_by(ConsentRecord.created_at.asc()).all()
@@ -86,6 +95,133 @@ def visible_student_ids(db: Session) -> set[str]:
         if terms and terms.action == "granted" and terms.policy_version == POLICY_VERSION:
             visible.add(uid)
     return visible
+
+
+# ── recruiter pools ──────────────────────────────────────────────────────────
+# Two separate pools, never mixed:
+#   campus: opted-in active students of live colleges that linked this recruiter
+#   open:   opted-in solo students (in no college, not a working professional)
+# Minors, professionals, recruiters and college staff are never in any pool.
+
+def age_on(dob: datetime.date, today: datetime.date) -> int:
+    return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+
+def is_minor(user: User | None, today: datetime.date | None = None) -> bool:
+    dob = getattr(user, "date_of_birth", None)
+    return bool(dob) and age_on(dob, today or datetime.date.today()) < ADULT_AGE
+
+
+def college_is_live(college, today: datetime.date | None = None) -> bool:
+    today = today or datetime.date.today()
+    return bool(college) and college.status == "active" and (
+        college.licence_valid_until is None or college.licence_valid_until >= today)
+
+
+def _staff_ids(db: Session, ids: set[str]) -> set[str]:
+    from app.models.college import CollegeAdmin
+    if not ids:
+        return set()
+    recruiters = {r.id for r in db.query(Recruiter.id).filter(Recruiter.id.in_(ids)).all()}
+    admins = {a.user_id for a in db.query(CollegeAdmin.user_id)
+              .filter(CollegeAdmin.user_id.in_(ids), CollegeAdmin.status != "removed").all()}
+    return recruiters | admins
+
+
+def _pool_facts(db: Session, ids: set[str]) -> dict[str, dict]:
+    """For each id: is_minor, professional, membership (status, college live, college id)."""
+    from app.models.college import College, CollegeMember
+    if not ids:
+        return {}
+    today = datetime.date.today()
+    facts = {}
+    for u in db.query(User).filter(User.id.in_(ids)).all():
+        try:
+            profile = json.loads(u.profile_data or "{}")
+        except ValueError:
+            profile = {}
+        facts[u.id] = {"minor": is_minor(u, today), "professional": profile.get("audience") == "professional",
+                       "member": None}
+    rows = (db.query(CollegeMember, College).join(College, College.id == CollegeMember.college_id)
+            .filter(CollegeMember.user_id.in_(ids), CollegeMember.status.in_(IN_COLLEGE_STATES)).all())
+    for m, c in rows:
+        if m.user_id in facts:
+            facts[m.user_id]["member"] = {"status": m.status, "college_id": c.id, "live": college_is_live(c, today)}
+    return facts
+
+
+def recruiter_pool_for(db: Session, user_id: str) -> tuple[str | None, str]:
+    """Which pool a learner would be in if they opt in, and why (for the UI)."""
+    if _staff_ids(db, {user_id}):
+        return None, "staff"
+    facts = _pool_facts(db, {user_id}).get(user_id)
+    if facts is None:
+        return None, "no_account"
+    if facts["minor"]:
+        return None, "minor"
+    member = facts["member"]
+    if member:
+        if member["status"] == "active" and member["live"]:
+            return "campus", "college"
+        return None, "college_pending"
+    if facts["professional"]:
+        return None, "professional"
+    return "open", "solo"
+
+
+def recruiter_visible_ids(db: Session, recruiter: Recruiter) -> set[str]:
+    """The only way a recruiter reaches students: the opted-in learners in
+    this recruiter's pool."""
+    from app.models.college import CollegeRecruiter
+    base = opted_in_ids(db) - {recruiter.id}
+    base -= _staff_ids(db, base)
+    facts = _pool_facts(db, base)
+    if (recruiter.pool or "open") == "campus":
+        linked = {link.college_id for link in db.query(CollegeRecruiter).filter(
+            CollegeRecruiter.recruiter_id == recruiter.id, CollegeRecruiter.status == "active").all()}
+        return {uid for uid, f in facts.items()
+                if not f["minor"] and f["member"] and f["member"]["status"] == "active"
+                and f["member"]["live"] and f["member"]["college_id"] in linked}
+    return {uid for uid, f in facts.items() if not f["minor"] and not f["member"] and not f["professional"]}
+
+
+def can_recruiter_see(db: Session, recruiter: Recruiter, student_id: str) -> bool:
+    return student_id in recruiter_visible_ids(db, recruiter)
+
+
+def withdraw_recruiter_visibility(db: Session, user_id: str) -> None:
+    """Pool changed (joined/left a college, seat removed, licence ended): the
+    learner's opt-in was for a different audience, so it switches off."""
+    for purpose in (RECRUITER_VISIBILITY, RECRUITER_HABIT_BADGE):
+        rec = latest_consent(db, user_id, purpose)
+        if rec and rec.action == "granted":
+            record_consent(db, user_id, purpose, False)
+
+
+def access_ok(db: Session, user: User | None) -> bool:
+    """Current terms, plus: a minor needs current parental consent; a former
+    minor who has turned 18 needs their own consent given after their birthday."""
+    if not user or not has_current_terms_consent(db, user.id):
+        return False
+    dob = user.date_of_birth
+    if not dob:
+        return True
+    if is_minor(user):
+        rec = latest_consent(db, user.id, PARENTAL_CONSENT_MINOR)
+        return bool(rec and rec.action == "granted")
+    return not needs_adult_reconsent(db, user)
+
+
+def needs_adult_reconsent(db: Session, user: User) -> bool:
+    dob = user.date_of_birth
+    if not dob or is_minor(user):
+        return False
+    try:
+        birthday = dob.replace(year=dob.year + ADULT_AGE)
+    except ValueError:  # 29 February
+        birthday = dob.replace(year=dob.year + ADULT_AGE, day=28)
+    rec = latest_consent(db, user.id, ADULT_RECONSENT)
+    return not (rec and rec.action == "granted" and rec.created_at.date() >= birthday)
 
 
 def granted_user_ids(db: Session, purpose: str, user_ids) -> set[str]:
@@ -155,6 +291,12 @@ def export_user_data(db: Session, user_id: str) -> dict:
         {"company": v.recruiter_company, "viewed_at": v.viewed_at.isoformat() if v.viewed_at else None}
         for v in db.query(RecruiterProfileView).filter(RecruiterProfileView.student_id == user_id).all()
     ]
+    from app.models.college import College, RosterEntry
+    data["college_roster"] = [
+        {k: v for k, v in _row_to_dict(r).items() if k not in ("minor_consent_ref", "attested_by")}
+        | {"college": (db.get(College, r.college_id).name if db.get(College, r.college_id) else None)}
+        for r in db.query(RosterEntry).filter(RosterEntry.claimed_user_id == user_id).all()
+    ]
     return data
 
 
@@ -182,9 +324,13 @@ def delete_auth_user(user_id: str) -> bool:
 
 
 def _erase_user_rows(db: Session, user_id: str) -> None:
+    from app.models.college import RosterEntry
     from app.models.engagement import Referral
     # The one row keyed to another learner: invitations this user sent.
     db.query(Referral).filter(Referral.referrer_id == user_id).delete()
+    # The college keeps its roster row (its own record); only the link to this account goes.
+    db.query(RosterEntry).filter(RosterEntry.claimed_user_id == user_id).update(
+        {RosterEntry.claimed_user_id: None, RosterEntry.claimed_at: None}, synchronize_session=False)
     for table in reversed(_user_tables()):  # dependents before parents
         db.execute(table.delete().where(table.c.user_id == user_id))
     db.query(User).filter(User.id == user_id).delete()
@@ -201,6 +347,8 @@ def erase_student(db: Session, user_id: str) -> None:
 
 
 def erase_recruiter(db: Session, recruiter_id: str) -> None:
+    from app.models.college import CollegeRecruiter
+    db.query(CollegeRecruiter).filter(CollegeRecruiter.recruiter_id == recruiter_id).delete()
     db.query(Recruiter).filter(Recruiter.id == recruiter_id).delete()
     # The student app auto-creates a placeholder `users` row on any visit; drop it too.
     _erase_user_rows(db, recruiter_id)

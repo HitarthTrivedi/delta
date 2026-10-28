@@ -52,6 +52,9 @@ def _why_not(db: Session, user_id: str, inviter: UserEngagement | None) -> str |
     """Why this learner can't link to this invite, or None if they can."""
     if inviter is None:
         return "This invite link is not valid."
+    from app.services.compliance import is_minor
+    if is_minor(db.get(User, user_id)) or is_minor(db.get(User, inviter.user_id)):
+        return "Invite links open up when you turn 18."
     if inviter.user_id == user_id:
         return "That's your own invite link. Share it with a friend!"
     if db.get(Referral, user_id):

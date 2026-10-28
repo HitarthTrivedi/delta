@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.auth import current_identity, require_owner
+from app.dependencies.auth import block_minor_ai, current_identity, require_owner
 from app.services import compliance
 from app.limiter import limiter
 from app.models import (
@@ -110,7 +110,7 @@ def get_career_context(user_id: str, background_tasks: BackgroundTasks, db: Sess
         raise HTTPException(status_code=500, detail=f"Could not load career context: {exc}") from exc
 
 
-@router.post("/user/{user_id}/initialize")
+@router.post("/user/{user_id}/initialize", dependencies=[Depends(block_minor_ai)])
 @limiter.limit("10/hour")
 def initialize_career_os(request: Request, user_id: str, payload: CareerOSInitializeRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
@@ -146,7 +146,7 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
         raise HTTPException(status_code=500, detail=f"Could not save event: {exc}") from exc
 
 
-@router.post("/user/{user_id}/weekly-cycle")
+@router.post("/user/{user_id}/weekly-cycle", dependencies=[Depends(block_minor_ai)])
 @limiter.limit("20/hour")
 def run_weekly_cycle(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
@@ -164,7 +164,7 @@ class TaskDetailRequest(BaseModel):
     skill: str = ""
 
 
-@router.post("/user/{user_id}/task-detail")
+@router.post("/user/{user_id}/task-detail", dependencies=[Depends(block_minor_ai)])
 @limiter.limit("30/minute")
 def get_task_detail(request: Request, user_id: str, payload: TaskDetailRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Generate a detailed how-to breakdown for a specific task using AI."""
@@ -200,7 +200,7 @@ def get_task_detail(request: Request, user_id: str, payload: TaskDetailRequest, 
         raise HTTPException(status_code=500, detail=f"Could not generate task detail: {exc}") from exc
 
 
-@router.post("/user/{user_id}/consolidate-memory")
+@router.post("/user/{user_id}/consolidate-memory", dependencies=[Depends(block_minor_ai)])
 @limiter.limit("10/hour")
 def run_memory_consolidation(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
@@ -331,7 +331,7 @@ def set_plan_style(user_id: str, payload: PlanStyleUpdate, db: Session = Depends
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.get("/user/{user_id}/day-plan")
+@router.get("/user/{user_id}/day-plan", dependencies=[Depends(block_minor_ai)])
 @limiter.limit("30/minute")
 def get_day_plan(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Return the current week's day plan, regenerating it if the week's tasks changed."""
@@ -387,7 +387,7 @@ class AdvanceExpiredRequest(BaseModel):
     carried_task_ids: list[str] = Field(default_factory=list)
 
 
-@router.post("/user/{user_id}/advance-expired-week")
+@router.post("/user/{user_id}/advance-expired-week", dependencies=[Depends(block_minor_ai)])
 @limiter.limit("20/hour")
 def advance_expired_week(request: Request, user_id: str, payload: AdvanceExpiredRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Auto-replan a week whose 7-day window lapsed with tasks unfinished, carrying

@@ -111,6 +111,10 @@ def share(db: Session, user_id: str, key: str) -> str:
     row = db.get(UserBadge, (user_id, key))
     if not row:
         raise LookupError("Earn this badge first, then you can share it.")
+    from app.models.user import User
+    from app.services.compliance import is_minor
+    if is_minor(db.get(User, user_id)):
+        raise LookupError("Public badge links open up when you turn 18.")
     if not row.share_token:
         row.share_token = secrets.token_urlsafe(12)
         db.commit()

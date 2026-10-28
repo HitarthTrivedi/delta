@@ -24,10 +24,11 @@ export default function RecruiterAdmin() {
       });
   }, [tab]);
 
+  const [pools, setPools] = useState({}); // recruiter id -> 'open' | 'campus'
   const review = async (id, approve) => {
     setBusyId(id);
     try {
-      await recruiterAPI.adminReview(id, approve);
+      await recruiterAPI.adminReview(id, approve, approve ? (pools[id] || 'open') : undefined);
       setRows((r) => r.filter((x) => x.id !== id));
       toast.success(approve ? 'Recruiter approved.' : 'Recruiter rejected.');
     } catch (err) {
@@ -84,6 +85,15 @@ export default function RecruiterAdmin() {
                       <p className="m-0 font-mono text-[11px] text-ink-soft mt-1">Registered {r.created_at ? new Date(r.created_at + 'Z').toLocaleDateString() : ''}</p>
                     </div>
                     <div className="flex gap-2">
+                      {tab !== 'approved' && (
+                        <select aria-label="Recruiter pool" value={pools[r.id] || r.pool || 'open'}
+                          onChange={(e) => setPools((p) => ({ ...p, [r.id]: e.target.value }))}
+                          className="px-2 py-2 border border-rule bg-paper text-[12px] text-ink">
+                          <option value="open">Off-campus (sees solo students)</option>
+                          <option value="campus">Campus (sees linked colleges)</option>
+                        </select>
+                      )}
+                      {tab === 'approved' && <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-soft">{r.pool === 'campus' ? 'Campus' : 'Off-campus'}</span>}
                       {tab !== 'approved' && (
                         <button onClick={() => review(r.id, true)} disabled={busyId === r.id} className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-oxblood bg-oxblood text-bone font-mono text-[11px] uppercase tracking-[0.12em] cursor-pointer">
                           {busyId === r.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Approve

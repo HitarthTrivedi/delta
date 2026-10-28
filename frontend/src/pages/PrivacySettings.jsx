@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Download, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { privacyAPI } from '../lib/api';
+import { collegeAPI, privacyAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
 const GRIEVANCE_EMAIL = 'hitartht318@gmail.com';
@@ -11,6 +11,9 @@ const GRIEVANCE_EMAIL = 'hitartht318@gmail.com';
 const PURPOSE_LABEL = {
   terms_privacy: 'Terms of Use & Privacy Policy',
   recruiter_visibility: 'Visible to recruiters',
+  college_enrollment: 'Joined your college on Delta',
+  parental_consent_minor: "Parent or college consent (under 18)",
+  adult_reconsent: 'Your own consent at 18',
   recruiter_terms: 'Recruiter terms',
   parental_consent: 'Parental consent (Delta for School)',
   account_deleted: 'Account deleted',
@@ -24,7 +27,7 @@ const PURPOSE_LABEL = {
 const SHARED = [
   'Your name',
   'Education: institution, field of study, year',
-  'For working professionals: current job, industry and years of experience',
+  'For students on a college seat: your college, branch and graduation year, as confirmed by your college',
   'Target role',
   'Skills and their levels',
   'Practice results: technical test, coding and mock-interview scores, with a per-skill breakdown',
@@ -153,6 +156,8 @@ export default function PrivacySettings() {
   }
 
   const visible = consent.recruiter_visible;
+  const pool = consent.recruiter_pool; // 'campus' | 'open' | null
+  const college = consent.college;
 
   return (
     <main className="min-h-screen bg-bone text-ink px-4 pt-24 pb-16">
@@ -171,9 +176,15 @@ export default function PrivacySettings() {
             <div>
               <h2 className={h2Class}>Visible to recruiters</h2>
               <p className={pClass}>
-                {visible
-                  ? 'You are visible. Approved recruiters can find you in search and open your profile.'
-                  : 'You are hidden. No recruiter can see you.'}
+                {!pool
+                  ? consent.recruiter_pool_reason || 'Not available for your account.'
+                  : visible
+                    ? (pool === 'campus'
+                      ? `You are visible to the recruiters ${college?.college || 'your college'} works with.`
+                      : 'You are visible to verified recruiters hiring off-campus.')
+                    : (pool === 'campus'
+                      ? `You are hidden. If you switch this on, only recruiters ${college?.college || 'your college'} works with can see you.`
+                      : 'You are hidden. If you switch this on, only verified off-campus recruiters can see you (never college-linked ones).')}
               </p>
             </div>
             <span className={`font-mono text-[11px] uppercase tracking-[0.12em] px-2.5 py-1 border ${visible ? 'text-oxblood border-oxblood' : 'text-ink-soft border-rule'}`}>
@@ -192,7 +203,7 @@ export default function PrivacySettings() {
             </div>
           </div>
 
-          <div className="mt-5 pt-5 border-t border-rule flex items-start justify-between gap-4 flex-wrap">
+          {pool && <div className="mt-5 pt-5 border-t border-rule flex items-start justify-between gap-4 flex-wrap">
             <div className="max-w-[520px]">
               <p className="text-[14px] font-semibold text-ink m-0">Optional: "Consistent learner" badge</p>
               <p className={`${pClass} mt-1 text-[13.5px]`}>
@@ -209,9 +220,9 @@ export default function PrivacySettings() {
               {busy === 'recruiter_habit_badge' ? <Loader2 size={14} className="animate-spin" /> : null}
               {consent.recruiter_habit_badge ? 'Turn off' : 'Turn on'}
             </button>
-          </div>
+          </div>}
 
-          <div className="mt-5 pt-5 border-t border-rule">
+          {pool && <div className="mt-5 pt-5 border-t border-rule">
             {visible ? (
               <button
                 onClick={() => setVisibility(false)}
@@ -230,7 +241,8 @@ export default function PrivacySettings() {
                     className="mt-1 w-[17px] h-[17px] shrink-0 cursor-pointer accent-[var(--oxblood)]"
                   />
                   <span>
-                    I consent to Delta sharing the details listed under "Recruiters see" with recruiters that Delta has verified,
+                    I consent to Delta sharing the details listed under "Recruiters see" with recruiters that Delta has verified
+                    ({pool === 'campus' ? `only those ${college?.college || 'my college'} works with` : 'off-campus recruiters only'}),
                     so they can consider me for jobs. I can withdraw this any time.
                   </span>
                 </label>
@@ -243,8 +255,11 @@ export default function PrivacySettings() {
                 </button>
               </>
             )}
-          </div>
+          </div>}
         </section>
+
+        {/* Your college (Delta for College) */}
+        <CollegeSection userId={userId} consent={consent} onChange={setConsent} />
 
         {/* Study reminders (opt-in) */}
         <section className={sectionClass}>
@@ -404,5 +419,92 @@ export default function PrivacySettings() {
         </p>
       </div>
     </main>
+  );
+}
+
+const COLLEGE_SEES = [
+  'Your name and roll number (from its own list)',
+  'Your readiness, practice scores and per-skill results',
+  'How many days you were active, and when you were last active',
+  'Your progress on any plan your college assigns',
+];
+const COLLEGE_NEVER_SEES = [
+  'Your chats with Aria and anything you tell the AI',
+  'Your résumé text, job matches, circles, leagues, XP and streaks',
+  'Whether you are visible to recruiters, and who viewed you',
+];
+
+function CollegeSection({ userId, consent, onChange }) {
+  const navigate = useNavigate();
+  const [code, setCode] = useState('');
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const c = consent.college;
+
+  const leave = async () => {
+    setBusy(true);
+    try {
+      await collegeAPI.leave(userId);
+      onChange(await privacyAPI.getConsent(userId));
+      toast.success('You left your college on Delta. Recruiter visibility was switched off.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not leave right now.');
+    } finally {
+      setBusy(false);
+      setConfirmLeave(false);
+    }
+  };
+
+  return (
+    <section className={sectionClass}>
+      <h2 className={h2Class}>Your college</h2>
+      {!c ? (
+        <>
+          <p className={pClass}>You are not on a college seat. If your college uses Delta, enter the join code your placement office gave you.</p>
+          <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) navigate(`/join-college/${code.trim()}`); }} className="mt-3 flex flex-wrap gap-2">
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Join code" maxLength={16}
+              className="border border-rule bg-paper px-3 py-2 text-[14px] text-ink uppercase" aria-label="College join code" />
+            <button type="submit" className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer`}>Continue</button>
+          </form>
+        </>
+      ) : (
+        <>
+          <p className={pClass}>
+            <strong className="text-ink">{c.college}</strong>{c.batch ? ` · ${c.batch}` : ''}
+            {c.status === 'pending' ? ' · waiting for your placement office to confirm your seat' : c.verified ? ' · confirmed by your college' : ''}
+            {!c.live && ' · your college\'s Delta access isn\'t active right now'}
+          </p>
+          {consent.is_minor && consent.parental_consent && (
+            <p className={`${pClass} mt-2`}>
+              Consent for under-18s: {consent.parental_consent.granted ? 'given' : 'waiting'}
+              {consent.parental_consent.method === 'college_attestation' ? ' (confirmed by your college)' : consent.parental_consent.parent_email ? ` (sent to ${consent.parental_consent.parent_email})` : ''}.
+            </p>
+          )}
+          <div className="grid sm:grid-cols-2 gap-5 mt-4">
+            <div>
+              <p className="text-[13px] font-semibold text-ink m-0 mb-2">Your college sees</p>
+              <ul className="m-0 pl-5 text-[13.5px] text-ink-soft leading-relaxed">{COLLEGE_SEES.map((s) => <li key={s}>{s}</li>)}</ul>
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-ink m-0 mb-2">Your college never sees</p>
+              <ul className="m-0 pl-5 text-[13.5px] text-ink-soft leading-relaxed">{COLLEGE_NEVER_SEES.map((s) => <li key={s}>{s}</li>)}</ul>
+            </div>
+          </div>
+          <div className="mt-5 pt-5 border-t border-rule flex flex-wrap items-center gap-3">
+            {confirmLeave ? (
+              <>
+                <span className="text-[13.5px] text-ink">You'll lose your seat and become a solo learner. Recruiter visibility switches off.</span>
+                <button onClick={leave} disabled={busy} className={`${btnClass} border-oxblood text-oxblood bg-transparent cursor-pointer`}>
+                  {busy && <Loader2 size={14} className="animate-spin" />} Leave college
+                </button>
+                <button onClick={() => setConfirmLeave(false)} className={`${btnClass} border-rule text-ink-soft bg-transparent cursor-pointer`}>Cancel</button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmLeave(true)} className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer`}>Leave college</button>
+            )}
+          </div>
+        </>
+      )}
+    </section>
   );
 }

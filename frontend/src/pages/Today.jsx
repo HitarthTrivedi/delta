@@ -8,7 +8,7 @@ import { useUserWithSkills } from '../hooks/useUser';
 import { engagementKey, useEngagement } from '../hooks/useEngagement';
 import { useCareerContext } from '../hooks/useCareerOS';
 import { getTaskProgress } from '../lib/taskProgress';
-import { circlesAPI, engagementAPI } from '../lib/api';
+import { circlesAPI, collegeAPI, engagementAPI } from '../lib/api';
 import { clearReferral, pendingReferral } from '../lib/referral';
 import { enablePush, pushSupported } from '../lib/push';
 import InterviewerAvatar from '../components/interview/InterviewerAvatar';
@@ -290,6 +290,21 @@ function ReferralCard({ userId }) {
   );
 }
 
+function CollegeCard({ userId }) {
+  const { data } = useQuery({ queryKey: ['college-state', userId], queryFn: () => collegeAPI.studentState(userId),
+    enabled: !!userId, staleTime: 5 * 60 * 1000 });
+  if (!data || data.membership || !data.suggestion) return null;
+  return (
+    <Link to="/join-college" className={`${card} flex items-center justify-between gap-3 p-4 hover:border-ink-soft`}>
+      <span>
+        <span className="block text-sm font-semibold text-ink">{data.suggestion.college} is on Delta</span>
+        <span className="block text-xs text-ink-soft">Your college gave you a seat. Join to get its plan and practice, and campus recruiters.</span>
+      </span>
+      <ArrowRight size={18} className="shrink-0 text-ink-soft" aria-hidden="true" />
+    </Link>
+  );
+}
+
 function FriendsCard({ userId }) {
   const { data } = useQuery({ queryKey: ['circles', userId], queryFn: () => circlesAPI.list(userId), enabled: !!userId, staleTime: 60 * 1000 });
   if (!data) return null;
@@ -435,6 +450,7 @@ export default function Today() {
         )}
 
         <ReferralCard userId={userId} />
+        <CollegeCard userId={userId} />
 
         {!e.study_time && !setupDone && (
           <HabitSetup userId={userId} e={e} onDone={() => { setSetupDone(true); queryClient.invalidateQueries({ queryKey: engagementKey(userId) }); }} />

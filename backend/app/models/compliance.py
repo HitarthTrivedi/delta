@@ -37,6 +37,9 @@ class Recruiter(Base):
     company_website = Column(String, nullable=True)
     status = Column(String, default="pending")  # pending | approved | rejected
     preferences = Column(Text, nullable=True)  # JSON: last saved search preferences
+    # Which students this recruiter can ever see: "campus" = only opted-in students of
+    # colleges that linked them; "open" = only opted-in students not in a college.
+    pool = Column(String, nullable=False, default="open", server_default="open")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     reviewed_at = Column(DateTime, nullable=True)
 

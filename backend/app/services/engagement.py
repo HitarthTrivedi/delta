@@ -563,6 +563,10 @@ def suggested_study_time(db: Session, eng: UserEngagement) -> str | None:
     the time changes only if they accept it."""
     if not eng.study_time or not _valid_hhmm(eng.study_time):
         return None
+    from app.models.user import User
+    from app.services.compliance import is_minor
+    if is_minor(db.get(User, eng.user_id)):  # no behaviour-based suggestions for under-18s
+        return None
     since = local_today(eng) - datetime.timedelta(days=21)
     rows = (db.query(XpEvent.local_date, func.min(XpEvent.created_at))
             .filter(XpEvent.user_id == eng.user_id, XpEvent.local_date >= since)
