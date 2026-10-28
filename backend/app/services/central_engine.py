@@ -2000,6 +2000,17 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
             weekly_focus["phase_name"] = "Profile-based proof sprint"
             weekly_focus["primary_actions"] = _merge_capped_actions(weekly_focus["primary_actions"], proof_actions[:2] + trend_actions[:1], cap=weekly_cap)
             weekly_focus["selection_reason"] = "Matched against resume/project evidence and current skill depth."
+    # A job the learner chose to plan around (Job match) comes first, then the roadmap fills the rest.
+    try:
+        from app.services.job_match import weekly_job_actions
+        job_actions = weekly_job_actions(db, user.id)
+    except Exception as exc:  # a job-match problem must never block the week
+        logging.getLogger("delta.job_match").warning("job tasks skipped for %s: %s", user.id, exc)
+        job_actions = []
+    if job_actions:
+        weekly_focus["primary_actions"] = _merge_capped_actions(
+            job_actions, weekly_focus["primary_actions"], cap=max(weekly_cap, len(job_actions)))
+        weekly_focus["selection_reason"] = "Starts with the skills for the job you're aiming at, then your roadmap."
     if should_cycle_break:
         # Check we haven't had a break too recently (< 14 days)
         dest_so_far = _as_json(roadmap.destination if roadmap else "{}", {})

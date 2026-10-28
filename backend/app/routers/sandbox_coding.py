@@ -5,6 +5,8 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from app.services import integrity
+from app.services.integrity import IntegrityPayload
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -34,6 +36,7 @@ class RunPayload(BaseModel):
 class SubmitPayload(BaseModel):
     language: str
     code: str
+    integrity: Optional[IntegrityPayload] = None
 
 
 def _session_or_404(db: Session, user_id: str, session_id: str) -> SandboxSession:
@@ -165,6 +168,7 @@ def submit_session_code(
     # too (a completed problem alone would always read as 100).
     data["submissions"] = int(data.get("submissions") or 0) + 1
     data["best_pass_pct"] = max(int(data.get("best_pass_pct") or 0), round(100 * passed_count / total))
+    integrity.record(data, payload.integrity)
     session.data = json.dumps(data)
     db.commit()
 
@@ -187,7 +191,8 @@ def submit_session_code(
             impact={"sandbox_session_id": session.id, "tests_passed": f"{passed_count}/{total}"},
         )
 
-    return {"passed": passed_count, "total": total, "all_passed": all_passed, "results": results}
+    return {"passed": passed_count, "total": total, "all_passed": all_passed, "results": results,
+            "integrity": integrity.notes(session)}
 
 
 @router.get("/{user_id}/sessions")

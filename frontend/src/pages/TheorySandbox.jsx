@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { sandboxTheoryAPI } from '../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { refreshEngagement } from '../hooks/useEngagement';
+import useSessionSignals from '../hooks/useSessionSignals';
+import IntegrityNote from '../components/IntegrityNote';
 import { useAuthStore } from '../store/authStore';
 
 const panelStyle = {
@@ -72,6 +74,7 @@ export default function TheorySandbox() {
   const [result, setResult] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
   const deadlineRef = useRef(null);
+  const signals = useSessionSignals(stage === 'test' ? sessionId : null);
 
   useEffect(() => {
     if (!userId || stage !== 'setup') return;
@@ -85,7 +88,7 @@ export default function TheorySandbox() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const data = await sandboxTheoryAPI.submit(userId, sessionId, answers);
+      const data = await sandboxTheoryAPI.submit(userId, sessionId, answers, signals.snapshot());
       refreshEngagement(queryClient, userId);
       deadlineRef.current = null;
       setTimeLeft(null);
@@ -97,7 +100,7 @@ export default function TheorySandbox() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, userId, sessionId, answers, queryClient]);
+  }, [submitting, userId, sessionId, answers, queryClient, signals]);
 
   // Countdown for timed tests; auto-submits at zero.
   const submitRef = useRef(submitTest);
@@ -420,6 +423,7 @@ export default function TheorySandbox() {
                 {result.time_taken_seconds != null && ` · ${fmt(result.time_taken_seconds)}${result.time_limit_seconds ? ` of ${fmt(result.time_limit_seconds)}` : ''}`}
                 {result.overtime && ' · over time'}
               </p>
+              <IntegrityNote notes={result.integrity} style={{ justifyContent: 'center', marginTop: 10 }} />
             </header>
 
             <section style={{ ...panelStyle, padding: 20, marginBottom: 14 }}>

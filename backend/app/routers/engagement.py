@@ -107,6 +107,24 @@ def get_badges(user_id: str, db: Session = Depends(get_db), _: str = Depends(req
     return {"badges": badges.listing(db, eng)}
 
 
+@router.post("/{user_id}/badges/{key}/share")
+@limiter.limit("20/minute")
+def share_badge(request: Request, user_id: str, key: str, db: Session = Depends(get_db),
+                _: str = Depends(require_owner)):
+    from app.services import badges
+    try:
+        return {"token": badges.share(db, user_id, key)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/{user_id}/badges/{key}/share")
+def unshare_badge(user_id: str, key: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    from app.services import badges
+    badges.unshare(db, user_id, key)
+    return {"ok": True}
+
+
 class ReferralPayload(BaseModel):
     code: str = Field(min_length=4, max_length=16)
 

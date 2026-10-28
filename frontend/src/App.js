@@ -45,6 +45,8 @@ const WeeklyPlan = lazy(() => import("./pages/WeeklyPlan"));
 const Today = lazy(() => import("./pages/Today"));
 const QuickPractice = lazy(() => import("./pages/QuickPractice"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const VerifyBadge = lazy(() => import("./pages/VerifyBadge"));
+const JobMatch = lazy(() => import("./pages/JobMatch"));
 const ProgressReport = lazy(() => import("./pages/ProgressReport"));
 const ResumePage = lazy(() => import("./pages/ResumePage"));
 const TrophyCabinet = lazy(() => import("./pages/TrophyCabinet"));
@@ -118,7 +120,7 @@ function LayoutWrapper({ children }) {
   }
 
   const isLanding = location.pathname === "/";
-  const isLogin = location.pathname === "/login" || location.pathname === "/unsubscribe" || isRecruiterArea || location.pathname.startsWith("/school/learn");
+  const isLogin = location.pathname === "/login" || location.pathname === "/unsubscribe" || location.pathname.startsWith("/v/") || isRecruiterArea || location.pathname.startsWith("/school/learn");
   const isPublicPage = ["/about", "/careers", "/contact", "/partners", "/investors", "/early-access"].includes(location.pathname);
 
   return (
@@ -199,6 +201,7 @@ function AppContent() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
+        <Route path="/v/:token" element={<VerifyBadge />} />
         <Route path="/recruiter/login" element={<LoginPage variant="recruiter" />} />
         <Route path="/recruiter" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterPortal /></RequireSignedIn>} />
         <Route path="/recruiter/admin" element={<RequireSignedIn loginPath="/recruiter/login"><RecruiterAdmin /></RequireSignedIn>} />
@@ -221,6 +224,7 @@ function AppContent() {
         <Route path="/achievements" element={<RequireAuth><ProtectedRoute><TrophyCabinet /></ProtectedRoute></RequireAuth>} />
         <Route path="/league" element={<RequireAuth><ProtectedRoute><League /></ProtectedRoute></RequireAuth>} />
         <Route path="/circles" element={<RequireAuth><ProtectedRoute><Circles /></ProtectedRoute></RequireAuth>} />
+        <Route path="/jobs" element={<RequireAuth><ProtectedRoute><JobMatch /></ProtectedRoute></RequireAuth>} />
         <Route path="/circles/join/:code" element={<RequireAuth><ProtectedRoute><CircleJoin /></ProtectedRoute></RequireAuth>} />
         <Route path="/opportunities" element={<RequireAuth><ProtectedRoute><Opportunities /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice" element={<RequireAuth><ProtectedRoute><PracticeHub /></ProtectedRoute></RequireAuth>} />

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated:** 25 October 2026 · **Policy version:** 2026-10-25
+**Last updated:** 25 October 2026 · **Policy version:** 2026-10-25.2
 
 This Privacy Policy explains how Delta collects, uses, shares and protects your personal data. It is written to comply with India's **Digital Personal Data Protection Act, 2023** (the "DPDP Act") and the rules made under it, and, where applicable, the Information Technology Act, 2000.
 
@@ -49,7 +49,9 @@ What you write to Delta's AI agents (intake, weekly planning, mock interviews), 
 Your roadmap, weekly tasks, completions, progress history and your Delta Score. For the daily habit features: the days you studied, your streak, XP and level, your daily goal and the study time you chose, your answers in the daily Quick 5 review (to decide when each question comes back), your daily quests and the badges you earn, if you join weekly leagues your league and weekly XP, if you join study circles the circles you are in, if you joined with a friend's invite link who invited you, and, if you turn reminders on, your reminder settings, the browser push address of each device you allowed, and for each reminder which wording we used and whether you studied that day (to learn which wording helps most). **XP, streaks, badges and leagues never change your test or interview scores, and recruiters never see them.** The one exception is optional: if you turn on the "Consistent learner" badge, recruiters who can already see you also see a yes/no badge when you studied on 20 or more of the last 30 days (Section 6).
 
 ### 3.6 Practice and assessment data
-Your answers and results from the technical tests, the code you submit in the coding sandbox, your mock-interview transcripts, and the resulting scores, including a per-skill breakdown.
+Your answers and results from the technical tests, the code you submit in the coding sandbox, your mock-interview transcripts, and the resulting scores, including a per-skill breakdown. For each session we also note how it was taken: whether a test was timed, how long it took, and, as counted by your browser, how often you left the tab and how much you pasted. You see these notes on your results.
+
+If you use **Job match**, we keep the jobs you analysed: the role and the skills read from the ad, not the text you pasted. If you **share a badge**, we keep the link you created until you turn it off.
 
 ### 3.7 Consent and transparency records
 What you consented to, which policy version, and when, plus a log of which recruiters opened your profile (Section 6).
@@ -77,6 +79,7 @@ We process your data **only with your consent**, for these specific purposes:
 | **Run your learning plan** | Build and adapt your roadmap and weekly tasks from your goals and progress. |
 | **AI features** | Generate plans, answers, tests, interview questions, feedback and résumé suggestions. |
 | **Practice and scoring** | Run tests and code, grade them, and show your results and skill levels. |
+| **Job match** (only when you use it) | Read a job ad you paste with AI (the ad only, never your profile), compare its skills with yours on our own server, and add tasks to your plan if you choose. |
 | **Progress, daily habit and reminders** | Track your progress, streaks and XP, and (only if you switch them on, a separate consent you can withdraw any time) send you at most one study reminder a day by email or browser notification. |
 | **Weekly leagues** (separate, optional consent) | Place you in a weekly league of up to 20 learners, ranked by the XP earned that week. Other members see only your first name, last initial and weekly XP. **Only if you join**; leaving removes you straight away. |
 | **Recruiter visibility** (separate, optional consent) | Show your candidate profile to verified recruiters, **only if you switch this on** (Section 6). The "Consistent learner" badge is a further optional consent of its own. |
@@ -84,6 +87,7 @@ We process your data **only with your consent**, for these specific purposes:
 | **Delta for School** (parental consent) | Show a child the reviewed lessons for their class, and record quiz scores so the child and parent can see progress. Nothing else. |
 | **Security** | Authenticate you, stop one user from reaching another's data, prevent abuse, fix errors. |
 | **Study circles** (separate, optional consent) | Let you study with a few friends you invite (up to 6). Other members see only your first name, last initial, whether you studied today and your study days this week. **Only if you start or join a circle**; leaving removes you straight away. |
+| **Sharing a badge** (your choice) | Create a public link for a badge you earned. Anyone with the link sees your first name, last initial, the badge and when you earned it. Turn it off any time and the link stops working. |
 | **Invite a friend** (optional) | Give you a personal invite link. If a friend joins with it and links up (their own choice), you see their first name and last initial and when you both earn the reward (a streak freeze each). |
 | **Improving Delta** | Understand how features are used from our **own** records (for example, how many learners come back after a week), in **aggregated** form. We use no third-party analytics or tracking tools. |
 
@@ -113,6 +117,7 @@ Recruiters **cannot see you** unless you turn on **"Visible to recruiters"** in 
   - target role;
   - skills and their levels;
   - practice results (technical test, coding and mock-interview scores, with a per-skill breakdown);
+  - how each practice session was taken: whether it was timed, and notes such as leaving the tab or pasting code (the same notes you see on your results);
   - your email address and any LinkedIn / GitHub / portfolio links you added, so they can contact you;
   - **only if you also turn on the optional "Consistent learner" badge:** that badge, when you studied on 20 or more of the last 30 days. It is a yes or no only.
 - **What they never see:** your conversations with Delta's AI, your personal introduction/backstory, résumé text, weekly plans, progress notes, phone number, GPA, or your XP, streak, badges and league standing.

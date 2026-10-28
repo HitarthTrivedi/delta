@@ -343,6 +343,11 @@ function CandidateDetail({ id, onClose }) {
                 ))}
               </div>
             )}
+            {d.integrity?.sessions > 0 && (
+              <p className="text-[12.5px] text-ink-soft mt-2 mb-0" title="Tab and paste counts come from the candidate's browser: treat them as signals, not proof. Timing comes from Delta's server.">
+                {d.integrity.timed} of {d.integrity.sessions} sessions timed · {d.integrity.with_notes === 0 ? 'no integrity notes' : `${d.integrity.with_notes} with integrity notes (see below)`}
+              </p>
+            )}
 
             {Object.keys(d.theory_skill_breakdown || {}).length > 0 && (
               <>
@@ -371,9 +376,15 @@ function CandidateDetail({ id, onClose }) {
                 <h3 className="font-display text-[20px] text-ink mt-7 mb-2">Recent sessions</h3>
                 <ul className="m-0 p-0 list-none grid gap-1.5">
                   {d.recent_sessions.map((s, i) => (
-                    <li key={i} className="flex justify-between gap-3 text-[13px] border-b border-rule pb-1.5">
-                      <span className="text-ink truncate">{s.title}</span>
-                      <span className="text-ink-soft shrink-0">{s.score}/100</span>
+                    <li key={i} className="text-[13px] border-b border-rule pb-1.5">
+                      <div className="flex justify-between gap-3">
+                        <span className="text-ink truncate">
+                          {s.title}
+                          {s.timed && <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] px-1.5 py-0.5 border border-rule text-ink-soft">Timed</span>}
+                        </span>
+                        <span className="text-ink-soft shrink-0">{s.score}/100</span>
+                      </div>
+                      {s.flags?.length > 0 && <p className="m-0 mt-0.5 text-[12px] text-ink-soft">{s.flags.join(' · ')}</p>}
                     </li>
                   ))}
                 </ul>

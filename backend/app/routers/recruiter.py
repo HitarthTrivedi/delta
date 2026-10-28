@@ -22,7 +22,7 @@ from app.models.compliance import Recruiter, RecruiterProfileView
 from app.models.sandbox_session import SandboxSession
 from app.models.skill_node import SkillNode
 from app.models.user import User
-from app.services import compliance, engagement
+from app.services import compliance, engagement, integrity
 from app.services.reminder_service import _supabase_admin_email
 from app.services.readiness import compute_readiness
 from app.services.domain_packs import resolve_field
@@ -308,9 +308,11 @@ def candidate_detail(request: Request, student_id: str, rec: Recruiter = Depends
         "readiness": {k: v for k, v in compute_readiness(db, student_id).items() if k in ("readiness", "label", "coverage", "coverage_total", "by_type", "rubric", "applicable_types")},
         "recent_sessions": [
             {"type": s.type, "title": s.title, "score": s.score,
-             "completed_at": s.completed_at.isoformat() if s.completed_at else None}
+             "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+             **integrity.notes(s)}
             for s in sessions[:20]
         ],
+        "integrity": integrity.summary(sessions),
         "consistent_learner": student_id in engagement.consistent_learners(db, [student_id]),
     }
 

@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { sandboxCodingAPI } from '../lib/api';
 import { refreshEngagement } from '../hooks/useEngagement';
+import useSessionSignals from '../hooks/useSessionSignals';
+import IntegrityNote from '../components/IntegrityNote';
 import { useAuthStore } from '../store/authStore';
 
 const panelStyle = {
@@ -32,6 +34,7 @@ export default function CodingSandbox() {
 
   // Active problem/session state
   const [session, setSession] = useState(null); // {session_id, title, topic, difficulty, statement, examples, starter_code}
+  const signals = useSessionSignals(session?.session_id || null);
   const [starting, setStarting] = useState(false);
   const [language, setLanguage] = useState('python');
   const [code, setCode] = useState('');
@@ -114,7 +117,7 @@ export default function CodingSandbox() {
     setSubmitting(true);
     setSubmitResult(null);
     try {
-      const result = await sandboxCodingAPI.submit(userId, session.session_id, language, code);
+      const result = await sandboxCodingAPI.submit(userId, session.session_id, language, code, signals.snapshot());
       setSubmitResult(result);
       if (result.all_passed) {
         toast.success('All test cases passed!');
@@ -282,6 +285,9 @@ export default function CodingSandbox() {
                   theme="vs-dark"
                   value={code}
                   onChange={(v) => setCode(v ?? '')}
+                  onMount={(editor) => {
+                    editor.onDidPaste((e) => signals.notePaste(editor.getModel()?.getValueInRange(e.range) || ''));
+                  }}
                   options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false, automaticLayout: true }}
                 />
 
@@ -321,6 +327,7 @@ export default function CodingSandbox() {
                           ))}
                         </div>
                       )}
+                      {submitResult.integrity && <IntegrityNote notes={submitResult.integrity} style={{ marginTop: 10, fontFamily: 'inherit' }} />}
                     </div>
                   )}
                 </div>
