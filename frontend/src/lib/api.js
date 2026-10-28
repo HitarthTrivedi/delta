@@ -379,6 +379,10 @@ export const collegeAPI = {
   recruiters: (cid) => api.get(`/college/${cid}/recruiters`).then(r => r.data),
   linkRecruiter: (cid, email) => api.post(`/college/${cid}/recruiters`, { email }).then(r => r.data),
   revokeRecruiter: (cid, id) => api.delete(`/college/${cid}/recruiters/${id}`).then(r => r.data),
+  overview: (cid) => api.get(`/college/${cid}/overview`).then(r => r.data),
+  batchDashboard: (cid, bid) => api.get(`/college/${cid}/batches/${bid}/dashboard`).then(r => r.data),
+  student: (cid, userId) => api.get(`/college/${cid}/students/${userId}`).then(r => r.data),
+  exportCsv: (cid, kind, params) => api.get(`/college/${cid}/exports/${kind}.csv`, { params, responseType: 'blob', timeout: 120000 }).then(r => r.data),
   // students
   studentState: (userId) => api.get(`/college/student/${userId}`).then(r => r.data),
   preview: (code) => api.get(`/college/join/${encodeURIComponent(code)}/preview`).then(r => r.data),
