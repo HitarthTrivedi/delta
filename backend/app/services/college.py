@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 from app.models.college import Batch, College, CollegeAdmin, CollegeMember, CollegeRecruiter, RosterEntry
 from app.models.compliance import Recruiter
 from app.models.user import User
-from app.services import compliance
+from app.services import college_assignments, compliance
 
 ROLES = ("tpo", "faculty")
 PROGRAMS = ("first_year_4y", "placement_6m", "none")
@@ -237,7 +237,7 @@ def batch_dict(db: Session, b: Batch) -> dict:
     return {"id": b.id, "name": b.name, "course": b.course, "duration_years": b.duration_years,
             "grad_year": b.grad_year, "branch": b.branch, "section": b.section, "program": b.program,
             "join_code": b.join_code, "join_code_active": b.join_code_active, "members": members,
-            "roster": roster, "archived": bool(b.archived_at)}
+            "roster": roster, "archived": bool(b.archived_at), "template": college_assignments.batch_template(db, b)}
 
 
 def _batch_name(grad_year, branch, section, course=None) -> str:
@@ -491,6 +491,7 @@ def approve_member(db: Session, college_id: str, member_id: str) -> dict:
         raise ValueError("Only students waiting for approval can be approved.")
     m.status, m.verified = "active", True
     db.commit()
+    college_assignments.on_member_active(db, m)
     return _member_dict(db, m)
 
 
@@ -499,6 +500,7 @@ def _end_membership(db: Session, m: CollegeMember, status: str) -> None:
     db.commit()
     compliance.record_consent(db, m.user_id, compliance.COLLEGE_ENROLLMENT, False, subject_id=m.college_id)
     compliance.withdraw_recruiter_visibility(db, m.user_id)
+    college_assignments.on_member_left(db, m)
 
 
 def remove_member(db: Session, college_id: str, member_id: str) -> None:
@@ -690,6 +692,7 @@ def join(db: Session, user_id: str, email: str | None, *, code: str | None = Non
     compliance.record_consent(db, user_id, compliance.COLLEGE_ENROLLMENT, True, subject_id=college.id)
     compliance.withdraw_recruiter_visibility(db, user_id)
     _prefill_profile(user_id, college, batch)
+    college_assignments.on_member_active(db, membership(db, user_id))
     return student_state(db, user_id, email)
 
 

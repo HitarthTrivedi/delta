@@ -63,6 +63,9 @@ class Batch(Base):
     join_code_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     archived_at = Column(DateTime, nullable=True)
+    # A roadmap the college set for this batch (services/roadmap_catalog.py); members can't stop it.
+    template_id = Column(String, nullable=True)
+    template_target_date = Column(Date, nullable=True)
 
 
 class RosterEntry(Base):
@@ -139,3 +142,24 @@ class ParentalConsentRequest(Base):
     expires_at = Column(DateTime, nullable=True)
     responded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class BatchTestAssignment(Base):
+    """A test the college set for a batch. Generated once (no learner data in
+    the prompt) and stored here with its answer key, which never reaches a
+    student while the test is open."""
+    __tablename__ = "batch_test_assignments"
+
+    id = Column(String, primary_key=True)
+    college_id = Column(String, ForeignKey("colleges.id"), nullable=False, index=True)
+    batch_id = Column(String, ForeignKey("batches.id"), nullable=False, index=True)
+    title = Column(String, nullable=False)
+    topic = Column(String, nullable=False)
+    category = Column(String, nullable=False, default="technical")  # technical | aptitude
+    difficulty = Column(String, nullable=False, default="medium")
+    questions = Column(Text, nullable=False)  # JSON, with answer_index + explanation
+    time_limit_seconds = Column(Integer, nullable=True)
+    due_date = Column(Date, nullable=True)
+    created_by = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)

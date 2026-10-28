@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies.auth import current_identity, require_owner
 from app.limiter import limiter
-from app.services import college, college_analytics, compliance
+from app.services import college, college_analytics, college_assignments, compliance
 
 router = APIRouter(prefix="/api/college", tags=["college"])
 
@@ -26,6 +26,8 @@ def _run(fn, *args, **kwargs):
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 def require_platform_admin(identity=Depends(current_identity)) -> str:
@@ -131,6 +133,11 @@ class JoinPayload(BaseModel):
 def student_state(user_id: str, _: str = Depends(require_owner), identity=Depends(current_identity),
                   db: Session = Depends(get_db)):
     return college.student_state(db, user_id, identity[1])
+
+
+@router.get("/student/{user_id}/tests")
+def student_tests(user_id: str, _: str = Depends(require_owner), db: Session = Depends(get_db)):
+    return {"tests": college_assignments.student_tests(db, user_id)}
 
 
 @router.get("/join/{code}/preview")
@@ -324,9 +331,63 @@ def get_student(college_id: str, user_id: str, identity=Depends(current_identity
 @router.get("/{college_id}/exports/{kind}.csv")
 @limiter.limit("30/minute")
 def export(request: Request, college_id: str, kind: str, batch_id: Optional[str] = None,
-           identity=Depends(current_identity), db: Session = Depends(get_db)):
+           assignment_id: Optional[str] = None, identity=Depends(current_identity), db: Session = Depends(get_db)):
     _staff(db, identity, college_id)
-    body = _run(college_analytics.export_csv, db, college_id, kind, batch_id)
+    body = _run(college_analytics.export_csv, db, college_id, kind, batch_id, assignment_id=assignment_id)
     name = f"{kind}-{datetime.date.today().isoformat()}.csv"
     return Response(content="﻿" + body, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
+# ── roadmaps and tests set for a batch (Delta for College P4) ────────────────
+
+class BatchTemplatePayload(BaseModel):
+    template_id: Optional[str] = None  # None: stop setting a roadmap for this batch
+    target_date: Optional[datetime.date] = None
+
+
+class BatchTestPayload(BaseModel):
+    topic: Optional[str] = Field(default=None, max_length=120)
+    title: Optional[str] = Field(default=None, max_length=120)
+    category: str = "technical"
+    area: Optional[str] = None
+    difficulty: str = "medium"
+    num_questions: int = 10
+    timed: bool = True
+    due_date: Optional[datetime.date] = None
+
+
+@router.put("/{college_id}/batches/{batch_id}/template")
+def set_batch_template(college_id: str, batch_id: str, payload: BatchTemplatePayload,
+                       identity=Depends(current_identity), db: Session = Depends(get_db)):
+    _staff(db, identity, college_id, write=True)
+    return {"template": _run(college_assignments.set_batch_template, db, college_id, batch_id, payload.template_id,
+                             payload.target_date)}
+
+
+@router.get("/{college_id}/batches/{batch_id}/tests")
+def get_batch_tests(college_id: str, batch_id: str, identity=Depends(current_identity), db: Session = Depends(get_db)):
+    _staff(db, identity, college_id)
+    return {"tests": _run(college_assignments.list_tests, db, college_id, batch_id)}
+
+
+@router.post("/{college_id}/batches/{batch_id}/tests")
+@limiter.limit("10/minute")
+def add_batch_test(request: Request, college_id: str, batch_id: str, payload: BatchTestPayload,
+                   identity=Depends(current_identity), db: Session = Depends(get_db)):
+    _staff(db, identity, college_id, write=True)
+    return _run(college_assignments.create_test, db, college_id, batch_id, by=identity[0], **payload.model_dump())
+
+
+@router.post("/{college_id}/tests/{assignment_id}/close")
+def close_batch_test(college_id: str, assignment_id: str, identity=Depends(current_identity),
+                     db: Session = Depends(get_db)):
+    _staff(db, identity, college_id, write=True)
+    return _run(college_assignments.close_test, db, college_id, assignment_id)
+
+
+@router.get("/{college_id}/tests/{assignment_id}/results")
+def batch_test_results(college_id: str, assignment_id: str, identity=Depends(current_identity),
+                       db: Session = Depends(get_db)):
+    _staff(db, identity, college_id)
+    return _run(college_assignments.results, db, college_id, assignment_id)

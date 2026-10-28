@@ -38,7 +38,7 @@ RISK_TEXT = {
     "low_readiness": f"Readiness below {LOW_READINESS}",
     "no_practice_21d": "No test, coding or interview practice for 21+ days",
 }
-EXPORTS = ("roster_status", "batch_readiness", "outcomes_naac")
+EXPORTS = ("roster_status", "batch_readiness", "outcomes_naac", "test_results")
 
 
 def _pct(part: int, whole: int) -> float | None:
@@ -290,10 +290,16 @@ def _csv(header: list[str], rows: list[list]) -> str:
 
 
 def export_csv(db: Session, college_id: str, kind: str, batch_id: str | None = None,
-               today: datetime.date | None = None) -> str:
+               today: datetime.date | None = None, assignment_id: str | None = None) -> str:
     today = today or datetime.date.today()
     if kind not in EXPORTS:
         raise LookupError("Unknown export.")
+    if kind == "test_results":
+        from app.services.college_assignments import results
+        r = results(db, college_id, assignment_id or "")
+        return _csv(["roll_no", "name", "test", "status", "score", "completed_at", "notes"],
+                    [[s["roll_no"], s["name"], r["test"]["title"], s["status"], s["score"], s["completed_at"],
+                      "; ".join(s["notes"])] for s in r["students"]])
     batches = {b.id: b for b in db.query(Batch).filter(Batch.college_id == college_id)}
     if batch_id and batch_id != UNASSIGNED and batch_id not in batches:
         raise LookupError("Batch not found.")
