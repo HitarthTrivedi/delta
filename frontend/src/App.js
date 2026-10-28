@@ -48,6 +48,8 @@ const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const VerifyBadge = lazy(() => import("./pages/VerifyBadge"));
 const CollegePortal = lazy(() => import("./pages/college/CollegePortal"));
 const CollegeConsole = lazy(() => import("./pages/college/CollegeConsole"));
+const CollegeBatch = lazy(() => import("./pages/college/CollegeBatch"));
+const CollegeStudent = lazy(() => import("./pages/college/CollegeStudent"));
 const CollegeJoin = lazy(() => import("./pages/CollegeJoin"));
 const ParentConsent = lazy(() => import("./pages/ParentConsent"));
 const JobMatch = lazy(() => import("./pages/JobMatch"));
@@ -213,6 +215,8 @@ function AppContent() {
         <Route path="/college/login" element={<LoginPage variant="college" />} />
         <Route path="/college" element={<RequireSignedIn loginPath="/college/login"><CollegePortal /></RequireSignedIn>} />
         <Route path="/college/admin" element={<RequireSignedIn loginPath="/college/login"><CollegeConsole /></RequireSignedIn>} />
+        <Route path="/college/batches/:batchId" element={<RequireSignedIn loginPath="/college/login"><CollegeBatch /></RequireSignedIn>} />
+        <Route path="/college/students/:userId" element={<RequireSignedIn loginPath="/college/login"><CollegeStudent /></RequireSignedIn>} />
         <Route path="/join-college" element={<RequireAuth><CollegeJoin /></RequireAuth>} />
         <Route path="/join-college/:code" element={<RequireAuth><CollegeJoin /></RequireAuth>} />
         <Route path="/recruiter/login" element={<LoginPage variant="recruiter" />} />

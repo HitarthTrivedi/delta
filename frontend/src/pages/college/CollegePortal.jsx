@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Loader2, LogOut, RefreshCw } from 'lucide-react';
+import { BarChart3, Copy, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { collegeAPI } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
+import { ExportButton, HBars, Stat, btn, errText, input, pct } from './shared';
 
 // The college's own portal (placement officer = TPO, read-only faculty):
-// batches and join codes, roster upload, students, staff and campus recruiters.
+// overview, batches and join codes, roster upload, students, staff and campus recruiters.
 
-const TABS = [['batches', 'Batches'], ['roster', 'Roster upload'], ['students', 'Students'], ['team', 'Team'], ['recruiters', 'Recruiters']];
+const TABS = [['overview', 'Overview'], ['batches', 'Batches'], ['roster', 'Roster upload'], ['students', 'Students'], ['team', 'Team'], ['recruiters', 'Recruiters']];
 const PROGRAMS = { none: 'No program', placement_6m: '6-month placement-ready', first_year_4y: 'From first year (4 years)' };
-const btn = 'inline-flex items-center gap-1.5 px-3.5 py-2 border font-mono text-[11px] uppercase tracking-[0.12em] cursor-pointer disabled:opacity-50';
-const input = 'border border-rule bg-paper px-3 py-2 text-[14px] text-ink';
-const errText = (err, fallback) => err?.response?.data?.detail || fallback;
 
 function Accept({ invites, policyVersion, onDone }) {
   const [checked, setChecked] = useState(false);
@@ -46,6 +44,56 @@ function Accept({ invites, policyVersion, onDone }) {
   );
 }
 
+function Overview({ cid }) {
+  const { data, isLoading } = useQuery({ queryKey: ['college-overview', cid], queryFn: () => collegeAPI.overview(cid) });
+  if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-ink-soft" />;
+  if (!data) return <p className="text-ink-soft text-[14px]">Could not load the overview.</p>;
+  return (
+    <div className="grid gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+        <Stat label="Active students" value={data.students} />
+        <Stat label="Avg readiness" value={data.avg_readiness ?? '—'} hint="of those who've practised" />
+        <Stat label="Active 7 days" value={pct(data.active_7d_pct)} />
+        <Stat label="Active 30 days" value={pct(data.active_30d_pct)} />
+        <Stat label="Need a nudge" value={data.at_risk} />
+      </div>
+      <section>
+        <h2 className="m-0 text-[15px] font-semibold">Batches</h2>
+        <ul className="m-0 mt-2 p-0 list-none border border-rule bg-paper divide-y divide-rule">
+          {data.batches.map((b) => (
+            <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-[14px]">
+              <Link to={`/college/batches/${b.id}?cid=${cid}`} className="text-ink font-semibold underline-offset-2 hover:underline">{b.name}</Link>
+              <span className="text-ink-soft tabular-nums">
+                {b.students} students · avg readiness {b.avg_readiness ?? '—'} · active 7 days {pct(b.active_7d_pct)} · {b.at_risk} need a nudge
+              </span>
+            </li>
+          ))}
+          {!data.batches.length && <li className="px-4 py-3 text-ink-soft text-[14px]">No batches yet.</li>}
+        </ul>
+      </section>
+      <section className="border border-rule bg-paper p-4">
+        <h2 className="m-0 text-[15px] font-semibold">Weakest skills across the college</h2>
+        <div className="mt-3">
+          {data.weak_skills.length ? (
+            <HBars caption="Students weak in each skill" items={data.weak_skills.map((w) => ({
+              label: w.skill, value: w.students_weak, display: `${w.students_weak} of ${w.students_tested} · avg ${w.avg_score}%`,
+            }))} />
+          ) : <p className="m-0 text-[14px] text-ink-soft">Not enough test results yet.</p>}
+        </div>
+      </section>
+      <section>
+        <h2 className="m-0 text-[15px] font-semibold">Exports</h2>
+        <p className="m-0 mt-1 text-[13px] text-ink-soft">CSV files that open in Excel. The outcomes sheet has empty placed / employer / package / higher-studies columns for your NAAC 5.2.1 and NIRF returns.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <ExportButton cid={cid} kind="roster_status">Roster and joining</ExportButton>
+          <ExportButton cid={cid} kind="batch_readiness">Readiness, all batches</ExportButton>
+          <ExportButton cid={cid} kind="outcomes_naac">Outcomes sheet</ExportButton>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function Batches({ cid, canEdit }) {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ['college-batches', cid], queryFn: () => collegeAPI.batches(cid) });
@@ -72,6 +120,7 @@ function Batches({ cid, canEdit }) {
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
+            <Link to={`/college/batches/${b.id}?cid=${cid}`} className={`${btn} border-ink text-ink`}><BarChart3 size={12} /> Dashboard</Link>
             <span className="font-mono tracking-[0.12em] text-ink">{b.join_code}</span>
             <button className={`${btn} border-rule text-ink`} onClick={async () => {
               try { await navigator.clipboard.writeText(link(b.join_code)); toast.success('Join link copied. Share it with this batch.'); } catch { toast.message(link(b.join_code)); }
@@ -280,11 +329,11 @@ export default function CollegePortal() {
   const queryClient = useQueryClient();
   const logout = useAuthStore((s) => s.logout);
   const [params] = useSearchParams();
-  const [tab, setTab] = useState('batches');
+  const [tab, setTab] = useState('overview');
   const me = useQuery({ queryKey: ['college-me'], queryFn: collegeAPI.me });
   const cid = params.get('cid') || me.data?.colleges?.[0]?.id;
   const college = useQuery({ queryKey: ['college', cid], queryFn: () => collegeAPI.get(cid), enabled: !!cid });
-  useEffect(() => { setTab('batches'); }, [cid]);
+  useEffect(() => { setTab('overview'); }, [cid]);
 
   const signOut = async () => { await logout(); navigate('/college/login'); };
   const shell = (body) => (
@@ -329,6 +378,7 @@ export default function CollegePortal() {
             className={`px-3 py-2 text-[14px] border-b-2 -mb-px cursor-pointer bg-transparent ${tab === k ? 'border-oxblood text-oxblood' : 'border-transparent text-ink-soft'}`}>{label}</button>
         ))}
       </nav>
+      {tab === 'overview' && <Overview cid={cid} />}
       {tab === 'batches' && <Batches cid={cid} canEdit={canEdit} />}
       {tab === 'roster' && <Roster cid={cid} college={c} canEdit={canEdit} />}
       {tab === 'students' && <Students cid={cid} canEdit={canEdit} />}
