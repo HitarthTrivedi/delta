@@ -71,6 +71,7 @@ These extra terms apply if you register a **recruiter account**. By ticking the 
 6. **Your own legal duties.** For candidate data you take away from Delta, you act as an independent **Data Fiduciary** under the DPDP Act, and you are responsible for complying with it.
 7. **Logging.** Every profile you open is logged and visible to the candidate.
 8. **Scores are indicators.** Practice scores are not certifications. Don't make hiring decisions on them alone.
+9. **Company roadmaps.** A roadmap you publish describes real requirements for roles you hire for. Its steps must not ask students for personal data, payment or anything outside Delta's practice tools. Delta reviews every roadmap and may change, refuse or remove it. What students share with you through a roadmap falls under points 2 to 6.
 
 Breaking these terms leads to immediate suspension, and may lead to legal action and to reporting to the authorities.
 
@@ -97,6 +98,7 @@ These extra terms apply if your college invites you as its placement officer or 
 3. **Under-18 students.** If you upload under-18 students and confirm your college holds their parents' consent, that consent must really exist and be kept on record.
 4. **Recruiters.** You link only recruiters you actually work with for placements.
 5. **Exports.** Reports you download are your college's responsibility.
+6. **Batch roadmaps and tests.** You set them for your students' preparation. Test results are indicators, not certifications, and must not be the only basis for deciding a student's placement eligibility.
 
 ## 8B. Under-18 college students
 

@@ -2046,6 +2046,18 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         weekly_focus["primary_actions"] = _merge_capped_actions(
             head + college_actions, weekly_focus["primary_actions"][len(job_actions):],
             cap=max(weekly_cap, len(head) + len(college_actions)))
+    # Company roadmaps the learner follows add their own tasks after those.
+    try:
+        from app.services.company_roadmaps import track_actions
+        company_actions = track_actions(db, user.id)
+    except Exception as exc:  # a company-track problem must never block the week
+        logging.getLogger("delta.company").warning("company tasks skipped for %s: %s", user.id, exc)
+        company_actions = []
+    if company_actions:
+        head = weekly_focus["primary_actions"][:len(job_actions) + len(college_actions)]
+        weekly_focus["primary_actions"] = _merge_capped_actions(
+            head + company_actions, weekly_focus["primary_actions"][len(head):],
+            cap=max(weekly_cap, len(head) + len(company_actions)))
     if enrollment and regenerate and not blocking_events and roadmap_templates.is_break_week(enrollment):
         weekly_focus["phase_name"] = "Break week"
         weekly_focus["is_break_week"] = True

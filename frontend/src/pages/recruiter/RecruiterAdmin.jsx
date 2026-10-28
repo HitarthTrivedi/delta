@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { Loader2, Check, X, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { recruiterAPI } from '../../lib/api';
+import { RoadmapReview } from './RecruiterRoadmaps';
 
-const TABS = ['pending', 'approved', 'rejected'];
+const TABS = ['pending', 'approved', 'rejected', 'roadmaps'];
 
 /** Admin-only (ADMIN_EMAILS on the backend): approve or reject recruiter accounts. */
 export default function RecruiterAdmin() {
@@ -15,6 +16,7 @@ export default function RecruiterAdmin() {
 
   useEffect(() => {
     setRows(null);
+    if (tab === 'roadmaps') return;
     recruiterAPI.adminList(tab)
       .then((d) => setRows(d.recruiters))
       .catch((err) => {
@@ -67,7 +69,7 @@ export default function RecruiterAdmin() {
               ))}
             </div>
 
-            {rows === null ? (
+            {tab === 'roadmaps' ? <RoadmapReview /> : rows === null ? (
               <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-ink-soft" /></div>
             ) : rows.length === 0 ? (
               <p className="text-ink-soft text-[14px]">No {tab} recruiters.</p>

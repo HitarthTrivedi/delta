@@ -129,7 +129,7 @@ def start(db: Session, user_id: str, template_id: str, target_date: datetime.dat
     t = TEMPLATES.get(template_id)
     if not t:
         raise LookupError("Unknown roadmap.")
-    today = today or datetime.date.today()
+    today = today or datetime.datetime.utcnow().date()  # UTC, like session and XP timestamps
     if target_date and target_date <= today + datetime.timedelta(days=13):
         raise ValueError("Pick a target date at least two weeks away.")
     e = db.query(RoadmapEnrollment).filter(RoadmapEnrollment.user_id == user_id).first()
@@ -193,7 +193,7 @@ def _matches(a: str, b: str) -> bool:
     return bool(a and b) and (a == b or a in b or b in a)
 
 
-def _evidence(db: Session, user_id: str, since: datetime.date) -> dict:
+def evidence(db: Session, user_id: str, since: datetime.date) -> dict:
     """What the learner has proven in tests (never self-claimed skills)."""
     from app.services.readiness import compute_readiness
     skills = compute_readiness(db, user_id)["skills"]
@@ -213,7 +213,7 @@ def _evidence(db: Session, user_id: str, since: datetime.date) -> dict:
     return {"skills": skills, "topics": topic_best}
 
 
-def _proven(ev: dict, skill: str) -> bool:
+def proven(ev: dict, skill: str) -> bool:
     if any(_matches(s["skill"], skill) and s["score"] >= PROVEN_SCORE and s["questions"] >= PROVEN_QUESTIONS
            for s in ev["skills"]):
         return True
@@ -225,9 +225,9 @@ def _gate_passed(ev: dict, gate: dict) -> bool:
                for k, v in ev["topics"].items())
 
 
-def _done_ids(db: Session, user_id: str) -> set[str]:
+def done_ids(db: Session, user_id: str, prefix: str = "tpl-") -> set[str]:
     rows = db.query(XpEvent.source_id).filter(XpEvent.user_id == user_id, XpEvent.source_type == "weekly_task",
-                                              XpEvent.source_id.like("tpl-%")).all()
+                                              XpEvent.source_id.like(f"{prefix}%")).all()
     return {r[0].split("@")[0] for r in rows}
 
 
@@ -236,11 +236,11 @@ def _plan(db: Session, e: RoadmapEnrollment, t: dict) -> dict:
     week = template_week(e, t)
     squeeze = compressed(e, t)
     phase = _phase_at(t, week)
-    ev = _evidence(db, e.user_id, e.started_on)
-    done = _done_ids(db, e.user_id)
+    ev = evidence(db, e.user_id, e.started_on)
+    done = done_ids(db, e.user_id)
 
     def eligible(p):
-        return [m for m in _required(p, squeeze) if not (m["skip"] and m["id"] not in done and _proven(ev, m["skill"]))]
+        return [m for m in _required(p, squeeze) if not (m["skip"] and m["id"] not in done and proven(ev, m["skill"]))]
 
     first, last = phase["weeks"]
     phase_items = eligible(phase)
@@ -249,7 +249,7 @@ def _plan(db: Session, e: RoadmapEnrollment, t: dict) -> dict:
     earlier = [p for p in t["phases"] if p["weeks"][1] < first]
     backlog = [m for p in earlier for m in eligible(p) if m["id"] not in done]
     skipped = [m for p in t["phases"] if p["weeks"][0] <= week for m in _required(p, squeeze)
-               if m["skip"] and m["id"] not in done and _proven(ev, m["skill"])]
+               if m["skip"] and m["id"] not in done and proven(ev, m["skill"])]
     # "On track" judges only what fell due before this week, not this week's own tasks.
     overdue_window = [m for p in earlier for m in eligible(p)] + phase_items[:quota * (week - first)]
     return {"week": week, "phase": phase, "squeeze": squeeze, "ev": ev, "done": done,
@@ -328,7 +328,7 @@ def advance(db: Session, user_id: str) -> RoadmapEnrollment | None:
     next_week = template_week(_peek(e, 1), t)
     leaving_phase = next_week > phase["weeks"][1]
     if gate and leaving_phase and e.held_weeks < gate["max_hold_weeks"] \
-            and not _gate_passed(_evidence(db, user_id, e.started_on), gate):
+            and not _gate_passed(evidence(db, user_id, e.started_on), gate):
         e.held_weeks += 1
         db.commit()
         return e
@@ -337,7 +337,7 @@ def advance(db: Session, user_id: str) -> RoadmapEnrollment | None:
     if e.week_index >= (_available_weeks(e) if compressed(e, t) else t["weeks"]):
         if t.get("then") and t["then"] in TEMPLATES:
             nxt = TEMPLATES[t["then"]]
-            e.template_id, e.template_version, e.started_on = nxt["id"], nxt["version"], datetime.date.today()
+            e.template_id, e.template_version, e.started_on = nxt["id"], nxt["version"], datetime.datetime.utcnow().date()
             e.week_index, e.held_weeks, e.target_date = 0, 0, None
         else:
             e.status, e.ended_at = "completed", datetime.datetime.utcnow()
