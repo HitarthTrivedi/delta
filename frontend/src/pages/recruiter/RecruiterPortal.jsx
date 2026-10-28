@@ -4,6 +4,7 @@ import { Loader2, LogOut, Search, X, ExternalLink, ShieldCheck, Trash2 } from 'l
 import { toast } from 'sonner';
 import { privacyAPI, recruiterAPI } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
+import { RecruiterRoadmaps } from './RecruiterRoadmaps';
 
 const SANDBOX_LABEL = { theory: 'Technical test', coding: 'Coding', interview: 'Mock interview' };
 
@@ -60,7 +61,24 @@ export default function RecruiterPortal() {
       </Shell>
     );
   }
-  return <Shell recruiter={r}><Dashboard recruiter={r} /></Shell>;
+  return <Shell recruiter={r}><ApprovedTabs recruiter={r} /></Shell>;
+}
+
+function ApprovedTabs({ recruiter }) {
+  const [tab, setTab] = useState('candidates');
+  return (
+    <>
+      <nav className="flex gap-1 border-b border-rule mb-6" role="tablist">
+        {[['candidates', 'Find candidates'], ['roadmaps', 'Roadmaps']].map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            className={`px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.12em] bg-transparent border-0 border-b-2 cursor-pointer ${tab === k ? 'text-oxblood border-oxblood' : 'text-ink-soft border-transparent'}`}>
+            {label}
+          </button>
+        ))}
+      </nav>
+      {tab === 'candidates' ? <Dashboard recruiter={recruiter} /> : <RecruiterRoadmaps recruiter={recruiter} />}
+    </>
+  );
 }
 
 function Shell({ recruiter, children }) {

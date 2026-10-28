@@ -8,7 +8,7 @@ import { useUserWithSkills } from '../hooks/useUser';
 import { engagementKey, useEngagement } from '../hooks/useEngagement';
 import { useCareerContext } from '../hooks/useCareerOS';
 import { getTaskProgress } from '../lib/taskProgress';
-import { circlesAPI, collegeAPI, engagementAPI } from '../lib/api';
+import { circlesAPI, collegeAPI, companyAPI, engagementAPI } from '../lib/api';
 import { clearReferral, pendingReferral } from '../lib/referral';
 import { enablePush, pushSupported } from '../lib/push';
 import InterviewerAvatar from '../components/interview/InterviewerAvatar';
@@ -305,14 +305,17 @@ function CollegeCard({ userId }) {
   );
 }
 
-function CollegeTestsCard({ userId }) {
-  const { data } = useQuery({ queryKey: ['college-tests', userId], queryFn: () => collegeAPI.studentTests(userId),
+function SetTestsCard({ userId }) {
+  const college = useQuery({ queryKey: ['college-tests', userId], queryFn: () => collegeAPI.studentTests(userId),
     enabled: !!userId, staleTime: 60 * 1000 });
-  const open = (data?.tests || []).filter((t) => t.open && t.status !== 'done');
+  const company = useQuery({ queryKey: ['company-tests', userId], queryFn: () => companyAPI.studentTests(userId),
+    enabled: !!userId, staleTime: 60 * 1000 });
+  const open = [...(college.data?.tests || []).map((t) => ({ ...t, source: 'Your college' })), ...(company.data?.tests || [])]
+    .filter((t) => t.open && t.status !== 'done');
   if (!open.length) return null;
   return (
     <section className={`${card} p-4`}>
-      <p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">From your college</p>
+      <p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">Tests set for you</p>
       <ul className="m-0 mt-2 p-0 list-none grid gap-2">
         {open.map((t) => (
           <li key={t.id}>
@@ -320,7 +323,7 @@ function CollegeTestsCard({ userId }) {
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-ink">{t.title}</span>
                 <span className="block text-xs text-ink-soft">
-                  {t.questions} questions{t.timed ? ', timed' : ''}{t.due_date ? ` · due ${new Date(`${t.due_date}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                  {t.source} · {t.questions} questions{t.timed ? ', timed' : ''}{t.due_date ? ` · due ${new Date(`${t.due_date}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
                   {t.status === 'started' ? ' · in progress' : ''}
                 </span>
               </span>
@@ -479,7 +482,7 @@ export default function Today() {
 
         <ReferralCard userId={userId} />
         <CollegeCard userId={userId} />
-        <CollegeTestsCard userId={userId} />
+        <SetTestsCard userId={userId} />
 
         {!e.study_time && !setupDone && (
           <HabitSetup userId={userId} e={e} onDone={() => { setSetupDone(true); queryClient.invalidateQueries({ queryKey: engagementKey(userId) }); }} />

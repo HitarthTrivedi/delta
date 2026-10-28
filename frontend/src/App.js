@@ -53,6 +53,7 @@ const CollegeStudent = lazy(() => import("./pages/college/CollegeStudent"));
 const CollegeJoin = lazy(() => import("./pages/CollegeJoin"));
 const ParentConsent = lazy(() => import("./pages/ParentConsent"));
 const JobMatch = lazy(() => import("./pages/JobMatch"));
+const CompanyRoadmaps = lazy(() => import("./pages/CompanyRoadmaps"));
 const ProgressReport = lazy(() => import("./pages/ProgressReport"));
 const ResumePage = lazy(() => import("./pages/ResumePage"));
 const TrophyCabinet = lazy(() => import("./pages/TrophyCabinet"));
@@ -242,6 +243,7 @@ function AppContent() {
         <Route path="/league" element={<RequireAuth><ProtectedRoute><League /></ProtectedRoute></RequireAuth>} />
         <Route path="/circles" element={<RequireAuth><ProtectedRoute><Circles /></ProtectedRoute></RequireAuth>} />
         <Route path="/jobs" element={<RequireAuth><ProtectedRoute><JobMatch /></ProtectedRoute></RequireAuth>} />
+        <Route path="/company-roadmaps" element={<RequireAuth><ProtectedRoute><CompanyRoadmaps /></ProtectedRoute></RequireAuth>} />
         <Route path="/circles/join/:code" element={<RequireAuth><ProtectedRoute><CircleJoin /></ProtectedRoute></RequireAuth>} />
         <Route path="/opportunities" element={<RequireAuth><ProtectedRoute><Opportunities /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice" element={<RequireAuth><ProtectedRoute><PracticeHub /></ProtectedRoute></RequireAuth>} />

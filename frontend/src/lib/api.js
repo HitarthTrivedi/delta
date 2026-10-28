@@ -353,6 +353,32 @@ export const privacyAPI = {
 };
 
 // ── Recruiter portal API (identity comes from the auth token, no user id in path) ──
+// ── Company roadmaps: recruiters build them, Delta admins review, students follow ──
+export const companyAPI = {
+  draftFromSkills: (skills, weeks) => api.post('/company/drafts/skills', { skills, weeks }).then(r => r.data),
+  // The first read of a new ad calls the model: allow time.
+  draftFromText: (text, weeks) => api.post('/company/drafts/text', { text, weeks }, { timeout: 90000 }).then(r => r.data),
+  list: () => api.get('/company/roadmaps').then(r => r.data),
+  create: (payload) => api.post('/company/roadmaps', payload).then(r => r.data),
+  get: (id) => api.get(`/company/roadmaps/${id}`).then(r => r.data),
+  update: (id, payload) => api.patch(`/company/roadmaps/${id}`, payload).then(r => r.data),
+  submit: (id) => api.post(`/company/roadmaps/${id}/submit`).then(r => r.data),
+  archive: (id) => api.post(`/company/roadmaps/${id}/archive`).then(r => r.data),
+  duplicate: (id) => api.post(`/company/roadmaps/${id}/duplicate`).then(r => r.data),
+  students: (id) => api.get(`/company/roadmaps/${id}/students`).then(r => r.data),
+  studentsCsv: (id) => api.get(`/company/roadmaps/${id}/students.csv`, { responseType: 'blob' }).then(r => r.data),
+  tests: (id) => api.get(`/company/roadmaps/${id}/tests`).then(r => r.data),
+  // Making a test calls the model once: allow time.
+  createTest: (id, payload) => api.post(`/company/roadmaps/${id}/tests`, payload, { timeout: 120000 }).then(r => r.data),
+  closeTest: (testId) => api.post(`/company/tests/${testId}/close`).then(r => r.data),
+  adminQueue: () => api.get('/company/admin/roadmaps').then(r => r.data),
+  adminReview: (id, approve, note) => api.post(`/company/admin/roadmaps/${id}/review`, { approve, note: note || null }).then(r => r.data),
+  visible: (userId) => api.get(`/company/student/${userId}/roadmaps`).then(r => r.data),
+  join: (userId, roadmapId) => api.post(`/company/student/${userId}/roadmaps/${roadmapId}/join`).then(r => r.data),
+  leave: (userId, roadmapId) => api.post(`/company/student/${userId}/roadmaps/${roadmapId}/leave`).then(r => r.data),
+  studentTests: (userId) => api.get(`/company/student/${userId}/tests`).then(r => r.data),
+};
+
 export const recruiterAPI = {
   me: () => api.get('/recruiter/me').then(r => r.data),
   register: (payload) => api.post('/recruiter/register', payload).then(r => r.data),

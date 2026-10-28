@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Download, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { collegeAPI, privacyAPI } from '../lib/api';
+import { collegeAPI, companyAPI, privacyAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
 const GRIEVANCE_EMAIL = 'hitartht318@gmail.com';
@@ -260,6 +260,7 @@ export default function PrivacySettings() {
 
         {/* Your college (Delta for College) */}
         <CollegeSection userId={userId} consent={consent} onChange={setConsent} />
+        <CompanySection userId={userId} />
 
         {/* Study reminders (opt-in) */}
         <section className={sectionClass}>
@@ -433,6 +434,41 @@ const COLLEGE_NEVER_SEES = [
   'Your résumé text, job matches, circles, leagues, XP and streaks',
   'Whether you are visible to recruiters, and who viewed you',
 ];
+
+function CompanySection({ userId }) {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({ queryKey: ['company-roadmaps-student', userId], queryFn: () => companyAPI.visible(userId), enabled: !!userId });
+  const tracks = data?.tracks || [];
+  const stop = async (t) => {
+    try {
+      await companyAPI.leave(userId, t.roadmap_id);
+      queryClient.invalidateQueries({ queryKey: ['company-roadmaps-student', userId] });
+      toast.success(`Stopped. ${t.company} no longer sees your progress or scores.`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not stop sharing right now.');
+    }
+  };
+  return (
+    <section className={sectionClass}>
+      <h2 className={h2Class}>Company roadmaps</h2>
+      {tracks.length ? (
+        <>
+          <p className={pClass}>You share your progress, your scores on each roadmap's skills and your results in its tests with these companies, and nothing else.</p>
+          <ul className="mt-3 grid gap-2 list-none p-0 m-0">
+            {tracks.map((t) => (
+              <li key={t.roadmap_id} className="flex flex-wrap items-center justify-between gap-2 text-[14px]">
+                <span><strong className="text-ink">{t.company}</strong> · {t.title}</span>
+                <button onClick={() => stop(t)} className={`${btnClass} border-ink text-ink bg-transparent cursor-pointer`}>Stop sharing and leave</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className={pClass}>You don't share anything with a company. <Link to="/company-roadmaps" className="text-oxblood underline">See company roadmaps</Link>: following one shares your progress on it with that company only.</p>
+      )}
+    </section>
+  );
+}
 
 function CollegeSection({ userId, consent, onChange }) {
   const navigate = useNavigate();

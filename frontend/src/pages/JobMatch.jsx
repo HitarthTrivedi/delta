@@ -179,6 +179,7 @@ export default function JobMatch() {
         <header>
           <h1 className="flex items-center gap-2 font-display text-3xl font-semibold text-ink"><Crosshair size={26} className="text-reward" /> Job match</h1>
           <p className="mt-1 text-ink-soft">Paste a job ad. See how close you are today, and turn the gaps into this week's tasks.</p>
+          <p className="mt-1 text-sm text-ink-soft">Some companies on Delta publish their own roadmaps: <Link to="/company-roadmaps" className="text-oxblood underline">see company roadmaps</Link>.</p>
         </header>
 
         <form onSubmit={analyse} className={`${card} p-5 sm:p-6`}>
