@@ -34,6 +34,7 @@ class StartPayload(BaseModel):
     category: str = "technical"  # technical | aptitude
     area: Optional[str] = None  # aptitude: quantitative | logical | verbal
     timed: bool = False
+    assignment_id: Optional[str] = None  # a test the learner's college set (questions already made)
 
 
 class SubmitPayload(BaseModel):
@@ -57,6 +58,39 @@ def _public_questions(questions: list[dict]) -> list[dict]:
     return [{"question": q["question"], "options": q["options"], "skill": q["skill"]} for q in questions]
 
 
+def _public_result(db: Session, data: dict, result: dict) -> dict:
+    """A college test that is still open never shows its answer key."""
+    from app.services.college_assignments import hide_answers
+    if hide_answers(data.get("assignment_id"), db):
+        return {**result, "questions": [], "answers_hidden": True}
+    return result
+
+
+def _start_assigned(db: Session, user_id: str, assignment_id: str) -> dict:
+    from app.services import college_assignments
+    try:
+        a = college_assignments.assignment_for_student(db, user_id, assignment_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    session = college_assignments.open_attempt(db, a.id, user_id)
+    if not session:  # same stored questions for the whole batch: no model call
+        started_at = datetime.datetime.utcnow()
+        session = SandboxSession(
+            id=str(uuid.uuid4()), user_id=user_id, type="theory", title=a.title[:200], status="in_progress",
+            data=json.dumps({"topic": a.topic, "category": a.category, "difficulty": a.difficulty,
+                             "questions": json.loads(a.questions), "time_limit_seconds": a.time_limit_seconds,
+                             "started_at": started_at.isoformat(), "assignment_id": a.id}),
+            created_at=started_at)
+        db.add(session)
+        db.commit()
+    data = json.loads(session.data)
+    return {"session_id": session.id, "topic": data["topic"], "category": data["category"],
+            "difficulty": data["difficulty"], "time_limit_seconds": data["time_limit_seconds"],
+            "questions": _public_questions(data["questions"]), "assignment_id": a.id}
+
+
 @router.post("/{user_id}/start")
 @limiter.limit("10/minute")
 def start_test(
@@ -66,6 +100,8 @@ def start_test(
     db: Session = Depends(get_db),
     _: str = Depends(require_owner),
 ):
+    if payload.assignment_id:
+        return _start_assigned(db, user_id, payload.assignment_id)
     num_questions = max(MIN_QUESTIONS, min(MAX_QUESTIONS, payload.num_questions))
     category = "aptitude" if payload.category == "aptitude" else "technical"
     difficulty = payload.difficulty if payload.difficulty in DIFFICULTIES else "medium"
@@ -122,7 +158,7 @@ def submit_test(
     data = json.loads(session.data or "{}")
 
     if session.status == "completed":
-        return {"session_id": session.id, "result": data.get("result") or {}}
+        return {"session_id": session.id, "result": _public_result(db, data, data.get("result") or {})}
 
     questions = data.get("questions") or []
     if len(payload.answers) != len(questions):
@@ -190,7 +226,7 @@ def submit_test(
         impact={"sandbox_session_id": session.id, "score": score},
     )
 
-    return {"session_id": session.id, "result": result}
+    return {"session_id": session.id, "result": _public_result(db, data, result)}
 
 
 @router.get("/{user_id}/sessions")
@@ -220,7 +256,7 @@ def get_session(user_id: str, session_id: str, db: Session = Depends(get_db), _:
         "topic": data.get("topic"), "category": data.get("category", "technical"),
         "difficulty": data.get("difficulty", "medium"),
         # Answer key only once the test is submitted.
-        "result": data.get("result") if session.status == "completed" else None,
+        "result": _public_result(db, data, data["result"]) if session.status == "completed" and data.get("result") else None,
         "created_at": session.created_at.isoformat() if session.created_at else None,
         "completed_at": session.completed_at.isoformat() if session.completed_at else None,
     }

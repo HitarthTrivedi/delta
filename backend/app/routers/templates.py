@@ -52,6 +52,11 @@ def _replan_this_week(db: Session, user_id: str) -> None:
         get_or_create_roadmap_state(db, user, market, regenerate=True)
 
 
+@router.get("")
+def all_templates(_=Depends(current_identity)):
+    return {"catalog": roadmap_templates.catalog()}
+
+
 @router.get("/user/{user_id}")
 def my_roadmap(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     return _state(db, user_id)

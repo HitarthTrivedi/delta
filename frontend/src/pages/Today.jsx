@@ -305,6 +305,34 @@ function CollegeCard({ userId }) {
   );
 }
 
+function CollegeTestsCard({ userId }) {
+  const { data } = useQuery({ queryKey: ['college-tests', userId], queryFn: () => collegeAPI.studentTests(userId),
+    enabled: !!userId, staleTime: 60 * 1000 });
+  const open = (data?.tests || []).filter((t) => t.open && t.status !== 'done');
+  if (!open.length) return null;
+  return (
+    <section className={`${card} p-4`}>
+      <p className="m-0 text-xs font-semibold uppercase tracking-[0.12em] text-ink-soft">From your college</p>
+      <ul className="m-0 mt-2 p-0 list-none grid gap-2">
+        {open.map((t) => (
+          <li key={t.id}>
+            <Link to={`/practice/theory?assignment=${t.id}`} className="flex items-center justify-between gap-3 hover:underline">
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-ink">{t.title}</span>
+                <span className="block text-xs text-ink-soft">
+                  {t.questions} questions{t.timed ? ', timed' : ''}{t.due_date ? ` · due ${new Date(`${t.due_date}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
+                  {t.status === 'started' ? ' · in progress' : ''}
+                </span>
+              </span>
+              <ArrowRight size={18} className="shrink-0 text-ink-soft" aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function FriendsCard({ userId }) {
   const { data } = useQuery({ queryKey: ['circles', userId], queryFn: () => circlesAPI.list(userId), enabled: !!userId, staleTime: 60 * 1000 });
   if (!data) return null;
@@ -451,6 +479,7 @@ export default function Today() {
 
         <ReferralCard userId={userId} />
         <CollegeCard userId={userId} />
+        <CollegeTestsCard userId={userId} />
 
         {!e.study_time && !setupDone && (
           <HabitSetup userId={userId} e={e} onDone={() => { setSetupDone(true); queryClient.invalidateQueries({ queryKey: engagementKey(userId) }); }} />

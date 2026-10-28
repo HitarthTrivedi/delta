@@ -2034,6 +2034,18 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         weekly_focus["primary_actions"] = _merge_capped_actions(
             job_actions, weekly_focus["primary_actions"], cap=max(weekly_cap, len(job_actions)))
         weekly_focus["selection_reason"] = "Starts with the skills for the job you're aiming at, then your roadmap."
+    # Tests the learner's college set come right after job tasks.
+    try:
+        from app.services.college_assignments import weekly_college_actions
+        college_actions = weekly_college_actions(db, user.id)
+    except Exception as exc:  # a college-test problem must never block the week
+        logging.getLogger("delta.college").warning("college tasks skipped for %s: %s", user.id, exc)
+        college_actions = []
+    if college_actions:
+        head = weekly_focus["primary_actions"][:len(job_actions)]
+        weekly_focus["primary_actions"] = _merge_capped_actions(
+            head + college_actions, weekly_focus["primary_actions"][len(job_actions):],
+            cap=max(weekly_cap, len(head) + len(college_actions)))
     if enrollment and regenerate and not blocking_events and roadmap_templates.is_break_week(enrollment):
         weekly_focus["phase_name"] = "Break week"
         weekly_focus["is_break_week"] = True
