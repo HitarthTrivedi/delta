@@ -60,22 +60,22 @@ def _public_questions(questions: list[dict]) -> list[dict]:
 
 def _public_result(db: Session, data: dict, result: dict) -> dict:
     """A college test that is still open never shows its answer key."""
-    from app.services.college_assignments import hide_answers
+    from app.services.assigned_tests import hide_answers
     if hide_answers(data.get("assignment_id"), db):
         return {**result, "questions": [], "answers_hidden": True}
     return result
 
 
 def _start_assigned(db: Session, user_id: str, assignment_id: str) -> dict:
-    from app.services import college_assignments
+    from app.services import assigned_tests
     try:
-        a = college_assignments.assignment_for_student(db, user_id, assignment_id)
+        a = assigned_tests.for_student(db, user_id, assignment_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    session = college_assignments.open_attempt(db, a.id, user_id)
-    if not session:  # same stored questions for the whole batch: no model call
+    session = assigned_tests.open_attempt(db, a.id, user_id)
+    if not session:  # the same stored questions for everyone it was set for: no model call
         started_at = datetime.datetime.utcnow()
         session = SandboxSession(
             id=str(uuid.uuid4()), user_id=user_id, type="theory", title=a.title[:200], status="in_progress",

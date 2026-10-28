@@ -17,13 +17,11 @@ from sqlalchemy.orm import Session
 
 from app.models.college import Batch, BatchTestAssignment, CollegeMember, RosterEntry
 from app.models.roadmap_template import RoadmapEnrollment
-from app.models.sandbox_session import SandboxSession
 from app.models.user import User
 from app.services import integrity, roadmap_templates
+from app.services.assigned_tests import SECONDS_PER_QUESTION, attempts as _attempts, check_attempt, is_open, summary
 from app.services.roadmap_catalog import TEMPLATES
 from app.services.theory_test_ai import APTITUDE_AREAS, DIFFICULTIES, MAX_QUESTIONS, MIN_QUESTIONS, generate_test
-
-SECONDS_PER_QUESTION = 60
 
 
 def _batch(db: Session, college_id: str, batch_id: str) -> Batch:
@@ -96,34 +94,8 @@ def on_member_left(db: Session, m: CollegeMember) -> None:
 
 # ── batch tests ──────────────────────────────────────────────────────────────
 
-def is_open(a: BatchTestAssignment, today: datetime.date | None = None) -> bool:
-    today = today or datetime.date.today()
-    return a.closed_at is None and (a.due_date is None or a.due_date >= today)
-
-
-def _attempts(db: Session, assignment_id: str, user_ids: list[str] | None = None) -> dict[str, SandboxSession]:
-    """Each student's session for this test (completed wins over in progress)."""
-    q = db.query(SandboxSession).filter(SandboxSession.type == "theory",
-                                        SandboxSession.data.contains(f'"assignment_id": "{assignment_id}"'))
-    if user_ids is not None:
-        q = q.filter(SandboxSession.user_id.in_(user_ids or [""]))
-    out: dict[str, SandboxSession] = {}
-    for s in q.all():
-        if json.loads(s.data or "{}").get("assignment_id") != assignment_id:
-            continue
-        if s.user_id not in out or s.status == "completed":
-            out[s.user_id] = s
-    return out
-
-
 def _test_dict(db: Session, a: BatchTestAssignment, members: int | None = None) -> dict:
-    attempts = _attempts(db, a.id)
-    done = [s for s in attempts.values() if s.status == "completed"]
-    return {"id": a.id, "batch_id": a.batch_id, "title": a.title, "topic": a.topic, "category": a.category,
-            "difficulty": a.difficulty, "questions": len(json.loads(a.questions)),
-            "time_limit_seconds": a.time_limit_seconds, "due_date": a.due_date.isoformat() if a.due_date else None,
-            "open": is_open(a), "created_at": a.created_at.isoformat(), "members": members,
-            "taken": len(done), "average": round(sum(s.score or 0 for s in done) / len(done)) if done else None}
+    return {**summary(db, a, members), "batch_id": a.batch_id}
 
 
 def create_test(db: Session, college_id: str, batch_id: str, *, topic: str | None, category: str = "technical",
@@ -229,25 +201,8 @@ def assignment_for_student(db: Session, user_id: str, assignment_id: str) -> Bat
     m = _membership(db, user_id)
     if not a or not m or m.batch_id != a.batch_id:
         raise LookupError("Test not found.")
-    if not is_open(a):
-        raise ValueError("This test has closed.")
-    s = _attempts(db, a.id, [user_id]).get(user_id)
-    if s and s.status == "completed":
-        raise ValueError("You've already taken this test.")
+    check_attempt(db, a, user_id)
     return a
-
-
-def open_attempt(db: Session, assignment_id: str, user_id: str) -> SandboxSession | None:
-    s = _attempts(db, assignment_id, [user_id]).get(user_id)
-    return s if s and s.status != "completed" else None
-
-
-def hide_answers(assignment_id: str | None, db: Session) -> bool:
-    """While a college test is open, students don't see the answer key."""
-    if not assignment_id:
-        return False
-    a = db.get(BatchTestAssignment, assignment_id)
-    return bool(a and is_open(a))
 
 
 def weekly_college_actions(db: Session, user_id: str) -> list[dict]:

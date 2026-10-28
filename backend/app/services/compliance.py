@@ -36,6 +36,7 @@ STUDY_CIRCLES = "study_circles"  # opt-in private study groups
 REFERRAL_LINK = "referral_link"  # invited learner agrees to be linked to their inviter
 RECRUITER_HABIT_BADGE = "recruiter_habit_badge"  # opt-in "Consistent learner" badge for recruiters
 COLLEGE_ENROLLMENT = "college_enrollment"  # student joins a college (subject_id = college id)
+COMPANY_ROADMAP = "company_roadmap"  # share progress + scores on one company's roadmap (subject_id = roadmap id)
 COLLEGE_ADMIN_TERMS = "college_admin_terms"  # college staff accept their duties
 PARENTAL_CONSENT_MINOR = "parental_consent_minor"  # under-18 college student's parent/college consent
 ADULT_RECONSENT = "adult_reconsent"  # a former minor's own consent after turning 18
@@ -172,8 +173,15 @@ def recruiter_pool_for(db: Session, user_id: str) -> tuple[str | None, str]:
 def recruiter_visible_ids(db: Session, recruiter: Recruiter) -> set[str]:
     """The only way a recruiter reaches students: the opted-in learners in
     this recruiter's pool."""
+    return in_recruiter_pool(db, recruiter, opted_in_ids(db) - {recruiter.id})
+
+
+def in_recruiter_pool(db: Session, recruiter: Recruiter, user_ids: set[str]) -> set[str]:
+    """Which of these learners are in this recruiter's pool (campus: active
+    students of live colleges that linked the recruiter; open: solo students).
+    Never staff, minors or professionals."""
     from app.models.college import CollegeRecruiter
-    base = opted_in_ids(db) - {recruiter.id}
+    base = set(user_ids)
     base -= _staff_ids(db, base)
     facts = _pool_facts(db, base)
     if (recruiter.pool or "open") == "campus":
@@ -196,6 +204,8 @@ def withdraw_recruiter_visibility(db: Session, user_id: str) -> None:
         rec = latest_consent(db, user_id, purpose)
         if rec and rec.action == "granted":
             record_consent(db, user_id, purpose, False)
+    from app.services.company_roadmaps import leave_all
+    leave_all(db, user_id)  # company roadmaps were joined for the old audience too
 
 
 def access_ok(db: Session, user: User | None) -> bool:
@@ -348,7 +358,14 @@ def erase_student(db: Session, user_id: str) -> None:
 
 def erase_recruiter(db: Session, recruiter_id: str) -> None:
     from app.models.college import CollegeRecruiter
+    from app.models.company import CompanyRoadmap, CompanyRoadmapMember, CompanyTest
     db.query(CollegeRecruiter).filter(CollegeRecruiter.recruiter_id == recruiter_id).delete()
+    roadmap_ids = [r.id for r in db.query(CompanyRoadmap.id).filter(CompanyRoadmap.recruiter_id == recruiter_id)]
+    if roadmap_ids:
+        db.query(CompanyTest).filter(CompanyTest.roadmap_id.in_(roadmap_ids)).delete(synchronize_session=False)
+        db.query(CompanyRoadmapMember).filter(CompanyRoadmapMember.roadmap_id.in_(roadmap_ids)).delete(
+            synchronize_session=False)
+        db.query(CompanyRoadmap).filter(CompanyRoadmap.id.in_(roadmap_ids)).delete(synchronize_session=False)
     db.query(Recruiter).filter(Recruiter.id == recruiter_id).delete()
     # The student app auto-creates a placeholder `users` row on any visit; drop it too.
     _erase_user_rows(db, recruiter_id)
