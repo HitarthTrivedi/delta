@@ -285,6 +285,7 @@ export const engagementAPI = {
 // ── Job match: paste a job ad -> gaps -> tasks ──
 // ── Predefined role roadmaps (no AI; a college may assign one) ──
 export const templatesAPI = {
+  catalog: () => api.get('/templates').then(r => r.data),
   mine: (userId) => api.get(`/templates/user/${userId}`).then(r => r.data),
   outline: (templateId) => api.get(`/templates/${templateId}`).then(r => r.data),
   start: (userId, template_id, target_date) => api.post(`/templates/user/${userId}/start`, { template_id, target_date: target_date || null }).then(r => r.data),
@@ -388,6 +389,13 @@ export const collegeAPI = {
   linkRecruiter: (cid, email) => api.post(`/college/${cid}/recruiters`, { email }).then(r => r.data),
   revokeRecruiter: (cid, id) => api.delete(`/college/${cid}/recruiters/${id}`).then(r => r.data),
   overview: (cid) => api.get(`/college/${cid}/overview`).then(r => r.data),
+  setBatchTemplate: (cid, bid, template_id, target_date) => api.put(`/college/${cid}/batches/${bid}/template`, { template_id, target_date: target_date || null }).then(r => r.data),
+  batchTests: (cid, bid) => api.get(`/college/${cid}/batches/${bid}/tests`).then(r => r.data),
+  // Making a test calls the model once: allow time.
+  createTest: (cid, bid, payload) => api.post(`/college/${cid}/batches/${bid}/tests`, payload, { timeout: 120000 }).then(r => r.data),
+  closeTest: (cid, aid) => api.post(`/college/${cid}/tests/${aid}/close`).then(r => r.data),
+  testResults: (cid, aid) => api.get(`/college/${cid}/tests/${aid}/results`).then(r => r.data),
+  studentTests: (userId) => api.get(`/college/student/${userId}/tests`).then(r => r.data),
   batchDashboard: (cid, bid) => api.get(`/college/${cid}/batches/${bid}/dashboard`).then(r => r.data),
   student: (cid, userId) => api.get(`/college/${cid}/students/${userId}`).then(r => r.data),
   exportCsv: (cid, kind, params) => api.get(`/college/${cid}/exports/${kind}.csv`, { params, responseType: 'blob', timeout: 120000 }).then(r => r.data),

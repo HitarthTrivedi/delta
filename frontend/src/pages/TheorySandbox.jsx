@@ -126,7 +126,7 @@ export default function TheorySandbox() {
     setStarting(true);
     try {
       const data = await sandboxTheoryAPI.start(userId, opts);
-      try { localStorage.setItem(LAST_TEST_KEY, JSON.stringify(opts)); } catch { /* ignore */ }
+      if (!opts.assignment_id) { try { localStorage.setItem(LAST_TEST_KEY, JSON.stringify(opts)); } catch { /* ignore */ } }
       setSessionId(data.session_id);
       setTestTopic(data.topic);
       setQuestions(data.questions || []);
@@ -147,6 +147,15 @@ export default function TheorySandbox() {
   const startRef = useRef(startTest);
   startRef.current = startTest;
   const quickStartedRef = useRef(false);
+  // A test the learner's college set (?assignment=id): the same questions for the whole batch.
+  useEffect(() => {
+    const assignmentId = params.get('assignment');
+    if (!userId || !assignmentId || quickStartedRef.current) return;
+    quickStartedRef.current = true;
+    setParams({}, { replace: true });
+    startRef.current({ assignment_id: assignmentId });
+  }, [userId, params, setParams]);
+
   useEffect(() => {
     if (!userId || params.get('quick') !== '1' || quickStartedRef.current) return;
     quickStartedRef.current = true;
@@ -449,6 +458,11 @@ export default function TheorySandbox() {
             <section style={{ ...panelStyle, padding: 20, marginBottom: 20 }}>
               <h2 style={{ margin: '0 0 14px', fontSize: 14, color: 'rgb(var(--ink-rgb) / 0.6)' }}>Review answers</h2>
               <div style={{ display: 'grid', gap: 18 }}>
+                {result.answers_hidden && (
+                  <p style={{ margin: 0, fontSize: 13.5, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+                    This test is from your college. The answers stay hidden until it closes, so everyone in your batch gets a fair attempt. Come back here after the due date to review them.
+                  </p>
+                )}
                 {result.questions.map((r, i) => (
                   <div key={i}>
                     <p style={{ margin: '0 0 8px', fontSize: 13.5, fontWeight: 600, display: 'flex', gap: 8, lineHeight: 1.5 }}>

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { collegeAPI } from '../../lib/api';
 import { ExportButton, HBars, Stat, SubpageShell, WeekBars, day, errText, input, pct } from './shared';
+import { BatchRoadmap, BatchTests } from './BatchAssign';
 
 // One batch for the placement team: readiness spread, weekly activity, the
 // skills most students are weak in, who needs a nudge, and every student.
@@ -18,6 +19,8 @@ export default function CollegeBatch() {
     queryFn: () => collegeAPI.batchDashboard(cid, batchId),
     enabled: !!cid,
   });
+  const college = useQuery({ queryKey: ['college', cid], queryFn: () => collegeAPI.get(cid), enabled: !!cid });
+  const canEdit = ['tpo', 'delta'].includes(college.data?.role);
   const studentLink = (uid) => `/college/students/${uid}?cid=${cid}`;
 
   if (isLoading) return <SubpageShell cid={cid}><Loader2 className="h-6 w-6 animate-spin text-ink-soft" /></SubpageShell>;
@@ -56,6 +59,13 @@ export default function CollegeBatch() {
           <WeekBars caption="Share of students active each week" weeks={data.trend.map((w) => ({ week_of: w.week_of, value: w.active_pct }))} />
         </section>
       </div>
+
+      {batchId !== 'unassigned' && (
+        <div className="mt-6 grid gap-6">
+          <BatchRoadmap cid={cid} batchId={batchId} canEdit={canEdit} />
+          <BatchTests cid={cid} batchId={batchId} canEdit={canEdit} />
+        </div>
+      )}
 
       <section className="mt-6 border border-rule bg-paper p-4">
         <h2 className="m-0 text-[15px] font-semibold">Weakest skills</h2>
