@@ -283,6 +283,14 @@ export const engagementAPI = {
 };
 
 // ── Job match: paste a job ad -> gaps -> tasks ──
+// ── Predefined role roadmaps (no AI; a college may assign one) ──
+export const templatesAPI = {
+  mine: (userId) => api.get(`/templates/user/${userId}`).then(r => r.data),
+  outline: (templateId) => api.get(`/templates/${templateId}`).then(r => r.data),
+  start: (userId, template_id, target_date) => api.post(`/templates/user/${userId}/start`, { template_id, target_date: target_date || null }).then(r => r.data),
+  stop: (userId) => api.post(`/templates/user/${userId}/stop`).then(r => r.data),
+};
+
 export const jobsAPI = {
   list: (userId) => api.get(`/jobs/${userId}`).then(r => r.data),
   // The first read of a new ad calls the model: allow time.

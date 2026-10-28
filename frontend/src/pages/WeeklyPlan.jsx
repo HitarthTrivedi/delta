@@ -14,6 +14,7 @@ import { useAuthStore } from '../store/authStore';
 import { useAgent2Chat } from '../store/agent2ChatStore';
 import { careerContextKey, seedCareerContext } from '../hooks/useCareerOS';
 import { refreshEngagement } from '../hooks/useEngagement';
+import TemplatePicker from '../components/TemplatePicker';
 
 const panelStyle = {
   background: 'var(--paper)',
@@ -945,6 +946,14 @@ export default function WeeklyPlan() {
             <p style={{ margin: '8px 0 0', color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.5 }}>
               Week {context?.week_number || 1} · {weeklyFocus.phase_name || 'First useful week'} · {targetRole} · {hoursPerWeek}h a week
             </p>
+            {context?.template && (
+              <p style={{ margin: '6px 0 0', color: 'var(--ink)', fontSize: 13.5, lineHeight: 1.5 }}>
+                <span style={{ ...monoLabel, color: 'var(--oxblood)' }}>Roadmap</span>{' '}
+                {context.template.title} · Week {context.template.week} of {context.template.weeks} · {context.template.on_track ? 'On track' : 'Catching up'}
+                {context.template.target_date && ` · Target ${new Date(`${context.template.target_date}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`}
+                {context.template.held_at_gate && context.template.gate && ` · Score ${context.template.gate.min_score}+ in a ${context.template.gate.topic} test to move on`}
+              </p>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div role="group" aria-label="Layout" title="Week lists every task together. Day spreads them across your 7 days."
@@ -1277,6 +1286,10 @@ export default function WeeklyPlan() {
             <ChevronDown size={18} className="wp-settings-chevron" aria-hidden="true" />
           </summary>
           <div className="wp-settings-body" style={{ padding: '4px 22px 22px', display: 'grid', gap: 24 }}>
+            <div>
+              <p style={{ ...monoLabel, margin: '0 0 8px' }}>How your weeks are planned</p>
+              <TemplatePicker userId={userId} onChanged={() => queryClient.invalidateQueries({ queryKey: careerContextKey(userId) })} />
+            </div>
             {longHorizonLanes.length > 0 && (
               <div>
                 <p style={{ ...monoLabel, margin: '0 0 4px' }}>
