@@ -147,11 +147,24 @@ Recruiters **cannot see you** unless you turn on **"Visible to recruiters"** in 
 If your college bought seats on Delta and you join with its code or your college email, you are on a **college seat**.
 
 - **Roles.** The college decides what it uploads about its students (its roster) and how it uses the reports it sees: for that, the **college is the Data Fiduciary** and Delta processes the data for it, under a written agreement. For everything else you do on Delta, Delta is the Data Fiduciary.
-- **What your college sees:** your name and roll number (from its own roster), your readiness, practice scores and per-skill results, how many days you were active and when you were last active, and your progress on any plan your college assigns.
+- **What your college sees:** your name and roll number (from its own roster), your readiness, practice scores and per-skill results, how many days you were active and when you were last active, your progress on any plan your college assigns, and your results (with how each was taken) in tests your college sets.
+- **Plans and tests your college sets.** Your college can choose a roadmap for your batch; you follow it while you are in that batch, and it stays yours (to keep or stop) if you leave. A test your college sets is the same for everyone in the batch, and its answers are shown after it closes.
 - **What your college never sees:** your conversations with Delta's AI, your résumé text, job matches, study circles, leagues, XP and streaks, whether you are visible to recruiters, and who viewed you.
 - **Leaving.** You can leave your college on Delta at any time (Privacy settings). Your college can also remove your seat. You keep your account as an individual learner.
 - **When a college's contract ends**, its seats end. The college can export its reports for 30 days; then we delete its roster and reports. Your own account stays.
 - Reports a college downloads are the college's responsibility.
+
+---
+
+## 6B. Company roadmaps
+
+Some companies on Delta publish a **roadmap** for a role they hire for. Delta builds it from the skills the company lists, using steps written and reviewed by people, and checks every roadmap before students see it.
+
+- **Who can see a company's roadmap:** the same groups as in Section 6. A campus company's roadmap is shown only to students of colleges that work with it; an off-campus company's roadmap only to students who aren't on a college seat. Working professionals, under-18s and college staff can't follow company roadmaps.
+- **Following one is a separate consent, for that one company.** When you follow a roadmap, you agree to share with that company: your name and education (as in Section 6), your progress on that roadmap, your scores on its skills, and your results in the tests it sets (with how each was taken). You don't need to turn on "Visible to recruiters" for this, and following one roadmap shares nothing with any other company.
+- **What the company never sees:** your conversations with Delta's AI, résumé text, your other plans, your email address, XP, streaks, badges, leagues or study circles.
+- **Stopping:** leave the roadmap at any time (on the Company roadmaps page or in Privacy settings). The company stops seeing you **immediately**. Joining or leaving a college also ends your company roadmaps, because the companies that can see you change.
+- **The company's duties** are the same as a recruiter's (Section 6 and the Terms of Use): use the data only to assess you for its own roles, don't share or sell it, and delete it when no longer needed.
 
 ---
 

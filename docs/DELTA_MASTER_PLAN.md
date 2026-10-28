@@ -47,7 +47,7 @@ This module has two sides.
 - Delta **suggests matching students**, ranked by how well their profile fits and by their **sandbox scores** (theory + coding + interview, per skill).
 - Recruiters have **separate accounts** (`/recruiter/login`), are **manually approved** by a Delta admin before they see anyone, and only ever see students who **opted in** (Section 6).
 - **Two pools that never mix:** *campus* recruiters see only opted-in students of colleges that linked them; *open* (off-campus) recruiters see only opted-in solo students. Professionals and under-18s are never shown.
-- Later: company-specific roadmaps, where a company's requirements become a roadmap that students can opt into, plus company-specific assessments.
+- **Company roadmaps** (built): a company's requirements become a roadmap students in its recruiter pool can follow, plus tests the company sets. Students share their progress and scores on it with that one company, by a separate consent.
 
 ### Module 3 — Delta for Professionals
 - **Who:** people who are *not* in college: working professionals, career switchers, people from any field who want to upskill.
@@ -80,7 +80,7 @@ This module has two sides.
 | College / recruiter | Separate recruiter login + registration + admin approval | Built (v1) | `routers/recruiter.py`, `models/compliance.py`, `pages/recruiter/RecruiterPortal.jsx`, `pages/recruiter/RecruiterAdmin.jsx`, `LoginPage.jsx` (`variant="recruiter"`) |
 | College / recruiter | Preference form + ranked matching of opted-in students | Built (v1) | `routers/recruiter.py` (`/search`, `_score_candidate`) |
 | College / recruiter | Candidate scorecard (per-skill sandbox evidence) | Built (v1) | `routers/recruiter.py` (`/candidates/{id}`), `RecruiterPortal.jsx` (`CandidateDetail`) |
-| College / recruiter | Company-specific roadmaps | Not started | — |
+| College / recruiter | Company roadmaps: a recruiter lists skills (or pastes a job ad, read by Job match's cached extraction), Delta assembles steps from a human-written skill library (no AI), a Delta admin approves; students in that recruiter's pool follow it as an extra track (max 2, 2 tasks a week, after job and college tasks) with a per-roadmap `company_roadmap` consent; the company sees progress, scores on its skills and its own tests' results (made once, answers hidden while open) | Built | `services/skill_library.py`, `services/company_roadmaps.py`, `services/assigned_tests.py`, `routers/company.py`, `pages/recruiter/RecruiterRoadmaps.jsx`, `pages/CompanyRoadmaps.jsx` |
 | Compliance | Consent gate (Terms + Privacy + 18+ checkboxes, versioned) | Built | `components/ConsentGate.jsx`, `routers/privacy.py`, `services/compliance.py` |
 | Compliance | Privacy settings: recruiter opt-in, who viewed me, export, delete account | Built | `pages/PrivacySettings.jsx`, `routers/privacy.py` |
 | Compliance | Privacy Policy + Terms of Use (single source) | Built | `frontend/public/legal/*.md`, rendered by `components/LegalDocument.jsx` |
@@ -125,7 +125,7 @@ This module has two sides.
 2. **Phase 2: recruiter portal + DPDP compliance.** ✅ v1 built: separate recruiter accounts with admin approval, saved preferences, ranked matching, candidate scorecards, student opt-in, consent gate, privacy settings, rewritten legal docs. Next: anti-cheating for scores recruiters rely on.
 3. **Phase 3: Delta for Professionals.** ✅ v1 built.
 4. **Phase 4: Delta for School.** ✅ v1 built: Maths + Science, CBSE 6–10, parent-managed. Next: approve all lessons, then more subjects (Social Science, English), then more boards.
-5. **Phase 5: company-specific roadmaps.** Recruiter requirements produce a roadmap template that students can join; their progress and scores feed back to the recruiter.
+5. **Phase 5: company-specific roadmaps.** ✅ v1 built (see Status). Decisions: an approved roadmap is locked (the company duplicates it to change it), so members always follow what Delta reviewed; joining or leaving a college ends company tracks with the other recruiter consents. Next: coding problems and AI interviews chosen by the company; let a college see which company roadmaps its students follow.
 
 ## 5. Conventions (follow these when adding features)
 
