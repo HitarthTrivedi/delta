@@ -76,6 +76,12 @@ Full list with comments: `backend/.env.example`. The production essentials:
 | `CORS_ORIGINS`, `FRONTEND_URL` | The frontend origin, e.g. `https://app.example.com` |
 | `GEMINI_API_KEY` (…`_5`) | Gemini keys |
 | `GEMINI_MODEL` / `GEMINI_LITE_MODEL` / `GEMINI_BACKUP_MODEL` | Current Flash / Flash-Lite model ids |
+| `AI_ROUTES_JSON` (optional) | Change which model a task uses, e.g. `{"chat_reply": "lite"}`. Values: `full`, `lite`, `groq:quality`, `groq:fast` or a model id. Defaults: `DEFAULT_AI_ROUTES` in `backend/app/config.py` |
+| `AI_PRICES_JSON` (optional) | USD per 1M input/output tokens per model, if list prices change. Defaults: `DEFAULT_AI_PRICES` |
+| `AI_MONTHLY_BUDGET_USD` | Monthly AI budget. Unset = no alerts and no degrading |
+| `AI_BUDGET_THRESHOLDS` | `50,80,100` (% at which admins are emailed) |
+| `AI_CAPS_JSON` (optional) | Monthly caps per plan and feature, e.g. `{"solo": {"chat": 400}}`. Defaults: `DEFAULT_AI_CAPS` |
+| `GROQ_API_KEY`, `GROQ_QUALITY_MODELS`, `GROQ_FAST_MODEL` | Groq (optional; without a key, Groq tasks use their Gemini fallback) |
 | `GOOGLE_TTS_API_KEY`, `INTERVIEW_TTS_VOICES` | Interviewer voice (optional) |
 | `ADMIN_EMAILS`, `CONTENT_REVIEWER_EMAILS` | Comma-separated |
 | `JDOODLE_CLIENT_ID`, `JDOODLE_CLIENT_SECRET` | Coding sandbox |
@@ -137,10 +143,17 @@ Restore the latest backup into a scratch Postgres (a free Supabase project or a 
 
 Watch opt-outs: a rising opt-out rate means reminders are too frequent or too pushy.
 
+## 7A. AI spend, budget and caps
+
+- **Where to look:** Recruiter admin → "ai usage" tab (or `GET /api/engagement/admin/ai-usage`). It shows this month's estimated spend by task and model, the budget, alerts already sent, and which model each task uses. Estimates come from real token counts × `AI_PRICES_JSON`; the provider's bill is the source of truth, so compare them monthly.
+- **Alerts:** admins (`ADMIN_EMAILS`) get one email per threshold per month, and Sentry gets a warning.
+- **At 100%** Delta degrades until the 1st of next month: every Gemini task uses `GEMINI_LITE_MODEL`, and the optional AI features (regenerate a brief, opportunity board, ATS rewrite) return "paused for the rest of the month". Everything else works. **To lift it mid-month**, raise `AI_MONTHLY_BUDGET_USD` on Railway (takes effect within a minute of the redeploy).
+- **Caps:** each learner's plan is derived (`college` while on a live college seat, otherwise `solo`). Over a cap they see "You've used your N … for this month. More on 1 <month>." Learners see their own numbers in Privacy settings. Tests set by a college or a company are never capped (no AI call).
+
 ## 8. Limits to watch
 
 - JDoodle free tier: 200 code runs/day. Above that, self-host Judge0 (Master Plan section 7).
-- Gemini: per-key rate limits; rotation across up to 5 keys.
+- Gemini: per-key rate limits; rotation across up to 5 keys. Spend: the AI usage view (section 7A).
 - Google TTS: free monthly character quota, then pay-per-character. Keep the budget alert on.
 - Supabase free: 500 MB database, pauses when idle.
 - One API replica: before adding a second, move the reminder scheduler and rate-limit counters to shared storage (Master Plan backlog).

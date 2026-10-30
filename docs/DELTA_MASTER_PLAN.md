@@ -214,9 +214,9 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 ### Production backlog (in order)
 1. **New Supabase project** (Mumbai). Keys go in the host's encrypted settings and teammates' local `.env` files, never in git.
 2. ✅ **Postgres + migrations:** code is Postgres-ready (psycopg 3, tested on Postgres), Alembic adopted with a baseline. Remaining: point `DATABASE_URL` at the new Supabase project.
-3. **Model routing in `ai_service`:** lite vs full model chosen per call site, with names from config. `GEMINI_LITE_MODEL` exists and the interview uses it; move other chatty call sites to it.
+3. ✅ **Model routing in `ai_service`:** every call names a task; `DEFAULT_AI_ROUTES` (config, overridable with `AI_ROUTES_JSON`) picks full, lite or Groq per task. No model ids are hardcoded at call sites.
 4. **Background job queue** for roadmap generation and other long AI work, so pages never wait on the model.
-5. **Per-plan usage caps** and a monthly AI budget alarm.
+5. ✅ **Per-plan usage caps** and a monthly AI budget alarm: a daily ledger of calls, tokens and estimated cost (no personal data); admins emailed at 50/80/100% of `AI_MONTHLY_BUDGET_USD`; at 100% everything uses the lite model and optional AI features pause. Plans are derived (`college` / `solo`); `pro` waits for Razorpay. See OPERATIONS.md §7A.
 6. ✅ **Monitoring:** Sentry wired (set `SENTRY_DSN`), `/health` checks the database; add the UptimeRobot monitor.
 7. **Staging environment + load test** (at least 500 concurrent users) before any big college onboarding.
 8. ✅ **Backups:** nightly encrypted off-site dump (`db-backup.yml`) + `restore_backup.sh`; set the secrets and run the monthly restore drill (`docs/OPERATIONS.md`).
