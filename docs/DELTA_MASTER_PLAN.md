@@ -215,7 +215,7 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 1. **New Supabase project** (Mumbai). Keys go in the host's encrypted settings and teammates' local `.env` files, never in git.
 2. ✅ **Postgres + migrations:** code is Postgres-ready (psycopg 3, tested on Postgres), Alembic adopted with a baseline. Remaining: point `DATABASE_URL` at the new Supabase project.
 3. ✅ **Model routing in `ai_service`:** every call names a task; `DEFAULT_AI_ROUTES` (config, overridable with `AI_ROUTES_JSON`) picks full, lite or Groq per task. No model ids are hardcoded at call sites.
-4. **Background job queue** for roadmap generation and other long AI work, so pages never wait on the model.
+4. ✅ **Background job queue** on the app database (`background_jobs`, `FOR UPDATE SKIP LOCKED` on Postgres): planning a week (first week, next week, an expired week, Aria's "next week") runs in worker threads inside the API process; pages poll `GET /api/background-jobs/{id}`. One plan job per learner at a time. The Celery stub is gone.
 5. ✅ **Per-plan usage caps** and a monthly AI budget alarm: a daily ledger of calls, tokens and estimated cost (no personal data); admins emailed at 50/80/100% of `AI_MONTHLY_BUDGET_USD`; at 100% everything uses the lite model and optional AI features pause. Plans are derived (`college` / `solo`); `pro` waits for Razorpay. See OPERATIONS.md §7A.
 6. ✅ **Monitoring:** Sentry wired (set `SENTRY_DSN`), `/health` checks the database; add the UptimeRobot monitor.
 7. **Staging environment + load test** (at least 500 concurrent users) before any big college onboarding.
@@ -238,7 +238,6 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 
 **Week 1 after the v1 beta launch** (deliberately not done before it):
 - Frontend: move from Create React App (deprecated; its build tooling carries most `npm audit` findings) to Vite; remove unused dependencies (all `@radix-ui/*`, `cmdk`, `vaul`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `react-hook-form`, `zod`, `date-fns`, `motion`, `cra-template`) and the unused `components/ui/*`, `CareerChat.jsx`, `mockData.js`, `plugins/health-check`; self-host Monaco (today loaded from jsdelivr).
-- Postgres-backed job queue (`jobs` table + `SKIP LOCKED`) for roadmap / weekly-cycle generation; delete the Celery stub.
 - Before a 2nd API replica: advisory lock around the reminder scheduler, shared rate-limit storage.
 - Interview: stream replies sentence by sentence; resume abandoned sessions; a male interviewer variant (same `tools/avatar/` pipeline, e.g. `toigo_male_suit_tie_and_jacket`) and a male/female choice.
 - React Query + skeletons on the remaining pages; frontend Sentry; k6 load test (500 concurrent) on staging.

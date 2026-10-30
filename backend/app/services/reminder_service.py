@@ -263,6 +263,12 @@ def run_daily_reminders(force: bool = False) -> dict:
         logger.warning("AI budget check failed: %s", exc)
         db.rollback()
     try:
+        from app.services import jobs
+        jobs.cleanup(db)  # finished background jobs older than JOB_KEEP_DAYS
+    except Exception as exc:
+        logger.warning("Background job cleanup failed: %s", exc)
+        db.rollback()
+    try:
         learners = db.query(UserEngagement).filter(UserEngagement.reminders_opt_in.is_(True)).all()
         for eng in learners:
             local_now = engagement._now().astimezone(engagement._tz(eng.timezone))

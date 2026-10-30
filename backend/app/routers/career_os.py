@@ -11,6 +11,7 @@ from app.database import get_db
 from app.dependencies.auth import block_minor_ai, current_identity, require_owner
 from app.services import compliance
 from app.limiter import limiter
+from app.services import jobs
 from app.models import (
     CareerMemoryProfile,
     IngestionSession,
@@ -26,9 +27,8 @@ from app.services.central_engine import (
     evaluate_week_status,
     initialize_career_os_for_user,
     log_journey_event,
-    refresh_roadmap_with_ai,
     run_memory_consolidation_cycle,
-    run_weekly_career_cycle,
+    check_weekly_gate,
     serialize_journey_event,
 )
 from app.services.domain_packs import get_domain_pack, list_domain_packs
@@ -103,7 +103,8 @@ def get_domain_pack_by_id(domain_id: str):
 @limiter.limit("60/minute")
 def get_career_context(request: Request, user_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
-        return compile_career_context(db, user_id, background_tasks=background_tasks)
+        # Page loads never wait on the model: a week that needs planning is queued (`roadmap_job`).
+        return compile_career_context(db, user_id, background_tasks=background_tasks, generate=False)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
@@ -147,16 +148,16 @@ def create_journey_event(user_id: str, payload: JourneyEventCreate, db: Session 
         raise HTTPException(status_code=500, detail=f"Could not save event: {exc}") from exc
 
 
-@router.post("/user/{user_id}/weekly-cycle", dependencies=[Depends(block_minor_ai)])
+@router.post("/user/{user_id}/weekly-cycle", dependencies=[Depends(block_minor_ai)], status_code=202)
 @limiter.limit("20/hour")
 def run_weekly_cycle(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+    """Checks the gate now (finish your tasks first), then plans the new week as a
+    background job. Poll GET /api/background-jobs/{id}, then reload the context."""
     try:
-        return run_weekly_career_cycle(db, user_id)
+        check_weekly_gate(db, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        _log.error("weekly-cycle failed for %s: %s", user_id, exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Agent 2 hit an error generating your next week: {exc}") from exc
+    return {"job": jobs.job_dict(jobs.enqueue(db, user_id, "weekly_cycle"))}
 
 
 class TaskDetailRequest(BaseModel):
@@ -389,7 +390,7 @@ class AdvanceExpiredRequest(BaseModel):
     carried_task_ids: list[str] = Field(default_factory=list)
 
 
-@router.post("/user/{user_id}/advance-expired-week", dependencies=[Depends(block_minor_ai)])
+@router.post("/user/{user_id}/advance-expired-week", dependencies=[Depends(block_minor_ai)], status_code=202)
 @limiter.limit("20/hour")
 def advance_expired_week(request: Request, user_id: str, payload: AdvanceExpiredRequest, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Auto-replan a week whose 7-day window lapsed with tasks unfinished, carrying
@@ -407,10 +408,4 @@ def advance_expired_week(request: Request, user_id: str, payload: AdvanceExpired
         if str(a.get("id") or "").strip().lower() in keep
         or str(a.get("title") or "").strip().lower() in keep
     ]
-    try:
-        return run_weekly_career_cycle(db, user_id, bypass_gate=True, carried_actions=carried)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        _log.error("advance_expired_week failed for %s: %s", user_id, exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"job": jobs.job_dict(jobs.enqueue(db, user_id, "weekly_cycle", {"carried_actions": carried}))}

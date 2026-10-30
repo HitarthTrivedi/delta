@@ -15,6 +15,7 @@ import { useAgent2Chat } from '../store/agent2ChatStore';
 import { careerContextKey, seedCareerContext } from '../hooks/useCareerOS';
 import { refreshEngagement } from '../hooks/useEngagement';
 import TemplatePicker from '../components/TemplatePicker';
+import { waitForJob } from '../lib/backgroundJobs';
 
 const panelStyle = {
   background: 'var(--paper)',
@@ -369,6 +370,7 @@ export default function WeeklyPlan() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  const [building, setBuilding] = useState(false); // first week being planned in the background
   const [checked, setChecked] = useState({});
   const [skipped, setSkipped] = useState({});
   const [chatOpen, setChatOpen] = useState(false);
@@ -442,19 +444,23 @@ export default function WeeklyPlan() {
     if (cached) applyContext(cached);
     setLoading(true);
     try {
-      const data = await careerOSAPI.getContext(userId);
+      let data = await careerOSAPI.getContext(userId);
+      if (data.roadmap_job) {
+        // The week is being planned in the background: wait for it, then read it.
+        setBuilding(true);
+        try {
+          await waitForJob(data.roadmap_job.id);
+        } finally {
+          setBuilding(false);
+        }
+        data = await careerOSAPI.getContext(userId);
+      }
       applyContext(data);
       seedCareerContext(queryClient, userId, data);
       if (regenerate) toast.success('Aria loaded your first weekly plan.');
     } catch (err) {
       console.error(err);
-      // Only show the error toast for real failures, not timeouts/slow generation
-      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout');
-      if (!isTimeout) {
-        toast.error('Unable to load your plan right now.');
-      } else {
-        toast.error('Taking longer than usual — refresh in a moment.');
-      }
+      toast.error(err?.response?.data?.detail || err?.message || 'Unable to load your plan right now.');
     } finally {
       setLoading(false);
     }
@@ -643,7 +649,9 @@ export default function WeeklyPlan() {
     setExpiredOpen(false);
     setAdvancing(true);
     try {
-      const data = await careerOSAPI.advanceExpiredWeek(userId, ids);
+      const { job } = await careerOSAPI.advanceExpiredWeek(userId, ids);
+      await waitForJob(job.id);
+      const data = await careerOSAPI.getContext(userId);
       setContext(data);
       seedCareerContext(queryClient, userId, data);
       const progress = getTaskProgress(data, fallbackActions);
@@ -654,7 +662,7 @@ export default function WeeklyPlan() {
       resetAgent2Chat('New week loaded — the previous week expired. Tell me if anything has changed.');
       toast.success('Week changed. Carried over the tasks you kept.');
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Could not change the week.');
+      toast.error(err?.response?.data?.detail || err?.message || 'Could not change the week.');
     } finally {
       setAdvancing(false);
     }
@@ -751,7 +759,20 @@ export default function WeeklyPlan() {
     if (!text || sending) return;
     const prompt = `Agent 2 weekly plan discussion. Current weekly actions: ${actions.map(a => a.title).join('; ')}. User update: ${text}`;
     const response = await sendAgent2(userId, text, prompt);
-    if (response && Array.isArray(response.updated_actions)) {
+    if (response?.job_id) {
+      // Aria started planning next week in the background: show it when ready.
+      setAdvancing(true);
+      try {
+        await waitForJob(response.job_id);
+        dropCachedContext();
+        await loadContext();
+        resetAgent2Chat('New week loaded. Tell me if anything has changed — exams, pace, priorities.');
+      } catch (err) {
+        toast.error(err?.message || 'Could not prepare next week.');
+      } finally {
+        setAdvancing(false);
+      }
+    } else if (response && Array.isArray(response.updated_actions)) {
       dropCachedContext();
       setContext(prev => ({
         ...(prev || {}),
@@ -869,7 +890,9 @@ export default function WeeklyPlan() {
   const requestNextWeek = async () => {
     setAdvancing(true);
     try {
-      const data = await careerOSAPI.runWeeklyCycle(userId);
+      const { job } = await careerOSAPI.runWeeklyCycle(userId);
+      await waitForJob(job.id);
+      const data = await careerOSAPI.getContext(userId);
       setContext(data);
       seedCareerContext(queryClient, userId, data);
       const progress = getTaskProgress(data, fallbackActions);
@@ -1036,7 +1059,7 @@ export default function WeeklyPlan() {
                 <>
                   <Loader2 size={16} color="var(--ink)" style={{ animation: 'spin 1s linear infinite' }} />
                   <span style={{ fontSize: 14, color: 'var(--ink)' }}>
-                    {new URLSearchParams(location.search).get('from') === 'intake'
+                    {building || new URLSearchParams(location.search).get('from') === 'intake'
                       ? 'Aria is building your first week from your profile. This can take up to a minute the first time.'
                       : 'Loading your week…'}
                   </span>

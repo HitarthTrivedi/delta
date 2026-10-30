@@ -24,7 +24,7 @@ from app.services.central_engine import (
     compile_career_context,
     initialize_career_os_for_user,
     log_journey_event,
-    run_weekly_career_cycle,
+    check_weekly_gate,
     serialize_journey_event,
 )
 from app.services.onboarding_pipeline import finalize_onboarding, start_onboarding
@@ -1073,23 +1073,16 @@ def chat_message(
                     user_update = f"{user_update}\n\n[Live web search results for your query:]\n{search_context}"
 
             if intent == "next_week":
+                # The gate answers now; planning the week runs as a background job.
                 try:
-                    next_context = run_weekly_career_cycle(db, data.user_id)
-                    next_actions = ((next_context.get("roadmap") or {}).get("weekly_focus") or {}).get("primary_actions") or []
-                    sync_user_context(data.user_id, profile_file, next_context)
-                    sync_current_week(data.user_id, next_context, next_actions, reason="User asked Agent 2 for next week's tasks.")
-                    next_phase = ((next_context.get("roadmap") or {}).get("weekly_focus") or {}).get("phase_name")
-                    response_text = (
-                        f"Here is your next week ({next_phase}). " if next_phase else "Here is your next week. "
-                    ) + "These are the tasks I have set:\n\n" + _format_action_bullets(next_actions)
+                    check_weekly_gate(db, data.user_id)
+                    from app.services import jobs
+                    job = jobs.enqueue(db, data.user_id, "weekly_cycle")
+                    response_text = "I'm preparing your next week now. It will appear on My plan in about a minute."
                     append_chat_turn(data.user_id, user_update, response_text, intent)
-                    return ChatResponse(
-                        response=response_text, context=user_context,
-                        updated_actions=next_actions, week_phase=next_phase,
-                    )
-                except (ValueError, Exception) as exc:
-                    logger.error("next_week via chat failed for %s: %s", data.user_id, exc, exc_info=True)
-                    response_text = str(exc) if isinstance(exc, ValueError) else f"Something went wrong generating next week's plan. Please try the 'Request Next Week' button on the Roadmap page."
+                    return ChatResponse(response=response_text, context=user_context, job_id=job.id)
+                except ValueError as exc:
+                    response_text = str(exc)
                     append_chat_turn(data.user_id, user_update, response_text, intent)
                     return ChatResponse(response=response_text, context=user_context)
 

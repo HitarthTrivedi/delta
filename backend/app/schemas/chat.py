@@ -13,6 +13,8 @@ class ChatResponse(BaseModel):
     # could disagree. None means "no change to the task list this turn".
     updated_actions: Optional[List[dict]] = None
     week_phase: Optional[str] = None
+    # Set when the reply started a background job (e.g. planning next week): poll it, then reload the plan.
+    job_id: Optional[str] = None
 
 class OnboardingStartRequest(BaseModel):
     raw_input: str
