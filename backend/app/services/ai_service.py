@@ -2,6 +2,11 @@
 AI Service — unified LLM client for all delta agents.
 Uses google-genai SDK with Gemini. Supports up to 5 API keys in round-robin
 rotation — on quota exhaustion (429) it immediately retries with the next key.
+
+Every call names a `task` (e.g. "theory_test"); config routes each task to a
+model (services/ai_usage.routes). Each call's tokens go to the daily usage
+ledger, and while the monthly AI budget is spent every task uses the lite
+model (services/ai_budget).
 """
 
 import os
@@ -81,19 +86,19 @@ def _backup_model() -> str:
     return settings.GEMINI_BACKUP_MODEL
 
 
-GROQ_MODELS = {
-    "openai/gpt-oss-120b",
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "meta-llama/llama-4-scout-17b",
-}
+def _quality_pool() -> list[str]:
+    """Groq quality tier (GROQ_QUALITY_MODELS): alternated so their daily buckets combine."""
+    from app.config import settings
+    return [m.strip() for m in settings.GROQ_QUALITY_MODELS.split(",") if m.strip()]
 
-# Quality tier: alternate two independent daily buckets to double the headroom.
-_QUALITY_POOL = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
-_quality_cycle = itertools.cycle(_QUALITY_POOL)
 
-# Fast tier: cheap/frequent calls (intent classification, extraction, routing).
-FAST_MODEL = "llama-3.1-8b-instant"
+def _fast_model() -> str:
+    """Groq fast tier (GROQ_FAST_MODEL): cheap, frequent calls such as intent routing."""
+    from app.config import settings
+    return settings.GROQ_FAST_MODEL
+
+
+_quality_cycles: dict[tuple, itertools.cycle] = {}
 
 # Free-tier per-request token budgets are small (TPM: 8b≈6K, 120b≈8K, 70b≈12K) and a
 # request reserves its max_tokens up front — so an oversized max_tokens alone triggers
@@ -110,10 +115,67 @@ def _groq_max_tokens(model: str, requested: int) -> int:
     return min(requested, _GROQ_MAX_OUTPUT.get(model, 2048))
 
 
+def _is_groq(model: str) -> bool:
+    return model in _GROQ_MAX_OUTPUT or model in _quality_pool() or model == _fast_model()
+
+
 def quality_model() -> str:
-    """Next Groq quality model, round-robined across gpt-oss-120b and
-    llama-3.3-70b-versatile so their separate rate-limit buckets combine."""
-    return next(_quality_cycle)
+    """Next Groq quality model, round-robined across GROQ_QUALITY_MODELS so their
+    separate rate-limit buckets combine."""
+    pool = tuple(_quality_pool())
+    if pool not in _quality_cycles:
+        _quality_cycles[pool] = itertools.cycle(pool)
+    return next(_quality_cycles[pool])
+
+
+def _route_to_model(route: str) -> str:
+    from app.config import settings
+    if route == "full":
+        return settings.GEMINI_MODEL
+    if route == "lite":
+        return settings.GEMINI_LITE_MODEL
+    if route == "groq:quality":
+        return quality_model()
+    if route == "groq:fast":
+        return _fast_model()
+    return route
+
+
+def resolve_model(task: str | None, model: str | None = None) -> str:
+    """The model for this call: an explicit `model`, else the task's route.
+    While the monthly budget is spent, Gemini calls drop to the lite model."""
+    from app.config import settings
+    from app.services import ai_budget, ai_usage
+    if model:
+        logger.info(f"[LLM] explicit model {model} for task {task or 'untagged'}")
+        chosen = model
+    else:
+        chosen = _route_to_model(ai_usage.routes().get(task or "", "full"))
+    if not _is_groq(chosen) and chosen != settings.GEMINI_LITE_MODEL and ai_budget.degraded():
+        chosen = settings.GEMINI_LITE_MODEL
+    return chosen
+
+
+def _gemini_fallback(task: str | None) -> str:
+    """When Groq fails: the task's own Gemini route, or the lite model."""
+    from app.config import settings
+    from app.services import ai_usage
+    route = _route_to_model(ai_usage.routes().get(task or "", "full"))
+    return route if not _is_groq(route) else settings.GEMINI_LITE_MODEL
+
+
+def _record(task: str | None, model: str, prompt: str, text: str, input_tokens=None, output_tokens=None) -> None:
+    from app.services import ai_usage
+    ai_usage.record(task or "untagged", model,
+                    int(input_tokens) if input_tokens else ai_usage.estimate_tokens(prompt),
+                    int(output_tokens) if output_tokens else ai_usage.estimate_tokens(text))
+
+
+def _gemini_usage(response) -> tuple[int | None, int | None]:
+    meta = getattr(response, "usage_metadata", None)
+    if not meta:
+        return None, None
+    return getattr(meta, "prompt_token_count", None), getattr(meta, "candidates_token_count", None)
 
 
 def _get_groq():
@@ -135,19 +197,19 @@ def _get_groq():
     return _groq_client
 
 
-def _groq_generate(prompt: str, temperature: float, max_tokens: int, model: str) -> str | None:
-    """One-shot Groq completion. Returns text, None if Groq is unconfigured, or
-    raises on an API error so the caller can fall back to Gemini."""
+def _groq_generate(prompt: str, temperature: float, max_tokens: int, model: str) -> tuple[str | None, object]:
+    """One-shot Groq completion. Returns (text, usage); text is None if Groq is
+    unconfigured. Raises on an API error so the caller can fall back to Gemini."""
     client = _get_groq()
     if client is None:
-        return None
+        return None, None
     resp = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
         max_tokens=_groq_max_tokens(model, max_tokens),
     )
-    return (resp.choices[0].message.content or "").strip()
+    return (resp.choices[0].message.content or "").strip(), getattr(resp, "usage", None)
 
 
 def _groq_stream(prompt: str, temperature: float, max_tokens: int, model: str):
@@ -171,31 +233,33 @@ def _groq_stream(prompt: str, temperature: float, max_tokens: int, model: str):
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 
-def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None) -> str:
+def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None,
+                      task: str | None = None) -> str:
     """
-    Send a prompt to Gemini and return the response text.
+    Send a prompt to the model routed for `task` and return the response text.
     Retries across all available API keys on 429/quota errors before failing.
-    `model` overrides the globally configured GEMINI_MODEL for this call.
+    `model` overrides the task's route for this call.
     """
     _build_clients()
-    if not model:
-        model = _gemini_model()
+    model = resolve_model(task, model)
 
-    logger.info(f"[LLM] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
+    logger.info(f"[LLM] {task or 'untagged'} | {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
 
     # Groq path — fast LPU inference. On any failure, fall back to Gemini below.
     # When Groq is simply unconfigured, fall through quietly (it warns once at init).
-    if model in GROQ_MODELS:
+    if _is_groq(model):
         if _get_groq() is not None:
             try:
-                text = _groq_generate(prompt, temperature, max_tokens, model)
+                text, usage = _groq_generate(prompt, temperature, max_tokens, model)
                 if text:
                     logger.info(f"[LLM] groq success | {model} | response_len={len(text)}")
+                    _record(task, model, prompt, text, getattr(usage, "prompt_tokens", None),
+                            getattr(usage, "completion_tokens", None))
                     return text
                 logger.warning(f"[LLM] groq {model} returned empty — falling back to Gemini")
             except Exception as e:
                 logger.warning(f"[LLM] groq {model} failed ({type(e).__name__}: {str(e)[:120]}) — falling back to Gemini")
-        model = _gemini_model()
+        model = _gemini_fallback(task)
 
     if not _clients:
         logger.warning("No API clients available — using mock fallback")
@@ -218,7 +282,8 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
             )
             text = response.text
             if text:
-                logger.info(f"[LLM] success | response_len={len(text)}")
+                logger.info(f"[LLM] success | {model} | response_len={len(text)}")
+                _record(task, model, prompt, text, *_gemini_usage(response))
                 return text.strip()
         except Exception as e:
             err_str = str(e).lower()
@@ -236,36 +301,39 @@ def generate_response(prompt: str, temperature: float = 0.7, max_tokens: int = 1
         backup = _backup_model()
         if backup and model != backup:
             logger.warning(f"[LLM] {model} unavailable ({str(last_error)[:80]}) — retrying once on {backup}")
-            return generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=backup)
+            return generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=backup, task=task)
         logger.error(f"[LLM] All {len(_clients)} keys exhausted. Last error: {last_error}")
         raise ValueError("All API quota limits reached. Please try again in a few minutes.")
 
     return _mock_structured_response(prompt)
 
 
-def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None):
-    """Stream a Gemini response as text chunks (generator).
+def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: int = 10000, model: str | None = None,
+                             task: str | None = None):
+    """Stream the response for `task` as text chunks (generator).
 
     Mirrors generate_response's key rotation. If streaming yields nothing or
     fails before any output, falls back to a single non-streaming reply so the
     caller always gets an answer. Never raises — the chat must not break.
     """
     _build_clients()
-    if not model:
-        model = _gemini_model()
+    model = resolve_model(task, model)
 
-    logger.info(f"[LLM stream] {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
+    logger.info(f"[LLM stream] {task or 'untagged'} | {model} | temp={temperature} | tokens={max_tokens} | prompt_len={len(prompt)}")
 
     # Groq streaming path. On failure before any output, fall back to Gemini below.
     # When Groq is simply unconfigured, fall through quietly (it warns once at init).
-    if model in GROQ_MODELS:
+    if _is_groq(model):
         if _get_groq() is not None:
             got = False
+            parts = []
             try:
                 for piece in _groq_stream(prompt, temperature, max_tokens, model):
                     got = True
+                    parts.append(piece)
                     yield piece
                 if got:
+                    _record(task, model, prompt, "".join(parts))
                     return
                 logger.warning(f"[LLM stream] groq {model} empty — falling back to Gemini")
             except Exception as e:
@@ -273,7 +341,7 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
                     logger.error(f"[LLM stream] groq error after partial output: {e}")
                     return
                 logger.warning(f"[LLM stream] groq {model} failed ({type(e).__name__}) — falling back to Gemini")
-        model = _gemini_model()
+        model = _gemini_fallback(task)
 
     if not _clients:
         yield _stream_fallback(prompt)
@@ -285,6 +353,7 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
         if client is None:
             break
         got = False
+        parts, last = [], None
         try:
             stream = client.models.generate_content_stream(
                 model=model,
@@ -292,11 +361,14 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
                 config={"temperature": temperature, "max_output_tokens": max_tokens},
             )
             for chunk in stream:
+                last = chunk
                 text = getattr(chunk, "text", None)
                 if text:
                     got = True
+                    parts.append(text)
                     yield text
             if got:
+                _record(task, model, prompt, "".join(parts), *_gemini_usage(last))
                 return
             # produced no text — try the next key
         except Exception as e:
@@ -315,7 +387,7 @@ def generate_response_stream(prompt: str, temperature: float = 0.7, max_tokens: 
     # Nothing streamed — fall back to a single non-streaming reply.
     logger.warning(f"[LLM stream] falling back to non-streaming reply. last_error={last_error}")
     try:
-        yield generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=model)
+        yield generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=model, task=task)
     except Exception:
         yield _stream_fallback(prompt)
 
@@ -350,13 +422,14 @@ def sanitize_llm_json_text(text: str) -> str:
     return re.sub(r"\\(?=[A-Za-z]{2,})", r"\\\\", text)
 
 
-def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None, max_tokens: int = 10000) -> dict | list:
+def generate_json(prompt: str, temperature: float = 0.3, model: str | None = None, max_tokens: int = 10000,
+                  task: str | None = None) -> dict | list:
     """
     Generate a JSON response. Strips markdown fences and parses automatically.
     Small JSON payloads (e.g. intent routing) should pass a low max_tokens so the
     request reserves fewer tokens against tight free-tier per-minute budgets.
     """
-    raw = generate_response(prompt, temperature=temperature, model=model, max_tokens=max_tokens)
+    raw = generate_response(prompt, temperature=temperature, model=model, max_tokens=max_tokens, task=task)
 
     clean = raw
     if "```json" in clean:

@@ -52,10 +52,12 @@ def _ok(r):
 def test_turns_use_the_lite_model(monkeypatch):
     H = _student("iv_lite", "Data Analyst")
     models = []
-    monkeypatch.setattr(iai, "generate_response", lambda p, **k: models.append(k.get("model")) or "Tell me about a dataset you cleaned.")
+    monkeypatch.setattr(iai, "generate_response", lambda p, **k: models.append(k.get("task")) or "Tell me about a dataset you cleaned.")
     st = _ok(client.post("/api/sandbox/interview/iv_lite/start", headers=H, json={"role_type": "technical", "num_questions": 3}))
     _ok(client.post(f"/api/sandbox/interview/iv_lite/sessions/{st['session_id']}/respond", headers=H, json={"answer": "I used pandas."}))
-    assert models and all(m == settings.GEMINI_LITE_MODEL for m in models)
+    from app.services.ai_service import resolve_model
+    assert models and all(m == "interview_turn" for m in models)
+    assert resolve_model("interview_turn") == settings.GEMINI_LITE_MODEL
 
 
 def test_system_design_is_not_offered_to_non_tech_fields(monkeypatch):

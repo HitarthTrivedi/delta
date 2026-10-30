@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Download, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { collegeAPI, companyAPI, privacyAPI } from '../lib/api';
+import { collegeAPI, companyAPI, engagementAPI, privacyAPI } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
 const GRIEVANCE_EMAIL = 'hitartht318@gmail.com';
@@ -261,6 +261,7 @@ export default function PrivacySettings() {
         {/* Your college (Delta for College) */}
         <CollegeSection userId={userId} consent={consent} onChange={setConsent} />
         <CompanySection userId={userId} />
+        <UsageSection userId={userId} />
 
         {/* Study reminders (opt-in) */}
         <section className={sectionClass}>
@@ -434,6 +435,28 @@ const COLLEGE_NEVER_SEES = [
   'Your résumé text, job matches, circles, leagues, XP and streaks',
   'Whether you are visible to recruiters, and who viewed you',
 ];
+
+function UsageSection({ userId }) {
+  const { data } = useQuery({ queryKey: ['ai-usage', userId], queryFn: () => engagementAPI.usage(userId), enabled: !!userId });
+  if (!data) return null;
+  const resets = new Date(`${data.resets_on}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+  return (
+    <section className={sectionClass}>
+      <h2 className={h2Class}>AI features this month</h2>
+      <p className={pClass}>
+        Your plan: {data.plan === 'college' ? 'your college\'s seat' : 'individual'}. Each AI feature has a monthly allowance; it resets on {resets}.
+      </p>
+      <ul className="mt-3 grid gap-1 list-none p-0 m-0 text-[14px]">
+        {data.features.filter((f) => f.cap != null).map((f) => (
+          <li key={f.feature} className="flex justify-between gap-3">
+            <span className="text-ink">{f.label.charAt(0).toUpperCase() + f.label.slice(1)}</span>
+            <span className="text-ink-soft tabular-nums">{f.used} of {f.cap}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function CompanySection({ userId }) {
   const queryClient = useQueryClient();

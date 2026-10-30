@@ -273,6 +273,8 @@ export const engagementAPI = {
   removePush: (userId, endpoint) => api.delete(`/engagement/${userId}/push`, { data: { endpoint } }).then(r => r.data),
   unsubscribe: (u, t) => api.post('/engagement/unsubscribe', { u, t }).then(r => r.data),
   badges: (userId) => api.get(`/engagement/${userId}/badges`).then(r => r.data),
+  usage: (userId) => api.get(`/engagement/usage/${userId}`).then(r => r.data),
+  adminAiUsage: () => api.get('/engagement/admin/ai-usage').then(r => r.data),
   league: (userId) => api.get(`/engagement/${userId}/league`).then(r => r.data),
   setLeague: (userId, enabled) => api.put(`/engagement/${userId}/league`, { enabled }).then(r => r.data),
   shareBadge: (userId, key) => api.post(`/engagement/${userId}/badges/${key}/share`).then(r => r.data),

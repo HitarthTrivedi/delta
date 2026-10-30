@@ -26,6 +26,7 @@ from app.services.resume_service import (
 )
 from app.dependencies.auth import require_owner, verify_resource_owner
 from app.limiter import limiter
+from app.services import ai_budget, usage_caps
 
 logger = logging.getLogger("delta.resume")
 from app.dependencies.auth import block_minor_ai  # noqa: E402
@@ -94,6 +95,7 @@ def upload_resume(
     filename = file.filename or "resume.pdf"
     parsed = parse_resume(content, filename)
     raw_text = parsed.get("raw_text") or ""
+    usage_caps.take(db, user_id, "resume")
 
     try:
         # Try high-fidelity LLM parsing first
@@ -225,7 +227,9 @@ def download_resume(user_id: str, db: Session = Depends(get_db), _: str = Depend
 # ── POST /api/resume/{user_id}/ats-optimize ──────────────────────────────────
 
 @router.post("/{user_id}/ats-optimize")
-def ats_optimize(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("10/hour")
+def ats_optimize(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner),
+                 __: None = Depends(ai_budget.optional_ai)):
     """Rewrite resume bullet points using market demand keywords (ATS mode)."""
     resume = get_or_create_resume_profile(user_id, db)
     if not resume or not resume.structured_data:
@@ -239,7 +243,8 @@ def ats_optimize(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
 
     try:
         market_skills = get_market_skills(user_id, db)
-        optimized = optimize_for_ats(structured, market_skills)
+        with usage_caps.using(db, user_id, "resume"):
+            optimized = optimize_for_ats(structured, market_skills)
         saved = save_resume(user_id, db, optimized, source=resume.source or "generated", market_skills=market_skills)
         return {
             "status": "ats_optimized",

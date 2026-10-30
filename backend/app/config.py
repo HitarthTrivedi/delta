@@ -53,6 +53,21 @@ class Settings(BaseSettings):
     # GEMINI_MODEL stays the default for work where quality shows (reports, tests).
     GEMINI_LITE_MODEL: str = os.getenv("GEMINI_LITE_MODEL", "gemini-2.5-flash-lite")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    # Groq models: "quality" calls round-robin the list (separate rate-limit buckets).
+    GROQ_QUALITY_MODELS: str = os.getenv("GROQ_QUALITY_MODELS", "openai/gpt-oss-120b,llama-3.3-70b-versatile")
+    GROQ_FAST_MODEL: str = os.getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant")
+    # Which model each AI task uses (JSON, merged over DEFAULT_AI_ROUTES below).
+    # Values: "full" (GEMINI_MODEL), "lite" (GEMINI_LITE_MODEL), "groq:quality",
+    # "groq:fast", or an exact model name.
+    AI_ROUTES_JSON: str = os.getenv("AI_ROUTES_JSON", "")
+    # USD per 1M input / output tokens, per model (JSON, merged over DEFAULT_AI_PRICES).
+    AI_PRICES_JSON: str = os.getenv("AI_PRICES_JSON", "")
+    # Monthly AI budget in USD. Empty = no alerts and no degrading (usage is still recorded).
+    AI_MONTHLY_BUDGET_USD: str = os.getenv("AI_MONTHLY_BUDGET_USD", "")
+    # % of the budget at which admins are emailed (each once a month).
+    AI_BUDGET_THRESHOLDS: str = os.getenv("AI_BUDGET_THRESHOLDS", "50,80,100")
+    # Monthly AI caps per plan and feature (JSON, merged over DEFAULT_AI_CAPS).
+    AI_CAPS_JSON: str = os.getenv("AI_CAPS_JSON", "")
     # Google Cloud Text-to-Speech: the 3D interviewer's voice + lip-sync timings.
     # Without a key the interview uses the browser voice and the 2D avatar.
     GOOGLE_TTS_API_KEY: str = os.getenv("GOOGLE_TTS_API_KEY", "")
@@ -146,3 +161,38 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 settings = Settings()
+
+# ── AI routing, prices and caps (defaults; the *_JSON settings override them) ──
+# Full model only where accuracy shows (reports, tests, roadmaps, résumé
+# parsing); lite or Groq for chatty, latency-sensitive calls.
+DEFAULT_AI_ROUTES = {
+    "weekly_brief": "full", "theory_test": "full", "interview_report": "full", "coding_problem": "full",
+    "school_lesson": "full", "resume_parse": "full", "resume_ats": "full", "intake_resume": "full",
+    "onboarding_finalize": "full",
+    "interview_turn": "lite", "job_extract": "lite", "task_detail": "lite", "opportunities": "lite",
+    "onboarding_questions": "lite",
+    "chat_intent": "groq:fast", "chat_reply": "groq:quality", "day_focus": "groq:quality",
+    "intake_extract": "groq:quality", "intake_question": "groq:quality",
+}
+
+# List prices in USD per 1M tokens [input, output]. Check against the providers'
+# pricing pages before launch and whenever a model changes.
+DEFAULT_AI_PRICES = {
+    "gemini-2.5-flash": [0.30, 2.50],
+    "gemini-2.5-flash-lite": [0.10, 0.40],
+    "openai/gpt-oss-120b": [0.15, 0.75],
+    "llama-3.3-70b-versatile": [0.59, 0.79],
+    "llama-3.1-8b-instant": [0.05, 0.08],
+}
+
+# Monthly uses per plan and feature. "college" = an active seat at a live
+# college; "solo" = everyone else; "pro" waits for payments. A missing
+# feature means no cap. Sized so normal use never meets them.
+DEFAULT_AI_CAPS = {
+    "solo": {"chat": 600, "theory_test": 60, "mock_interview": 30, "coding_problem": 60, "resume": 20,
+             "job_match": 30, "opportunities": 10, "brief_regenerate": 10, "intake": 300},
+    "college": {"chat": 1000, "theory_test": 100, "mock_interview": 50, "coding_problem": 100, "resume": 30,
+                "job_match": 50, "opportunities": 20, "brief_regenerate": 20, "intake": 300},
+    "pro": {"chat": 1500, "theory_test": 150, "mock_interview": 80, "coding_problem": 150, "resume": 40,
+            "job_match": 80, "opportunities": 30, "brief_regenerate": 30, "intake": 300},
+}

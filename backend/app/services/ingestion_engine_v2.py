@@ -3,7 +3,7 @@ Ingestion Engine v2 — Clean, reliable intake agent for delta Career OS.
 
 Architecture:
   - Resume parse runs on gemini-2.5-flash (accuracy); the Q&A round (extraction +
-    next-question) runs on the Groq quality tier via quality_model() for fast,
+    next-question) runs on the Groq quality tier (task routes in config) for fast,
     intent-aware questions.
   - Writes extracted profile to profile_store (data/profiles/<user_id>.json)
   - Downstream agents (roadmap, brief) read from the same profile store
@@ -25,7 +25,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from app.services.ai_service import generate_response, generate_json, quality_model
+from app.services.ai_service import generate_response, generate_json
 from app.services.profile_store import load_profile, save_profile, profile_as_context_string
 from app.services.web_search import WebSearchService
 
@@ -35,9 +35,8 @@ logger = logging.getLogger("delta.ingestion_v2")
 #  - Resume parsing is a single, accuracy-critical, infrequent call → use the
 #    stronger gemini-2.5-flash so skills/facts are extracted correctly without guessing.
 #  - The conversational Q&A round (field extraction + next-question) is where intent
-#    understanding matters most, so it runs on the Groq quality tier via quality_model()
-#    — fast, and far better at reading the user's goal than gemma-4-31b-it was.
-INTAKE_RESUME_MODEL = "gemini-2.5-flash"
+#    understanding matters most, so it runs on the Groq quality tier ("intake_extract"
+#    and "intake_question" routes) — fast, and far better at reading the user's goal.
 
 # Minimum number of genuine user answers required before the intake can finish —
 # guarantees a real goals/ambitions conversation even when a resume already fills
@@ -571,7 +570,7 @@ class IngestionEngineV2:
     def _safe_generate_json(self, prompt: str, conversation: list[dict]) -> dict:
         heuristic = self._heuristic_extract_from_conversation(conversation)
         try:
-            extracted = generate_json(prompt, model=quality_model())
+            extracted = generate_json(prompt, task="intake_extract")
             if isinstance(extracted, dict) and extracted:
                 # Heuristic fills in fields the AI missed (e.g. hours_per_week from regex)
                 for key, val in heuristic.items():
@@ -584,7 +583,7 @@ class IngestionEngineV2:
 
     def _safe_generate_text(self, prompt: str, fallback: str, temperature: float = 0.6, max_tokens: int = 2000) -> str:
         try:
-            text = generate_response(prompt, temperature=temperature, max_tokens=max_tokens, model=quality_model())
+            text = generate_response(prompt, temperature=temperature, max_tokens=max_tokens, task="intake_question")
             return text.strip() or fallback
         except Exception as exc:
             logger.warning(f"AI text generation failed; using fallback text: {exc}")
@@ -997,18 +996,18 @@ Return ONLY the JSON object."""
 
         extracted = {}
         try:
-            generated = generate_json(prompt, temperature=0.1, model=INTAKE_RESUME_MODEL)
+            generated = generate_json(prompt, temperature=0.1, task="intake_resume")
             if isinstance(generated, dict):
                 extracted = generated
         except Exception as exc:
-            logger.warning(f"Resume parse via {INTAKE_RESUME_MODEL} failed: {exc}")
+            logger.warning(f"Resume parse (intake_resume route) failed: {exc}")
 
         # gemini-2.5-flash is quota-limited and frequently returns 503; when it
         # yields nothing, retry on the Groq quality tier so the resume still parses.
         if not extracted:
             try:
                 logger.info("Resume parse falling back to Groq quality tier")
-                generated = generate_json(prompt, temperature=0.1, model=quality_model())
+                generated = generate_json(prompt, temperature=0.1, task="intake_extract")
                 if isinstance(generated, dict):
                     extracted = generated
             except Exception as exc:

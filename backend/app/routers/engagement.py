@@ -24,6 +24,22 @@ class BreakPayload(BaseModel):
     days: int = Field(ge=1, le=engagement.BREAK_DAYS_PER_MONTH)
 
 
+@router.get("/admin/ai-usage")
+def admin_ai_usage(identity=Depends(current_identity), db: Session = Depends(get_db)):
+    """Month-to-date AI spend by task and model, the budget, alerts sent and whether Delta is degraded."""
+    if not compliance.is_admin(identity[1]):
+        raise HTTPException(status_code=403, detail="Admins only.")
+    from app.services import ai_budget
+    return ai_budget.summary(db)
+
+
+@router.get("/usage/{user_id}")
+def my_ai_usage(user_id: str, _: str = Depends(require_owner), db: Session = Depends(get_db)):
+    """This month's AI uses against the learner's plan caps."""
+    from app.services import usage_caps
+    return usage_caps.usage(db, user_id)
+
+
 @router.get("/admin/metrics")
 def admin_metrics(db: Session = Depends(get_db), identity=Depends(current_identity)):
     """Retention dashboard numbers (aggregates only), for ADMIN_EMAILS."""

@@ -134,7 +134,7 @@ Return ONLY valid JSON in exactly this shape:
 Rules: honor the preferred location and opportunity types. Order by match_score descending. Be realistic and specific. No text outside the JSON."""
 
     try:
-        data = generate_json(prompt, temperature=0.5)
+        data = generate_json(prompt, temperature=0.5, task="opportunities")
     except Exception as exc:
         logger.error("opportunity generation failed for %s: %s", user_id, exc)
         return []

@@ -79,7 +79,7 @@ export default function CodingSandbox() {
       setCode(data.starter_code?.[firstLang] || '');
     } catch (err) {
       console.error(err);
-      toast.error('Could not load this problem. Try again.');
+      toast.error(err?.response?.data?.detail || 'Could not load this problem. Try again.');
     } finally {
       setStarting(false);
     }

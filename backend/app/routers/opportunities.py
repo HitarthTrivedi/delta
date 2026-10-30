@@ -9,7 +9,9 @@ import datetime
 import json
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from app.limiter import limiter
+from app.services import ai_budget, usage_caps
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -102,11 +104,14 @@ def update_preferences(
 
 
 @router.post("/{user_id}/generate")
-def generate_board(user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("5/hour")
+def generate_board(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner),
+                   __: None = Depends(ai_budget.optional_ai)):
     """Regenerate suggestions from the current profile + saved preferences (LLM call)."""
     board = _get_or_create(db, user_id)
     prefs = _load_prefs(board)
-    opportunities = generate_opportunities(user_id, prefs)
+    with usage_caps.using(db, user_id, "opportunities"):
+        opportunities = generate_opportunities(user_id, prefs)
     board.opportunities = json.dumps(opportunities)
     board.profile_signature = profile_signature(user_id)
     board.generated_at = datetime.datetime.utcnow()

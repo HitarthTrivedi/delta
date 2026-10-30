@@ -295,7 +295,7 @@ LIVE MARKET TREND INTELLIGENCE (fetched right now via web search — use this to
     print(f"=========================================================================")
 
     try:
-        response_text = generate_response(prompt).strip()
+        response_text = generate_response(prompt, task="weekly_brief").strip()
         
         # Clean potential markdown wrapping
         if "```json" in response_text:

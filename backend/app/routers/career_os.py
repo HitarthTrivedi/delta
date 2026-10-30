@@ -100,7 +100,8 @@ def get_domain_pack_by_id(domain_id: str):
 
 
 @router.get("/user/{user_id}/context")
-def get_career_context(user_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("60/minute")
+def get_career_context(request: Request, user_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     try:
         return compile_career_context(db, user_id, background_tasks=background_tasks)
     except ValueError as exc:
@@ -187,7 +188,7 @@ def get_task_detail(request: Request, user_id: str, payload: TaskDetailRequest, 
             "official regulator or professional-body sites; roadmap.sh or docs only for software). Steps must be concrete actions."
         )
 
-        detail = generate_json(prompt, temperature=0.3)
+        detail = generate_json(prompt, temperature=0.3, task="task_detail")
 
         if not detail or not isinstance(detail, dict):
             raise HTTPException(status_code=500, detail="AI returned an empty response. Try again.")
@@ -306,7 +307,8 @@ class PlanStyleUpdate(BaseModel):
 
 
 @router.put("/user/{user_id}/plan-style")
-def set_plan_style(user_id: str, payload: PlanStyleUpdate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+@limiter.limit("20/minute")
+def set_plan_style(request: Request, user_id: str, payload: PlanStyleUpdate, db: Session = Depends(get_db), _: str = Depends(require_owner)):
     """Set week/day plan style. When switching to 'day', persist the schedule and
     generate the 7-day distribution."""
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()

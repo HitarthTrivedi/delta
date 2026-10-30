@@ -40,6 +40,7 @@ from app.services.agent2_memory import (
     upsert_upcoming_event,
 )
 from app.limiter import limiter
+from app.services import usage_caps
 from app.dependencies.auth import current_identity, require_owner, verify_resource_owner
 
 from app.dependencies.auth import block_minor_ai  # noqa: E402
@@ -658,10 +659,10 @@ Meaning of each action:
 
 Return only the JSON object."""
     try:
-        from app.services.ai_service import generate_json, FAST_MODEL
+        from app.services.ai_service import generate_json
         # The intent decision is a tiny JSON object — cap output low so the request
         # stays well under the fast model's small per-minute token budget (avoids 413).
-        result = generate_json(prompt, temperature=0.1, model=FAST_MODEL, max_tokens=300)
+        result = generate_json(prompt, temperature=0.1, max_tokens=300, task="chat_intent")
         if isinstance(result, dict) and result.get("action") in _ACTION_TO_INTENT:
             return result
     except Exception as exc:
@@ -922,6 +923,7 @@ def chat_message(
     authorization: str | None = Header(None),
 ):
     verify_resource_owner(data.user_id, x_user_id=x_user_id, authorization=authorization)
+    usage_caps.take(db, data.user_id, "chat")
     user = db.query(User).filter(User.id == data.user_id).first()
     skills = db.query(SkillNode).filter(SkillNode.user_id == data.user_id).all()
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == data.user_id).first()
@@ -1007,7 +1009,7 @@ def chat_message(
     user_profile_doc = (read_profile_doc(data.user_id)[:800] if is_weekly_agent else "")
 
     try:
-        from app.services.ai_service import generate_response, quality_model
+        from app.services.ai_service import generate_response
 
         lowered_update = user_update.lower()
         if is_weekly_agent:
@@ -1378,7 +1380,7 @@ Skills: {skills_context}
             prompt,
             temperature=0.5 if is_weekly_agent else 0.7,
             max_tokens=10000,
-            model=quality_model(),
+            task="chat_reply",
         )
         cleaned_response = response.strip()
         updated_actions = None
@@ -1474,6 +1476,7 @@ def chat_stream(
         def _fallback():
             yield "event: fallback\ndata: {}\n\n"
         return StreamingResponse(_fallback(), media_type="text/event-stream")
+    usage_caps.take(db, data.user_id, "chat")  # the weekly-agent fallback is counted by /message
 
     user = db.query(User).filter(User.id == data.user_id).first()
     skills = db.query(SkillNode).filter(SkillNode.user_id == data.user_id).all()
@@ -1516,10 +1519,10 @@ User message: {data.message}
 Respond with a practical next step, mention relevant roadmap/project/market context when useful, and ask at most one follow-up question."""
 
     def _event_stream():
-        from app.services.ai_service import generate_response_stream, quality_model
+        from app.services.ai_service import generate_response_stream
         chunks: list[str] = []
         try:
-            for piece in generate_response_stream(prompt, temperature=0.7, max_tokens=10000, model=quality_model()):
+            for piece in generate_response_stream(prompt, temperature=0.7, max_tokens=10000, task="chat_reply"):
                 if piece:
                     chunks.append(piece)
                     yield f"data: {json.dumps({'delta': piece})}\n\n"

@@ -94,7 +94,7 @@ export default function Opportunities() {
       }
     } catch (err) {
       console.error(err);
-      toast.error('Could not generate opportunities right now. Try again shortly.');
+      toast.error(err?.response?.data?.detail || 'Could not generate opportunities right now. Try again shortly.');
     } finally {
       setGenerating(false);
     }

@@ -20,7 +20,6 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models.career_os import RoadmapState
 from app.models.engagement import XpEvent
 from app.models.job_match import JobDescription, JobTarget
@@ -78,7 +77,7 @@ def _clean(value, limit: int) -> str:
 
 
 def _extract(text: str) -> dict:
-    raw = generate_json(_prompt(text), temperature=0.2, model=settings.GEMINI_LITE_MODEL, max_tokens=3000)
+    raw = generate_json(_prompt(text), temperature=0.2, max_tokens=3000, task="job_extract")
     if not isinstance(raw, dict):
         raw = {}
     skills, seen = [], set()

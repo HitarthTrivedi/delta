@@ -54,7 +54,7 @@ def start_onboarding(raw_input: str, target_role: str | None = None) -> dict:
     }}
     """
     try:
-        response_text = generate_response(prompt)
+        response_text = generate_response(prompt, task="onboarding_questions")
         # Parse JSON from response
         # Find json boundaries if markdown code block is returned
         if "```json" in response_text:
@@ -167,7 +167,7 @@ def finalize_onboarding(raw_input: str, follow_ups: list, answers: list) -> dict
     }}
     """
     try:
-        response_text = generate_response(prompt)
+        response_text = generate_response(prompt, task="onboarding_finalize")
         if "```json" in response_text:
             response_text = response_text.split("```json")[1].split("```")[0]
         elif "```" in response_text:
