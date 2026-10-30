@@ -386,6 +386,19 @@ export const companyAPI = {
   studentTests: (userId) => api.get(`/company/student/${userId}/tests`).then(r => r.data),
 };
 
+// ── Verified readiness re-check (strict, timed; recruiters see passes only) ──
+export const verifyAPI = {
+  status: (userId) => api.get(`/verify/${userId}`).then(r => r.data),
+  // 202 {preparing: job} while the shared question bank is filled in the background.
+  start: (userId) => api.post(`/verify/${userId}/start`).then(r => r.data),
+  submitTheory: (userId, checkId, answers, integrity) => api.post(`/verify/${userId}/checks/${checkId}/theory`, { answers, integrity }).then(r => r.data),
+  run: (userId, checkId, language, code, stdin) => api.post(`/verify/${userId}/checks/${checkId}/coding/run`, { language, code, stdin }, { timeout: 60000 }).then(r => r.data),
+  submitCoding: (userId, checkId, language, code, integrity) => api.post(`/verify/${userId}/checks/${checkId}/coding/submit`, { language, code, integrity }, { timeout: 120000 }).then(r => r.data),
+  finish: (userId, checkId) => api.post(`/verify/${userId}/checks/${checkId}/finish`).then(r => r.data),
+  decline: (userId, requestId) => api.post(`/verify/${userId}/requests/${requestId}/decline`).then(r => r.data),
+  request: (studentId) => api.post(`/verify/candidates/${studentId}/request`).then(r => r.data),
+};
+
 export const recruiterAPI = {
   me: () => api.get('/recruiter/me').then(r => r.data),
   register: (payload) => api.post('/recruiter/register', payload).then(r => r.data),

@@ -48,7 +48,7 @@ def _session_or_404(db: Session, user_id: str, session_id: str) -> SandboxSessio
         SandboxSession.user_id == user_id,
         SandboxSession.type == "theory",
     ).first()
-    if not session:
+    if not session or json.loads(session.data or "{}").get("verified_check_id"):
         raise HTTPException(status_code=404, detail="Test session not found.")
     return session
 

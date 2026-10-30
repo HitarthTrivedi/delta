@@ -8,7 +8,7 @@ import { useUserWithSkills } from '../hooks/useUser';
 import { engagementKey, useEngagement } from '../hooks/useEngagement';
 import { useCareerContext } from '../hooks/useCareerOS';
 import { getTaskProgress } from '../lib/taskProgress';
-import { circlesAPI, collegeAPI, companyAPI, engagementAPI } from '../lib/api';
+import { circlesAPI, collegeAPI, companyAPI, engagementAPI, verifyAPI } from '../lib/api';
 import { clearReferral, pendingReferral } from '../lib/referral';
 import { enablePush, pushSupported } from '../lib/push';
 import InterviewerAvatar from '../components/interview/InterviewerAvatar';
@@ -336,6 +336,21 @@ function SetTestsCard({ userId }) {
   );
 }
 
+function VerifyRequestCard({ userId }) {
+  const { data } = useQuery({ queryKey: ['verify-status', userId], queryFn: () => verifyAPI.status(userId),
+    enabled: !!userId, staleTime: 60 * 1000 });
+  if (!data?.requests?.length || data.current) return null;
+  return (
+    <Link to="/practice/verify" className={`${card} flex items-center justify-between gap-3 p-4 hover:border-ink-soft`}>
+      <span>
+        <span className="block text-sm font-semibold text-ink">{data.requests.map((r) => r.company).join(', ')} asked you to verify your readiness</span>
+        <span className="block text-xs text-ink-soft">A short, strictly timed re-check. Recruiters see only a pass.</span>
+      </span>
+      <ArrowRight size={18} className="shrink-0 text-ink-soft" aria-hidden="true" />
+    </Link>
+  );
+}
+
 function FriendsCard({ userId }) {
   const { data } = useQuery({ queryKey: ['circles', userId], queryFn: () => circlesAPI.list(userId), enabled: !!userId, staleTime: 60 * 1000 });
   if (!data) return null;
@@ -483,6 +498,7 @@ export default function Today() {
         <ReferralCard userId={userId} />
         <CollegeCard userId={userId} />
         <SetTestsCard userId={userId} />
+        <VerifyRequestCard userId={userId} />
 
         {!e.study_time && !setupDone && (
           <HabitSetup userId={userId} e={e} onDone={() => { setSetupDone(true); queryClient.invalidateQueries({ queryKey: engagementKey(userId) }); }} />

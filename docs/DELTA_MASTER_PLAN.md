@@ -118,11 +118,12 @@ This module has two sides.
 | College | Job match: paste a job ad -> skill gaps (code, not AI) -> add up to 3 tasks to this week, or plan the next 4 weeks around it (weekly cycle puts its gap tasks first) | Built | `services/job_match.py`, `routers/jobs.py`, `pages/JobMatch.jsx` |
 | Recruiter | Trustworthy scores: per-session integrity notes (timed, tab switches, pasted code, implausibly fast answers), shown to the learner and to recruiters | Built | `services/integrity.py`, `hooks/useSessionSignals.js`, `components/IntegrityNote.jsx` |
 | Recruiter | Public "verify this badge" links (`/v/:token`), created on share and revocable | Built | `badges.share/public_view`, `routers/public.py`, `pages/VerifyBadge.jsx` |
+| Recruiter | Verified readiness re-check: the student (or a recruiter's request) starts a strict timed re-check of the whole readiness score: 12 medium questions from a shared verified bank (generated once with no learner data, never repeated for a student, kept apart from Quick 5) and, for tech fields, one catalog coding problem (25 min, 3 submits, pass count only). Verified if the score holds within `VERIFY_TOLERANCE` of practice with no serious integrity flags; valid 90 days, retry after 14. Recruiters see passes only. Coding packages are now stored once in the database and shared | Built | `services/verification.py`, `routers/verification.py`, `models/verification.py`, `pages/VerifyReadiness.jsx`, `RecruiterPortal.jsx` |
 
 ## 4. Build order
 
 1. **Phase 1: finish the student sandbox.** ✅ Theory tests are built. Next: aptitude tests on the same engine, plus a single "sandbox scorecard" per student that combines theory, coding and interview scores per skill.
-2. **Phase 2: recruiter portal + DPDP compliance.** ✅ v1 built: separate recruiter accounts with admin approval, saved preferences, ranked matching, candidate scorecards, student opt-in, consent gate, privacy settings, rewritten legal docs. Next: anti-cheating for scores recruiters rely on.
+2. **Phase 2: recruiter portal + DPDP compliance.** ✅ v1 built: separate recruiter accounts with admin approval, saved preferences, ranked matching, candidate scorecards, student opt-in, consent gate, privacy settings, rewritten legal docs. Anti-cheating: integrity notes and a verified readiness re-check (strict and timed, not proctoring).
 3. **Phase 3: Delta for Professionals.** ✅ v1 built.
 4. **Phase 4: Delta for School.** ✅ v1 built: Maths + Science, CBSE 6–10, parent-managed. Next: approve all lessons, then more subjects (Social Science, English), then more boards.
 5. **Phase 5: company-specific roadmaps.** ✅ v1 built (see Status). Decisions: an approved roadmap is locked (the company duplicates it to change it), so members always follow what Delta reviewed; joining or leaving a college ends company tracks with the other recruiter consents. Next: coding problems and AI interviews chosen by the company; let a college see which company roadmaps its students follow.
@@ -220,7 +221,7 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 6. ✅ **Monitoring:** Sentry wired (set `SENTRY_DSN`), `/health` checks the database; add the UptimeRobot monitor.
 7. **Staging environment + load test** (at least 500 concurrent users) before any big college onboarding.
 8. ✅ **Backups:** nightly encrypted off-site dump (`db-backup.yml`) + `restore_backup.sh`; set the secrets and run the monthly restore drill (`docs/OPERATIONS.md`).
-9. **Anti-cheating** for sandbox scores recruiters rely on: integrity notes are built (signals, not proof); next would be a short supervised re-check for the scores recruiters weigh most.
+9. **Anti-cheating** for sandbox scores recruiters rely on: ✅ integrity notes (signals, not proof) and a verified readiness re-check (see Status). It is a strict timed re-check with fresh questions, not proctoring; camera or screen proctoring would be the next step if recruiters ask for more.
 10. **Legal:** lawyer review of `frontend/public/legal/*.md`; update the Data Fiduciary name once the company is registered.
 
 **Gamification and retention** (research and plan: Duolingo's published streak, league and notification results; spaced retrieval; implementation intentions; CCPA dark-pattern rules; DPDP §9):

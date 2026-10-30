@@ -133,9 +133,12 @@ Recruiters **cannot see you** unless you turn on **"Visible to recruiters"** in 
   - skills and their levels;
   - practice results (technical test, coding and mock-interview scores, with a per-skill breakdown);
   - how each practice session was taken: whether it was timed, and notes such as leaving the tab or pasting code (the same notes you see on your results);
+  - **only if you pass a verified readiness re-check:** "Verified readiness" with the re-check score and date, until it expires. A re-check you don't pass is **never shown** to recruiters; they just see that you aren't verified;
+  - whether **their own company** asked you to take a re-check, and whether that request is open or closed;
   - your email address and any LinkedIn / GitHub / portfolio links you added, so they can contact you;
   - **only if you also turn on the optional "Consistent learner" badge:** that badge, when you studied on 20 or more of the last 30 days. It is a yes or no only.
 - **What they never see:** your conversations with Delta's AI, your personal introduction/backstory, résumé text, weekly plans, progress notes, phone number, GPA, or your XP, streak, badges and league standing.
+- **Verified readiness re-checks:** you can choose to take a short, strictly timed re-check (fresh questions from a shared question bank and, for tech fields, one coding problem). A recruiter who can see you may ask you to take one; you can decline. We keep which bank questions you've seen (so they aren't repeated), your re-check results and any requests, and you see all of it in your data export. A re-check is not camera or screen proctoring: we use the same timing and integrity notes as other practice sessions.
 - **Transparency:** every time a recruiter opens your full profile, we log it. You can see which company viewed you, and when, in Privacy settings.
 - **Recruiters' obligations:** recruiters must agree to use candidate data **only to assess candidates for roles at their own organisation**, not to copy, share or sell it, and to delete it when no longer needed. For data they take away from Delta, the recruiter is responsible as its own Data Fiduciary.
 - **Withdrawing:** switch visibility off at any time. You disappear from search and profiles **immediately**. We can't recall information a recruiter already viewed before you withdrew, but they are bound to delete it when they no longer need it.

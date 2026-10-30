@@ -165,6 +165,13 @@ class Settings(BaseSettings):
     # A running job older than this is retried once, then marked failed.
     JOB_STALE_MINUTES: int = int(os.getenv("JOB_STALE_MINUTES", "10") or "10")
     JOB_KEEP_DAYS: int = int(os.getenv("JOB_KEEP_DAYS", "7") or "7")
+    # Verified readiness re-check: verified when the re-check is within
+    # VERIFY_TOLERANCE points of the practice score with no serious integrity
+    # flags; valid VERIFY_VALID_DAYS; retry VERIFY_RETRY_DAYS after a miss.
+    VERIFY_TOLERANCE: float = float(os.getenv("VERIFY_TOLERANCE", "10") or "10")
+    VERIFY_MAX_TAB_SWITCHES: int = int(os.getenv("VERIFY_MAX_TAB_SWITCHES", "2") or "2")
+    VERIFY_VALID_DAYS: int = int(os.getenv("VERIFY_VALID_DAYS", "90") or "90")
+    VERIFY_RETRY_DAYS: int = int(os.getenv("VERIFY_RETRY_DAYS", "14") or "14")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     class Config:
@@ -201,9 +208,9 @@ DEFAULT_AI_PRICES = {
 # feature means no cap. Sized so normal use never meets them.
 DEFAULT_AI_CAPS = {
     "solo": {"chat": 600, "theory_test": 60, "mock_interview": 30, "coding_problem": 60, "resume": 20,
-             "job_match": 30, "opportunities": 10, "brief_regenerate": 10, "intake": 300},
+             "job_match": 30, "opportunities": 10, "brief_regenerate": 10, "intake": 300, "readiness_check": 2},
     "college": {"chat": 1000, "theory_test": 100, "mock_interview": 50, "coding_problem": 100, "resume": 30,
-                "job_match": 50, "opportunities": 20, "brief_regenerate": 20, "intake": 300},
+                "job_match": 50, "opportunities": 20, "brief_regenerate": 20, "intake": 300, "readiness_check": 4},
     "pro": {"chat": 1500, "theory_test": 150, "mock_interview": 80, "coding_problem": 150, "resume": 40,
-            "job_match": 80, "opportunities": 30, "brief_regenerate": 30, "intake": 300},
+            "job_match": 80, "opportunities": 30, "brief_regenerate": 30, "intake": 300, "readiness_check": 4},
 }

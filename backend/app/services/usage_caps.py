@@ -32,6 +32,7 @@ FEATURES = {
     "opportunities": "opportunity board refreshes",
     "brief_regenerate": "plan regenerations",
     "intake": "intake answers",
+    "readiness_check": "verified readiness re-checks",
 }
 
 
@@ -116,6 +117,17 @@ def refund(db: Session, user_id: str, feature: str) -> None:
              AiFeatureUse.count > 0)
      .update({AiFeatureUse.count: AiFeatureUse.count - 1}, synchronize_session=False))
     db.commit()
+
+
+def ensure_room(db: Session, user_id: str, feature: str) -> None:
+    """Raise the over-cap 429 if no use is left this month, without counting one."""
+    cap = cap_for(plan_for(db, user_id), feature)
+    if cap is None:
+        return
+    row = db.query(AiFeatureUse).filter(AiFeatureUse.user_id == user_id, AiFeatureUse.feature == feature,
+                                        AiFeatureUse.month == month_key()).first()
+    if row and row.count >= cap:
+        raise HTTPException(status_code=429, detail=_over_cap_message(feature, cap))
 
 
 def take(db: Session, user_id: str, feature: str) -> None:

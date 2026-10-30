@@ -104,6 +104,9 @@ def _execute(db: Session, job: BackgroundJob) -> None:
                   .order_by(MarketSnapshot.created_at.desc()).first())
         if user and market:
             central_engine.get_or_create_roadmap_state(db, user, market, regenerate=True)
+    elif job.kind == "verified_bank":
+        from app.services import verification
+        verification.fill(db, payload)
     else:
         raise ValueError(f"Unknown job kind {job.kind}")
 
