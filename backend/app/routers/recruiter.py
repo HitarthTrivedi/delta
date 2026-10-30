@@ -23,7 +23,7 @@ from app.models.compliance import Recruiter, RecruiterProfileView
 from app.models.sandbox_session import SandboxSession
 from app.models.skill_node import SkillNode
 from app.models.user import User
-from app.services import compliance, engagement, integrity
+from app.services import compliance, engagement, integrity, verification
 from app.services.reminder_service import _supabase_admin_email
 from app.services.readiness import compute_readiness
 from app.services.domain_packs import resolve_field
@@ -273,6 +273,7 @@ def search(request: Request, prefs: Preferences, rec: Recruiter = Depends(requir
     for s in db.query(SandboxSession).filter(SandboxSession.user_id.in_(ids), SandboxSession.status == "completed").all():
         sessions_by_user.setdefault(s.user_id, []).append(s)
     consistent = engagement.consistent_learners(db, ids)
+    verified = verification.verified_ids(db, ids)
 
     results = []
     for user in users:
@@ -293,6 +294,7 @@ def search(request: Request, prefs: Preferences, rec: Recruiter = Depends(requir
             "sandbox": summary,
             "top_skills": [{"name": s.name, "proficiency": s.proficiency} for s in top_skills],
             "consistent_learner": user.id in consistent,
+            "verified": user.id in verified,
         })
 
     results.sort(key=lambda r: (r["fit"] is not None, r["fit"] or 0, r["overall_sandbox_score"] or 0), reverse=True)
@@ -341,6 +343,9 @@ def candidate_detail(request: Request, student_id: str, rec: Recruiter = Depends
         ],
         "integrity": integrity.summary(sessions),
         "consistent_learner": student_id in engagement.consistent_learners(db, [student_id]),
+        # A passed re-check only; a miss reads as not verified.
+        "verification": verification.recruiter_view(db, student_id),
+        "verification_request": verification.request_status(db, rec, student_id),
     }
 
 

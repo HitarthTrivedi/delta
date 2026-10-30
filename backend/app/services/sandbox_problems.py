@@ -5,11 +5,12 @@ NeetCode-150 bank in central_engine.py — already used to build weekly LeetCode
 tasks, so problem naming/difficulty/skill-tagging stays consistent with the
 rest of the app. The actual displayable statement, starter code, and hidden
 test cases don't exist anywhere yet, so they're generated on demand via the
-shared AI service and cached per (topic, title) so repeat opens don't re-call
-the model.
+shared AI service and kept per (topic, title) in `coding_packages` (shared by
+every server and learner) so repeat opens don't re-call the model.
 """
 from __future__ import annotations
 
+import json
 import logging
 
 from app.services.ai_service import generate_json
@@ -17,10 +18,35 @@ from app.services.central_engine import LEETCODE_PROBLEMS, LEETCODE_SEQUENCE
 
 logger = logging.getLogger("delta.sandbox_problems")
 
-# In-process cache — problem content is deterministic-enough per (topic, title)
-# that regenerating per user/session would just waste AI calls for identical
-# content. Cleared on process restart, which is fine (regenerates on demand).
+# In-process layer over the `coding_packages` table: problem content is
+# deterministic-enough per (topic, title) that regenerating per user/session
+# would just waste AI calls for identical content.
 _package_cache: dict[str, dict] = {}
+
+
+def _load_package(key: str) -> dict | None:
+    from app.database import SessionLocal
+    from app.models.verification import CodingPackage
+    db = SessionLocal()
+    try:
+        row = db.get(CodingPackage, key)
+        return json.loads(row.package) if row else None
+    finally:
+        db.close()
+
+
+def _store_package(key: str, package: dict) -> None:
+    from sqlalchemy.exc import IntegrityError
+    from app.database import SessionLocal
+    from app.models.verification import CodingPackage
+    db = SessionLocal()
+    try:
+        db.add(CodingPackage(problem_key=key, package=json.dumps(package)))
+        db.commit()
+    except IntegrityError:  # another server stored it first
+        db.rollback()
+    finally:
+        db.close()
 
 
 def list_topics() -> list[dict]:
@@ -52,6 +78,10 @@ def generate_problem_package(topic: str, title: str, difficulty: str) -> dict:
     cache_key = f"{topic}::{title}"
     if cache_key in _package_cache:
         return _package_cache[cache_key]
+    stored = _load_package(cache_key)
+    if stored:
+        _package_cache[cache_key] = stored
+        return stored
 
     prompt = f"""You are writing a practice coding problem for a DSA interview-prep sandbox.
 Topic: {topic}
@@ -87,7 +117,10 @@ Rules: include 2-3 "examples" (shown to the solver) and 4-6 "test_cases" (used f
     if not isinstance(data, dict) or not data.get("test_cases"):
         # Fail-safe minimal package so the sandbox never hard-errors on a bad
         # generation — a trivial echo problem the user can still interact with.
-        data = {
+        # Never kept, so the next open tries again; `fallback` lets graded
+        # checks (the verified re-check) refuse it.
+        return {
+            "fallback": True,
             "statement": f"({title}) Problem generation is temporarily unavailable. Read an integer n from stdin and print n doubled.",
             "examples": [{"input": "5", "output": "10", "explanation": "5 * 2 = 10"}],
             "starter_code": {
@@ -99,5 +132,6 @@ Rules: include 2-3 "examples" (shown to the solver) and 4-6 "test_cases" (used f
             "test_cases": [{"input": "5", "expected_output": "10"}, {"input": "0", "expected_output": "0"}],
         }
 
+    _store_package(cache_key, data)
     _package_cache[cache_key] = data
     return data

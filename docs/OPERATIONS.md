@@ -91,6 +91,8 @@ Full list with comments: `backend/.env.example`. The production essentials:
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 5 / 5 per replica (keep replicas × 10 under the Supabase pooler's limit) |
 | `RATE_LIMIT_STORAGE_URI` | Empty for one replica. Before a second: an Upstash Redis URL, e.g. `rediss://default:<token>@<host>.upstash.io:6379` (§8) |
 | `JOB_WORKERS` / `JOB_POLL_SECONDS` | 2 / 1. Background job threads in the API process (planning weeks). `0` turns them off |
+| `VERIFY_TOLERANCE` / `VERIFY_MAX_TAB_SWITCHES` | 10 / 2. A readiness re-check is verified if its score is at most this many points below practice, with no more tab switches than this |
+| `VERIFY_VALID_DAYS` / `VERIFY_RETRY_DAYS` | 90 / 14. How long a pass shows to recruiters; how long after a miss before another re-check |
 | `JOB_STALE_MINUTES` / `JOB_KEEP_DAYS` | 10 / 7. A job stuck "running" longer is retried once, then failed; finished jobs are deleted after this many days |
 | **Must be unset or false** | `ALLOW_HEADER_AUTH`, `DEV_MODE`, `ENABLE_DOCS` |
 

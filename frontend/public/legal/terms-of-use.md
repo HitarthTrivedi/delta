@@ -70,7 +70,7 @@ These extra terms apply if you register a **recruiter account**. By ticking the 
 5. **Deletion.** You will delete candidate data you took from Delta once it is no longer needed for that hiring purpose, or promptly if the candidate asks.
 6. **Your own legal duties.** For candidate data you take away from Delta, you act as an independent **Data Fiduciary** under the DPDP Act, and you are responsible for complying with it.
 7. **Logging.** Every profile you open is logged and visible to the candidate.
-8. **Scores are indicators.** Practice scores are not certifications. Don't make hiring decisions on them alone.
+8. **Scores are indicators.** Practice scores are not certifications. Don't make hiring decisions on them alone. The same goes for "Verified readiness": it means the candidate held their practice level in a short, strictly timed re-check with fresh questions, not that they were proctored or certified. You may ask a candidate to take a re-check; they can decline, and you see a result only if they pass.
 9. **Company roadmaps.** A roadmap you publish describes real requirements for roles you hire for. Its steps must not ask students for personal data, payment or anything outside Delta's practice tools. Delta reviews every roadmap and may change, refuse or remove it. What students share with you through a roadmap falls under points 2 to 6.
 
 Breaking these terms leads to immediate suspension, and may lead to legal action and to reporting to the authorities.

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Code2, Briefcase, ListChecks, ArrowRight, Loader2, Target, Table2, LineChart as LineIcon, Zap } from 'lucide-react';
+import { Code2, Briefcase, ListChecks, ArrowRight, Loader2, Target, Table2, LineChart as LineIcon, Zap, ShieldCheck } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { verifyAPI } from '../lib/api';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useAuthStore } from '../store/authStore';
 import { useSandboxReport } from '../hooks/useSandboxReport';
@@ -156,6 +158,8 @@ export default function PracticeHub() {
             )}
           </div>
         </section>
+
+        <VerifyCard userId={userId} navigate={navigate} />
 
         {/* Tools */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
@@ -320,6 +324,35 @@ function SkillList({ title, items, empty }) {
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+// Verified readiness: a strict re-check that recruiters see only when it holds.
+function VerifyCard({ userId, navigate }) {
+  const { data } = useQuery({ queryKey: ['verify-status', userId], queryFn: () => verifyAPI.status(userId), enabled: !!userId });
+  if (!data || data.reason === 'minor') return null;
+  const until = data.verified && new Date(`${data.verified.valid_until}Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return (
+    <section style={{ ...panelStyle, padding: '16px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <span style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0 }}>
+        <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+        <span>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>
+            {data.verified ? `Verified readiness ${data.verified.score}` : 'Verify your readiness'}
+          </span>
+          <span style={{ display: 'block', fontSize: 13, color: muted, marginTop: 2 }}>
+            {data.verified
+              ? `Recruiters see it as verified until ${until}.`
+              : data.requests.length
+                ? `${data.requests.map((r) => r.company).join(', ')} asked you to verify. A short, strictly timed re-check; recruiters see only a pass.`
+                : 'A short, strictly timed re-check with fresh questions. If you hold your level, recruiters see your score as verified.'}
+          </span>
+        </span>
+      </span>
+      <button onClick={() => navigate('/practice/verify')} style={{ ...panelStyle, background: 'var(--ink)', color: 'var(--bone)', padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+        {data.current ? 'Continue' : data.verified ? 'Details' : 'Get verified'}
+      </button>
     </section>
   );
 }

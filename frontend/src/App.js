@@ -63,6 +63,7 @@ const CircleJoin = lazy(() => import("./pages/CircleJoin"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const PracticeHub = lazy(() => import("./pages/PracticeHub"));
 const CodingSandbox = lazy(() => import("./pages/CodingSandbox"));
+const VerifyReadiness = lazy(() => import("./pages/VerifyReadiness"));
 const InterviewSandbox = lazy(() => import("./pages/InterviewSandbox"));
 const TheorySandbox = lazy(() => import("./pages/TheorySandbox"));
 const InterviewReportPage = lazy(() => import("./pages/InterviewReportPage"));
@@ -248,6 +249,7 @@ function AppContent() {
         <Route path="/opportunities" element={<RequireAuth><ProtectedRoute><Opportunities /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice" element={<RequireAuth><ProtectedRoute><PracticeHub /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/coding" element={<RequireAuth><ProtectedRoute><CodingSandbox /></ProtectedRoute></RequireAuth>} />
+        <Route path="/practice/verify" element={<RequireAuth><ProtectedRoute><VerifyReadiness /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/interview" element={<RequireAuth><ProtectedRoute><InterviewSandbox /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/theory" element={<RequireAuth><ProtectedRoute><TheorySandbox /></ProtectedRoute></RequireAuth>} />
         <Route path="/practice/interview/report/:sessionId" element={<RequireAuth><ProtectedRoute><InterviewReportPage /></ProtectedRoute></RequireAuth>} />

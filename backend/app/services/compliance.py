@@ -359,7 +359,9 @@ def erase_student(db: Session, user_id: str) -> None:
 def erase_recruiter(db: Session, recruiter_id: str) -> None:
     from app.models.college import CollegeRecruiter
     from app.models.company import CompanyRoadmap, CompanyRoadmapMember, CompanyTest
+    from app.models.verification import VerificationRequest
     db.query(CollegeRecruiter).filter(CollegeRecruiter.recruiter_id == recruiter_id).delete()
+    db.query(VerificationRequest).filter(VerificationRequest.recruiter_id == recruiter_id).delete()
     roadmap_ids = [r.id for r in db.query(CompanyRoadmap.id).filter(CompanyRoadmap.recruiter_id == recruiter_id)]
     if roadmap_ids:
         db.query(CompanyTest).filter(CompanyTest.roadmap_id.in_(roadmap_ids)).delete(synchronize_session=False)

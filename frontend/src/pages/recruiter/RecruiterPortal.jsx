@@ -2,11 +2,23 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, LogOut, Search, X, ExternalLink, ShieldCheck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { privacyAPI, recruiterAPI } from '../../lib/api';
+import { privacyAPI, recruiterAPI, verifyAPI } from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 import { RecruiterRoadmaps } from './RecruiterRoadmaps';
 
 const SANDBOX_LABEL = { theory: 'Technical test', coding: 'Coding', interview: 'Mock interview' };
+
+const day = (iso) => (iso ? new Date(/(Z|[+-]\d\d:\d\d)$/.test(iso) ? iso : `${iso}Z`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''); // server times are UTC
+
+// A passed, in-date readiness re-check. Misses are never sent to recruiters.
+function VerifiedChip({ v }) {
+  return (
+    <span title={v ? `Passed a strictly timed re-check with fresh questions on ${day(v.on)}. An indicator, not a certification.` : 'Passed a strictly timed readiness re-check'}
+      className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] px-2 py-0.5 border border-oxblood text-oxblood">
+      <ShieldCheck size={11} aria-hidden="true" />{v ? `Verified readiness ${v.score} · ${day(v.on)}` : 'Verified'}
+    </span>
+  );
+}
 
 // Shown only when the student opted in to this badge and studied on 20+ of the last 30 days.
 function ConsistentBadge() {
@@ -284,7 +296,7 @@ function CandidateCard({ c, onOpen }) {
         <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft mt-1">Fit</div>
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="m-0 text-[17px] font-semibold text-ink flex flex-wrap items-center gap-2">{c.name}{c.consistent_learner && <ConsistentBadge />}</h3>
+        <h3 className="m-0 text-[17px] font-semibold text-ink flex flex-wrap items-center gap-2">{c.name}{c.verified && <VerifiedChip />}{c.consistent_learner && <ConsistentBadge />}</h3>
         {c.field_label && <p className="m-0 font-mono text-[10px] uppercase tracking-[0.12em] text-oxblood mt-0.5">{c.field_label}</p>}
         <p className="m-0 text-[13px] text-ink-soft">{c.target_role || 'No target role'}{edu && ` · ${edu}`}</p>
         <div className="flex flex-wrap gap-1.5 mt-3">
@@ -358,6 +370,17 @@ function CandidateDetail({ id, onClose }) {
               ))}
             </div>
 
+            <h3 className="font-display text-[20px] text-ink mt-7 mb-2">Readiness</h3>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-display text-[30px] text-ink leading-none">{d.readiness?.readiness ?? '—'}</span>
+              {d.readiness?.label && <span className="text-[13px] text-ink-soft">{d.readiness.label}</span>}
+              {d.verification?.verified && <VerifiedChip v={d.verification} />}
+            </div>
+            {d.readiness?.coverage_total > 0 && (
+              <p className="text-[12.5px] text-ink-soft m-0 mt-1">From {d.readiness.coverage} of {d.readiness.coverage_total} practice types.</p>
+            )}
+            {!d.verification?.verified && <AskToVerify studentId={id} request={d.verification_request} />}
+
             <h3 className="font-display text-[20px] text-ink mt-7 mb-2">Practice scores</h3>
             {Object.keys(d.sandbox).length === 0 ? <p className="text-ink-soft text-[14px] m-0">No completed practice sessions yet.</p> : (
               <div className="grid grid-cols-3 gap-3">
@@ -425,6 +448,35 @@ function CandidateDetail({ id, onClose }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function AskToVerify({ studentId, request }) {
+  const [req, setReq] = useState(request);
+  const [busy, setBusy] = useState(false);
+  const ask = async () => {
+    setBusy(true);
+    try {
+      setReq((await verifyAPI.request(studentId)).request);
+      toast.success('Request sent. You will see a chip here if they pass.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Could not send the request.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (req?.status === 'open') {
+    return <p className="text-[12.5px] text-ink-soft m-0 mt-2">You asked them to verify their readiness on {day(req.requested_at)}.</p>;
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3">
+      <button onClick={ask} disabled={busy} className={`${primaryBtn} py-2 px-4 text-[11px] border-ink text-ink bg-transparent cursor-pointer hover:border-oxblood hover:text-oxblood disabled:opacity-60`}>
+        {busy ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Ask to verify
+      </button>
+      <span className="text-[12px] text-ink-soft">
+        {req ? `Your last request (${day(req.requested_at)}) is closed. ` : ''}They take a strictly timed re-check; you see the result only if they pass.
+      </span>
     </div>
   );
 }
