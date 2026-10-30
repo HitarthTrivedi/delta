@@ -89,6 +89,8 @@ Full list with comments: `backend/.env.example`. The production essentials:
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Browser push reminders (optional) |
 | `SENTRY_DSN` | Error reports |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 5 / 5 (fine for one replica) |
+| `JOB_WORKERS` / `JOB_POLL_SECONDS` | 2 / 1. Background job threads in the API process (planning weeks). `0` turns them off |
+| `JOB_STALE_MINUTES` / `JOB_KEEP_DAYS` | 10 / 7. A job stuck "running" longer is retried once, then failed; finished jobs are deleted after this many days |
 | **Must be unset or false** | `ALLOW_HEADER_AUTH`, `DEV_MODE`, `ENABLE_DOCS` |
 
 ## 4. Deploying and database changes
@@ -126,6 +128,7 @@ Restore the latest backup into a scratch Postgres (a free Supabase project or a 
 |---|---|
 | UptimeRobot says API down | Railway deploy logs; `/health` returning 503 = database unreachable → Supabase status / project paused (free plan) |
 | Users see "AI is not available right now" | Gemini quota or outage: Google AI Studio usage page; add a key (`GEMINI_API_KEY_2…`) or switch `GEMINI_MODEL` |
+| "Aria is preparing your week" never finishes | `select status, error, count(*) from background_jobs group by 1, 2;`. Many `queued`: workers aren't running (Railway logs: "started N background job worker(s)", `JOB_WORKERS`). `failed`: the error column and Sentry |
 | Interview shows the 2D avatar | `GOOGLE_TTS_API_KEY` missing/invalid or quota hit (Sentry/Railway logs mention `tts`); the 2D fallback keeps interviews working |
 | Errors after a deploy | Sentry → newest issue; roll back with Railway's "Redeploy" on the previous deployment |
 | A migration failed on deploy | The old version keeps running. Fix the migration in a new commit; never edit a migration that already ran in production |
@@ -156,4 +159,4 @@ Watch opt-outs: a rising opt-out rate means reminders are too frequent or too pu
 - Gemini: per-key rate limits; rotation across up to 5 keys. Spend: the AI usage view (section 7A).
 - Google TTS: free monthly character quota, then pay-per-character. Keep the budget alert on.
 - Supabase free: 500 MB database, pauses when idle.
-- One API replica: before adding a second, move the reminder scheduler and rate-limit counters to shared storage (Master Plan backlog).
+- One API replica: before adding a second, move the reminder scheduler and rate-limit counters to shared storage (Master Plan backlog). The background job queue is already safe across replicas (`SKIP LOCKED`).
