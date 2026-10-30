@@ -146,6 +146,11 @@ app.include_router(background_jobs.router)
 
 @app.on_event("startup")
 def startup():
+    # Replicas starting together sync the schema one at a time (Postgres advisory lock).
+    from contextlib import ExitStack
+    from app.services.cluster_lock import cluster_lock
+    schema_lock = ExitStack()
+    schema_lock.enter_context(cluster_lock("startup-schema", wait=True))
     Base.metadata.create_all(bind=engine)
     # Add persistent JSON columns to users table (safe no-op if already present)
     try:
@@ -196,6 +201,7 @@ def startup():
             conn.commit()
     except Exception as e:
         print(f"[WARN] composite index creation skipped: {e}")
+    schema_lock.close()
 
     # Warm the embedding model + cache connection in the background so the first
     # real request doesn't pay the ~2s model load / Redis probe. Non-blocking;
