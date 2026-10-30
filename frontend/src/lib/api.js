@@ -207,9 +207,10 @@ export const careerOSAPI = {
   getSystemStatus: () => api.get('/career-os/system-status').then(r => r.data),
   getDomainPacks: () => api.get('/career-os/domain-packs').then(r => r.data),
   getDomainPack: (domainId) => api.get(`/career-os/domain-packs/${domainId}`).then(r => r.data),
-  getContext: (userId) => api.get(`/career-os/user/${userId}/context`, { timeout: 300000 }).then(r => r.data),
+  // Planning a week runs as a background job (see lib/backgroundJobs.js), so these return quickly.
+  getContext: (userId) => api.get(`/career-os/user/${userId}/context`).then(r => r.data),
   initialize: (userId, data) => api.post(`/career-os/user/${userId}/initialize`, data).then(r => r.data),
-  runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`, {}, { timeout: 300000 }).then(r => r.data),
+  runWeeklyCycle: (userId) => api.post(`/career-os/user/${userId}/weekly-cycle`, {}).then(r => r.data),
   consolidateMemory: (userId) => api.post(`/career-os/user/${userId}/consolidate-memory`).then(r => r.data),
   logJourneyEvent: (userId, data) => api.post(`/career-os/user/${userId}/journey`, data).then(r => r.data),
   getTaskDetail: (userId, data) => api.post(`/career-os/user/${userId}/task-detail`, data, { timeout: 60000 }).then(r => r.data),
@@ -219,7 +220,7 @@ export const careerOSAPI = {
   setPlanStyle: (userId, planStyle, daySchedule) => api.put(`/career-os/user/${userId}/plan-style`, { plan_style: planStyle, day_schedule: daySchedule }, { timeout: 120000 }).then(r => r.data),
   getDayPlan: (userId) => api.get(`/career-os/user/${userId}/day-plan`, { timeout: 120000 }).then(r => r.data),
   saveDayPlan: (userId, dayPlan) => api.put(`/career-os/user/${userId}/day-plan`, { day_plan: dayPlan }).then(r => r.data),
-  advanceExpiredWeek: (userId, carriedTaskIds) => api.post(`/career-os/user/${userId}/advance-expired-week`, { carried_task_ids: carriedTaskIds }, { timeout: 300000 }).then(r => r.data),
+  advanceExpiredWeek: (userId, carriedTaskIds) => api.post(`/career-os/user/${userId}/advance-expired-week`, { carried_task_ids: carriedTaskIds }).then(r => r.data),
 };
 
 // ── Opportunities API (AI-matched jobs & internships) ──
@@ -261,6 +262,10 @@ export const sandboxInterviewAPI = {
 
 // ── Technical Theory Test Sandbox API ──
 // ── Daily habit: streak, XP, goal, break mode, reminders ──
+export const backgroundJobsAPI = {
+  get: (jobId) => api.get(`/background-jobs/${jobId}`).then(r => r.data),
+};
+
 export const engagementAPI = {
   // tz: the browser's timezone, used the first time to set up the account.
   get: (userId, tz) => api.get(`/engagement/${userId}`, { params: tz ? { tz } : {} }).then(r => r.data),
