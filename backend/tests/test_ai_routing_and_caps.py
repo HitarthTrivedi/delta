@@ -46,9 +46,9 @@ def setup(monkeypatch):
     monkeypatch.setattr(settings, "AI_MONTHLY_BUDGET_USD", "")
     monkeypatch.setattr(settings, "AI_ROUTES_JSON", "")
     monkeypatch.setattr(settings, "AI_CAPS_JSON", "")
-    ai_budget._state.update({"checked_at": 0.0, "degraded": False})
+    ai_budget._state.update({"checked_at": float("-inf"), "degraded": False})
     yield
-    ai_budget._state.update({"checked_at": 0.0, "degraded": False})
+    ai_budget._state.update({"checked_at": float("-inf"), "degraded": False})
 
 
 def ok(r, code=200):
@@ -162,7 +162,7 @@ def test_budget_alerts_once_then_degrades(monkeypatch):
     state = ai_budget.check(db)
     assert state["degraded"] is True and sent[1:] == ["Delta AI spend at 80% of this month's budget",
                                                       "Delta AI spend at 100% of this month's budget"]
-    ai_budget._state["checked_at"] = 0.0
+    ai_budget._state["checked_at"] = float("-inf")
     assert ai_budget.degraded() is True
     assert ai_service.resolve_model("theory_test") == settings.GEMINI_LITE_MODEL  # everything drops to lite
     assert ai_service.resolve_model("chat_intent") == settings.GROQ_FAST_MODEL  # Groq is already cheap
@@ -241,3 +241,12 @@ def test_college_plan_and_month_rollover(monkeypatch):
     assert usage_caps.claim(db, "ai-college", "job_match") == (True, 1)  # new month, fresh count
     assert usage_caps.claim(db, "ai-college", "chat")[0] is True  # chat keeps the default cap
     db.close()
+
+
+def test_budget_is_checked_right_away_even_just_after_boot(monkeypatch):
+    monkeypatch.setattr(ai_budget, "time", types.SimpleNamespace(monotonic=lambda: 30.0))  # host booted 30 s ago, like a fresh CI runner
+    monkeypatch.setattr(settings, "AI_MONTHLY_BUDGET_USD", "1.00")
+    calls = []
+    monkeypatch.setattr(ai_budget, "refresh", lambda: calls.append(1) or {})
+    ai_budget.degraded()
+    assert calls == [1]
