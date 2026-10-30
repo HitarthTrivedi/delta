@@ -21,7 +21,7 @@ from app.limiter import limiter
 from app.config import settings
 from app.database import engine, Base
 from app.models import *  # noqa: F401,F403 — ensures all models register with Base
-from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders, achievements, opportunities, sandbox_coding, sandbox_interview, sandbox_theory, privacy, recruiter, school, sandbox_report, engagement, practice, circles, jobs, public, college, templates, company
+from app.routers import users, skills, briefs, chat, resume, calendar, dossier, career_os, ingestion, feedback, reminders, achievements, opportunities, sandbox_coding, sandbox_interview, sandbox_theory, privacy, recruiter, school, sandbox_report, engagement, practice, circles, jobs, public, college, templates, company, background_jobs
 
 # Global rate limiter imported from app.limiter (avoids circular imports)
 
@@ -141,6 +141,7 @@ app.include_router(public.router)
 app.include_router(college.router)
 app.include_router(templates.router)
 app.include_router(company.router)
+app.include_router(background_jobs.router)
 
 
 @app.on_event("startup")
@@ -221,6 +222,13 @@ def startup():
         start_reminder_scheduler()
     except Exception as e:
         print(f"[WARN] reminder scheduler not started: {e}")
+
+    # Background job workers (planning weeks off the request), in this process too.
+    try:
+        from app.services.jobs import start_workers
+        start_workers()
+    except Exception as e:
+        print(f"[WARN] job workers not started: {e}")
 
     print("[OK] delta 2.0 API started - tables synced")
 

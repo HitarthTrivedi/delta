@@ -19,6 +19,7 @@ from app.models.college import (College, CollegeAdmin, Batch, RosterEntry, Colle
 from app.models.roadmap_template import RoadmapEnrollment
 from app.models.company import CompanyRoadmap, CompanyRoadmapMember, CompanyTest
 from app.models.ai_usage import AiUsageDaily, AiBudgetAlert, AiFeatureUse
+from app.models.background_job import BackgroundJob
 from app.models.engagement import (UserEngagement, XpEvent, DailyActivity, UserBadge, LeagueCohort, LeagueMember,
                                    StudyCircle, CircleMember, Referral, NudgeLog)
 from app.models.practice import PracticeItem, UserPracticeState
@@ -35,5 +36,5 @@ __all__ = [
     "StudyCircle", "CircleMember", "Referral", "NudgeLog", "JobDescription", "JobTarget",
     "College", "CollegeAdmin", "Batch", "RosterEntry", "CollegeMember", "CollegeRecruiter", "ParentalConsentRequest", "PracticeItem", "UserPracticeState",
     "RoadmapEnrollment", "BatchTestAssignment", "CompanyRoadmap", "CompanyRoadmapMember", "CompanyTest",
-    "AiUsageDaily", "AiBudgetAlert", "AiFeatureUse",
+    "AiUsageDaily", "AiBudgetAlert", "AiFeatureUse", "BackgroundJob",
 ]

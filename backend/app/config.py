@@ -154,6 +154,13 @@ class Settings(BaseSettings):
     # Hour (local) for a learner's reminder when they haven't picked a study time.
     REMINDER_HOUR_LOCAL: int = int(os.getenv("REMINDER_HOUR_LOCAL", "19"))
     REMINDER_CHECK_INTERVAL_SECONDS: int = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "900"))
+    # Background jobs (planning a week runs off the request). Workers are threads
+    # in the API process; 0 turns them off (jobs then wait until a worker runs).
+    JOB_WORKERS: int = int(os.getenv("JOB_WORKERS", "2") or "2")
+    JOB_POLL_SECONDS: float = float(os.getenv("JOB_POLL_SECONDS", "1") or "1")
+    # A running job older than this is retried once, then marked failed.
+    JOB_STALE_MINUTES: int = int(os.getenv("JOB_STALE_MINUTES", "10") or "10")
+    JOB_KEEP_DAYS: int = int(os.getenv("JOB_KEEP_DAYS", "7") or "7")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     class Config:

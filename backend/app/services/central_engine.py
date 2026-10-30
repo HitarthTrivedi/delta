@@ -1299,6 +1299,33 @@ def evaluate_week_status(db: Session, user: User, roadmap: "RoadmapState | None"
     }
 
 
+class GenerationNeeded(Exception):
+    """The week needs the model to be planned, and the caller asked not to wait for it."""
+
+
+def check_weekly_gate(db: Session, user_id: str) -> None:
+    """Raise ValueError (a message for the learner) unless the current week can
+    be advanced: its tasks finished or skipped, and a minimum time passed.
+    Checked when the request comes in, so the answer is immediate even though
+    planning the new week runs as a background job."""
+    from app.config import settings
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise ValueError("User not found")
+    if settings.DEV_MODE:
+        return
+    status = evaluate_week_status(db, user, db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first())
+    expected_ids, accepted_ids = status["expected_ids"], status["accepted_ids"]
+    if expected_ids and not expected_ids.issubset(accepted_ids):
+        remaining = len(expected_ids - accepted_ids)
+        raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
+    elapsed_seconds = (datetime.datetime.utcnow() - status["week_start"]).total_seconds()
+    minimum_seconds = max(30, len(expected_ids or accepted_ids or [1]) * 60)
+    if elapsed_seconds < minimum_seconds:
+        minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
+        raise ValueError(f"Please wait about {minutes} more minute(s) before requesting the next week.")
+
+
 def run_weekly_career_cycle(
     db: Session, user_id: str,
     bypass_gate: bool = False,
@@ -1307,6 +1334,8 @@ def run_weekly_career_cycle(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise ValueError("User not found")
+    if not bypass_gate:
+        check_weekly_gate(db, user_id)
 
     roadmap_before = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
     valid_cycles = _valid_weekly_cycle_events(db, user_id)
@@ -1314,29 +1343,10 @@ def run_weekly_career_cycle(
     week_number = status["week_number"]
     current_week_start = status["week_start"]
     current_actions = status["current_actions"]
-    expected_ids = status["expected_ids"]
     accepted_ids = status["accepted_ids"]
     latest_task_state = status["latest_task_state"]
     def _normalize(s) -> str:
         return str(s).strip().lower()
-
-    from app.config import settings
-    dev_mode = settings.DEV_MODE
-
-    # Completion + min-time gates are skipped when bypass_gate is set — used when
-    # the 7-day window has already lapsed with tasks unfinished (an expired week
-    # the user has chosen to move on from after answering the carry-over prompt).
-    if not dev_mode and not bypass_gate:
-        # Completion gate: require the current tasks to be finished/skipped before advancing.
-        if expected_ids and not expected_ids.issubset(accepted_ids):
-            remaining = len(expected_ids - accepted_ids)
-            raise ValueError(f"Complete or skip the remaining {remaining} task(s) before requesting next week's plan.")
-
-        elapsed_seconds = (datetime.datetime.utcnow() - current_week_start).total_seconds()
-        minimum_seconds = max(30, len(expected_ids or accepted_ids or [1]) * 60)
-        if elapsed_seconds < minimum_seconds:
-            minutes = max(1, round((minimum_seconds - elapsed_seconds) / 60))
-            raise ValueError(f"Please wait about {minutes} more minute(s) before requesting the next week.")
 
     skills = db.query(SkillNode).filter(SkillNode.user_id == user.id).all()
 
@@ -1463,46 +1473,6 @@ def run_weekly_career_cycle(
     return context
 
 
-def refresh_roadmap_with_ai(user_id: str) -> None:
-    """
-    Background task: regenerate the roadmap phases with AI so the NEXT weekly
-    advancement gets genuinely personalised tasks rather than rule-based ones.
-    Runs after the response is already sent — user never waits for this.
-    Failures are logged but silently swallowed so they don't affect the user.
-    """
-    import logging as _logging
-    _bg_log = _logging.getLogger("delta.central_engine.bg")
-    try:
-        from app.database import SessionLocal
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return
-            market = db.query(MarketSnapshot).filter(
-                MarketSnapshot.user_id == user_id,
-            ).order_by(MarketSnapshot.created_at.desc()).first()
-            if not market:
-                return
-            roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first()
-            if not roadmap:
-                return
-            skills = db.query(SkillNode).filter(SkillNode.user_id == user_id).all()
-            _bg_log.info("BG: regenerating roadmap phases for user %s", user_id)
-            roadmap_payload = generate_weekly_brief(user, skills, market)
-            phases = roadmap_payload.get("phases", [])
-            if phases:
-                roadmap.phases = _dump(phases)
-                roadmap.active_phase_id = _select_active_phase(phases).get("id") if phases else None
-                roadmap.updated_at = datetime.datetime.utcnow()
-                roadmap.last_replanned_reason = "AI phase refresh after weekly advancement."
-                db.commit()
-                _bg_log.info("BG: roadmap phases refreshed for user %s", user_id)
-        finally:
-            db.close()
-    except Exception as exc:
-        _bg_log.error("BG roadmap refresh failed for %s: %s", user_id, exc, exc_info=True)
-
 
 def run_memory_consolidation_cycle(db: Session, user_id: str) -> dict:
     user = db.query(User).filter(User.id == user_id).first()
@@ -1524,7 +1494,10 @@ def run_memory_consolidation_cycle(db: Session, user_id: str) -> dict:
     return context
 
 
-def compile_career_context(db: Session, user_id: str, background_tasks=None) -> dict:
+def compile_career_context(db: Session, user_id: str, background_tasks=None, generate: bool = True) -> dict:
+    """Everything the plan pages show. With generate=False (page loads) a week
+    that needs the model is queued as a background job (`roadmap_job`) instead
+    of being planned inside the request."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise ValueError("User not found")
@@ -1552,7 +1525,18 @@ def compile_career_context(db: Session, user_id: str, background_tasks=None) -> 
 
     memory = get_or_create_career_memory(db, user)
     latest_market = _get_or_create_market_snapshot(db, user)
-    roadmap = get_or_create_roadmap_state(db, user, latest_market, regenerate=False)
+    from app.services import jobs
+    roadmap_job = None
+    try:
+        roadmap = get_or_create_roadmap_state(db, user, latest_market, regenerate=False, generate=generate)
+    except GenerationNeeded:
+        roadmap_job = jobs.job_dict(jobs.enqueue(db, user_id, "first_roadmap"))
+        roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user_id).first() or RoadmapState(
+            id="pending", user_id=user_id, destination="{}", phases="[]", weekly_focus=_dump({"primary_actions": []}),
+            resource_graph="[]", proof_requirements="[]")
+    if roadmap_job is None:
+        active = jobs.active_plan_job(db, user_id)
+        roadmap_job = jobs.job_dict(active) if active else None
     valid_cycles = _valid_weekly_cycle_events(db, user_id)
     valid_cycle_ids = {event.id for event in valid_cycles}
     journey = db.query(JourneyEvent).filter(
@@ -1615,6 +1599,7 @@ def compile_career_context(db: Session, user_id: str, background_tasks=None) -> 
         "week_expired": week_status["expired"],
         "expired_incomplete_tasks": week_status["incomplete_actions"] if week_status["expired"] else [],
         "template": roadmap_templates.progress(db, roadmap_templates.active_enrollment(db, user_id)),
+        "roadmap_job": roadmap_job,
     }
     # The agent2 memory syncs each read + rewrite the whole agent2_memory_data
     # JSON blob (4 extra DB round trips). Callers on a read path (the context
@@ -1770,7 +1755,9 @@ def log_journey_event(
     return event
 
 
-def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None) -> RoadmapState:
+def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot, regenerate: bool = False, agent2_memory: dict = None, onboarding_profile: dict = None, recent_events: list = None, generate: bool = True) -> RoadmapState:
+    """The learner's roadmap, planning the week when needed. With generate=False
+    a week that needs the model raises GenerationNeeded instead of waiting."""
     roadmap = db.query(RoadmapState).filter(RoadmapState.user_id == user.id).first()
     completed_cycles = len(_valid_weekly_cycle_events(db, user.id))
     # Task 7 — Hybrid cycle_count: max(completed_cycles, weeks_since_signup // 2)
@@ -1932,6 +1919,9 @@ def get_or_create_roadmap_state(db: Session, user: User, market: MarketSnapshot,
         and cycle_count > 0
         and cycle_count % break_interval == 0
     )
+
+    if not generate and not enrollment:
+        raise GenerationNeeded()
 
     # Stamp attempt timestamp so rapid page refreshes don't re-trigger generation
     if roadmap:
