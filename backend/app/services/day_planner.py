@@ -2,7 +2,7 @@
 day_planner.py — Distribute a week's Delta tasks across 7 concrete days.
 
 Used when a user picks the "day" plan style. The distribution is proposed by
-Groq (via ai_service.quality_model, which auto-falls back to Gemini) and then
+Groq (the "day_focus" task route, which auto-falls back to Gemini) and then
 passed through a deterministic repair pass so the output is ALWAYS structurally
 valid regardless of what the model returns:
 
@@ -148,7 +148,7 @@ def _llm_day_focus(days: list[dict], day_schedule: dict) -> dict:
     if not working:
         return {}
     try:
-        from app.services.ai_service import generate_json, quality_model
+        from app.services.ai_service import generate_json
     except Exception:
         return {}
 
@@ -165,7 +165,7 @@ def _llm_day_focus(days: list[dict], day_schedule: dict) -> dict:
         'Return ONLY JSON: {"focus": {"<day index>": "line", ...}}'
     )
     try:
-        raw = generate_json(prompt, temperature=0.5, model=quality_model())
+        raw = generate_json(prompt, temperature=0.5, task="day_focus")
     except Exception as exc:
         logger.warning("day-plan focus generation failed: %s", type(exc).__name__)
         return {}

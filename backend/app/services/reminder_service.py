@@ -256,6 +256,13 @@ def run_daily_reminders(force: bool = False) -> dict:
         logger.warning("College licence sweep failed: %s", exc)
         db.rollback()
     try:
+        # AI budget alerts also go out on quiet days with few AI calls.
+        from app.services import ai_budget
+        ai_budget.check(db)
+    except Exception as exc:
+        logger.warning("AI budget check failed: %s", exc)
+        db.rollback()
+    try:
         learners = db.query(UserEngagement).filter(UserEngagement.reminders_opt_in.is_(True)).all()
         for eng in learners:
             local_now = engagement._now().astimezone(engagement._tz(eng.timezone))

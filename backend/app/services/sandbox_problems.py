@@ -79,7 +79,7 @@ Return ONLY valid JSON in exactly this shape:
 Rules: include 2-3 "examples" (shown to the solver) and 4-6 "test_cases" (used for grading — can overlap with examples but must also cover edge cases like empty input, single element, duplicates, negatives, or large-ish values as appropriate to the topic). Output format must be exact and consistent across every example/test case (same number formatting, same separators). No text outside the JSON."""
 
     try:
-        data = generate_json(prompt, temperature=0.4, max_tokens=4000)
+        data = generate_json(prompt, temperature=0.4, max_tokens=4000, task="coding_problem")
     except Exception as exc:
         logger.error(f"problem generation failed for {cache_key}: {exc}")
         data = {}

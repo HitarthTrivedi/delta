@@ -8,7 +8,7 @@ from xml.sax.saxutils import escape
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from app.services import integrity
+from app.services import integrity, usage_caps
 from app.services.integrity import IntegrityPayload
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -98,7 +98,8 @@ def start_interview(
     _: str = Depends(require_owner),
 ):
     settings = normalize_settings(payload.role_type, payload.target_role, payload.difficulty, payload.num_questions, user_id)
-    question = generate_opening_question(user_id, settings)
+    with usage_caps.using(db, user_id, "mock_interview"):
+        question = generate_opening_question(user_id, settings)
 
     session = SandboxSession(
         id=str(uuid.uuid4()),

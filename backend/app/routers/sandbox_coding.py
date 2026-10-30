@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from app.services import integrity
+from app.services import integrity, usage_caps
 from app.services.integrity import IntegrityPayload
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -68,7 +68,9 @@ def get_problems(user_id: str, db: Session = Depends(get_db), _: str = Depends(r
 
 
 @router.post("/{user_id}/problems/start")
+@limiter.limit("20/minute")
 def start_problem(
+    request: Request,
     user_id: str,
     payload: StartProblemPayload,
     db: Session = Depends(get_db),
@@ -79,7 +81,8 @@ def start_problem(
     if not problem:
         raise HTTPException(status_code=404, detail="Problem not found.")
 
-    package = generate_problem_package(payload.topic, problem["title"], problem["difficulty"])
+    with usage_caps.using(db, user_id, "coding_problem"):
+        package = generate_problem_package(payload.topic, problem["title"], problem["difficulty"])
 
     session = SandboxSession(
         id=str(uuid.uuid4()),

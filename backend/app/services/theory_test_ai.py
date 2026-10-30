@@ -91,7 +91,7 @@ Return ONLY valid JSON in exactly this shape:
 Rules: exactly 4 options per question, exactly one correct; vary the position of the correct answer; no "all of the above"; no text outside the JSON."""
 
     try:
-        data = generate_json(prompt, temperature=0.5, max_tokens=8000)
+        data = generate_json(prompt, temperature=0.5, max_tokens=8000, task="theory_test")
     except Exception as exc:
         logger.error(f"theory test generation failed: {exc}")
         raise ValueError("generation failed") from exc

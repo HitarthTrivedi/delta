@@ -16,6 +16,7 @@ from app.services.portfolio_engine import assess_portfolio
 from app.services.project_engine import recommend_proof_projects
 from app.dependencies.auth import require_owner, verify_resource_owner
 from app.limiter import limiter
+from app.services import ai_budget, usage_caps
 
 router = APIRouter(prefix="/api/briefs", tags=["briefs"])
 
@@ -37,7 +38,8 @@ def get_latest_brief(user_id: str, db: Session = Depends(get_db), _: str = Depen
 
 @router.post("/generate/{user_id}", response_model=BriefResponse)
 @limiter.limit("5/hour")
-def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner)):
+def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db), _: str = Depends(require_owner),
+                   __: None = Depends(ai_budget.optional_ai)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -85,7 +87,10 @@ def generate_brief(request: Request, user_id: str, db: Session = Depends(get_db)
 
     try:
         # 2. Invoke rich roadmap compiler
-        roadmap_res = generate_weekly_brief(user, skills, market)
+        with usage_caps.using(db, user_id, "brief_regenerate"):
+            roadmap_res = generate_weekly_brief(user, skills, market)
+    except HTTPException:
+        raise
     except Exception as exc:
         _log.error("generate_weekly_brief failed for %s: %s", user_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Brief generation failed: {exc}") from exc

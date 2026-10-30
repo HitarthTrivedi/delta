@@ -64,7 +64,7 @@ Return ONLY valid JSON:
 }}
 Exactly 4 options per question, exactly one correct, vary the correct position. No text outside the JSON."""
     try:
-        data = generate_json(prompt, temperature=0.4, max_tokens=9000)
+        data = generate_json(prompt, temperature=0.4, max_tokens=9000, task="school_lesson")
     except Exception as exc:
         logger.error(f"lesson generation failed: {exc}")
         raise ValueError("generation failed") from exc

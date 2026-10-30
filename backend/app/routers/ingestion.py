@@ -3,7 +3,7 @@ Ingestion Router v2 — Clean API endpoints for the new ingestion engine.
 Uses IngestionEngineV2 which reads/writes from profile_store JSON files.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Body, Header
+from fastapi import APIRouter, Depends, HTTPException, Body, Header, Request
 import json
 import logging
 import re
@@ -14,6 +14,8 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger("delta.ingestion_router")
 
 from app.database import get_db
+from app.limiter import limiter
+from app.services import usage_caps
 from app.services.ingestion_engine_v2 import engine
 from app.services.profile_store import load_profile, save_profile, profile_as_context_string, clear_profile
 from app.dependencies.auth import require_owner, verify_resource_owner
@@ -63,7 +65,9 @@ class EditAnswerRequest(BaseModel):
 
 
 @router.post("/start")
+@limiter.limit("30/minute")
 def start_ingestion_session(
+    request: Request,
     payload: StartSessionRequest,
     db: Session = Depends(get_db),
     x_user_id: str | None = Header(None),
@@ -93,7 +97,9 @@ def start_ingestion_session(
 
 
 @router.post("/answer")
+@limiter.limit("30/minute")
 def submit_ingestion_answer(
+    request: Request,
     payload: AnswerRequest,
     db: Session = Depends(get_db),
     x_user_id: str | None = Header(None),
@@ -101,6 +107,7 @@ def submit_ingestion_answer(
 ):
     """Submit one user reply and get the next question or completion."""
     verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
+    usage_caps.take(db, payload.user_id, "intake")
     try:
         result = engine.process_answer(db, payload.user_id, payload.session_id, payload.answer)
         return result
@@ -111,7 +118,9 @@ def submit_ingestion_answer(
 
 
 @router.post("/edit-answer")
+@limiter.limit("30/minute")
 def edit_ingestion_answer(
+    request: Request,
     payload: EditAnswerRequest,
     db: Session = Depends(get_db),
     x_user_id: str | None = Header(None),
@@ -119,6 +128,7 @@ def edit_ingestion_answer(
 ):
     """Replace a previously-given answer (by round) and re-derive the profile."""
     verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
+    usage_caps.take(db, payload.user_id, "intake")
     try:
         return engine.edit_answer(db, payload.user_id, payload.session_id, payload.round, payload.answer)
     except ValueError as e:
@@ -128,7 +138,9 @@ def edit_ingestion_answer(
 
 
 @router.post("/resume")
+@limiter.limit("30/minute")
 def ingest_resume(
+    request: Request,
     payload: ResumeIngestionRequest,
     db: Session = Depends(get_db),
     x_user_id: str | None = Header(None),
@@ -136,6 +148,7 @@ def ingest_resume(
 ):
     """Dedicated endpoint for resume text ingestion — extracts all fields and returns follow-up."""
     verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
+    usage_caps.take(db, payload.user_id, "intake")
     try:
         result = engine.ingest_resume(db, payload.user_id, payload.session_id, payload.resume_text)
         return result
@@ -144,7 +157,9 @@ def ingest_resume(
 
 
 @router.post("/bridge")
+@limiter.limit("30/minute")
 def bridge_personal_data(
+    request: Request,
     payload: BridgeRequest,
     db: Session = Depends(get_db),
     x_user_id: str | None = Header(None),
@@ -152,6 +167,7 @@ def bridge_personal_data(
 ):
     """Personal Data Bridge: ingest unstructured text (resume, LinkedIn) into profile."""
     verify_resource_owner(payload.user_id, x_user_id=x_user_id, authorization=authorization)
+    usage_caps.take(db, payload.user_id, "intake")
     try:
         from app.models.semantic_memory import IngestionSession
         session = db.query(IngestionSession).filter(

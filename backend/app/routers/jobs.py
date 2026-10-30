@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies.auth import require_owner
 from app.limiter import limiter
-from app.services import job_match
+from app.services import job_match, usage_caps
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
@@ -41,7 +41,8 @@ def my_jobs(user_id: str, db: Session = Depends(get_db), _: str = Depends(requir
 @limiter.limit("10/hour")  # each new job text costs one model call
 def analyse(request: Request, user_id: str, payload: AnalysePayload, db: Session = Depends(get_db),
             _: str = Depends(require_owner)):
-    return _run(job_match.analyse, db, user_id, payload.text)
+    with usage_caps.using(db, user_id, "job_match"):
+        return _run(job_match.analyse, db, user_id, payload.text)
 
 
 @router.get("/{user_id}/{target_id}")

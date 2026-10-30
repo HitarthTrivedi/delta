@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 
-from app.config import settings as config
 from app.services.ai_service import generate_response, generate_json
 from app.services.profile_store import profile_as_compact_context, load_profile
 from app.services.domain_packs import resolve_field, get_domain_pack
@@ -121,7 +120,7 @@ This is the FIRST question. Greet the candidate in one short sentence (you are A
         # Turns use the lite model: the candidate waits on every one, and a short
         # spoken question doesn't need the bigger model. max_tokens stays generous
         # in case GEMINI_LITE_MODEL is set to a model that thinks before answering.
-        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000, model=config.GEMINI_LITE_MODEL))
+        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000, task="interview_turn"))
         if not question or _is_mock_fallback(question):
             return fallback
         return question
@@ -146,7 +145,7 @@ def generate_next_question(user_id: str, settings: dict, transcript: list[dict],
 This is question {question_count + 1} of {total}{" (the LAST one)" if last else ""}. React to the candidate's last answer in at most one short sentence (genuine, not gushing), then ask the next question: either a natural follow-up probing deeper, or a new relevant area if the topic is exhausted. Return ONLY what you would say, no labels, no quotes."""
     fallback = "Can you walk me through your reasoning on that, with a concrete example?"
     try:
-        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000, model=config.GEMINI_LITE_MODEL))
+        question = _clean_spoken(generate_response(prompt, temperature=0.7, max_tokens=3000, task="interview_turn"))
         if not question or _is_mock_fallback(question):
             return {"question": fallback, "done": False}
         return {"question": question, "done": False}
@@ -190,7 +189,7 @@ Return ONLY valid JSON in exactly this shape:
 }}
 Rules: be honest, not just encouraging. If answers were vague, missing or shallow, score them low and say what a stronger answer includes. Unanswered questions score 0. Base every point on what was actually said. One per_question entry per interviewer question that the candidate answered. No text outside the JSON."""
     try:
-        data = generate_json(prompt, temperature=0.3, max_tokens=5000)
+        data = generate_json(prompt, temperature=0.3, max_tokens=5000, task="interview_report")
     except Exception as exc:
         logger.error(f"feedback generation failed: {exc}")
         raise FeedbackUnavailable() from exc
