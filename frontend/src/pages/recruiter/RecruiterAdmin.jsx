@@ -4,8 +4,9 @@ import { Loader2, Check, X, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { recruiterAPI } from '../../lib/api';
 import { RoadmapReview } from './RecruiterRoadmaps';
+import AiUsageAdmin from './AiUsageAdmin';
 
-const TABS = ['pending', 'approved', 'rejected', 'roadmaps'];
+const TABS = ['pending', 'approved', 'rejected', 'roadmaps', 'ai usage'];
 
 /** Admin-only (ADMIN_EMAILS on the backend): approve or reject recruiter accounts. */
 export default function RecruiterAdmin() {
@@ -16,7 +17,7 @@ export default function RecruiterAdmin() {
 
   useEffect(() => {
     setRows(null);
-    if (tab === 'roadmaps') return;
+    if (tab === 'roadmaps' || tab === 'ai usage') return;
     recruiterAPI.adminList(tab)
       .then((d) => setRows(d.recruiters))
       .catch((err) => {
@@ -69,7 +70,7 @@ export default function RecruiterAdmin() {
               ))}
             </div>
 
-            {tab === 'roadmaps' ? <RoadmapReview /> : rows === null ? (
+            {tab === 'ai usage' ? <AiUsageAdmin /> : tab === 'roadmaps' ? <RoadmapReview /> : rows === null ? (
               <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-ink-soft" /></div>
             ) : rows.length === 0 ? (
               <p className="text-ink-soft text-[14px]">No {tab} recruiters.</p>
