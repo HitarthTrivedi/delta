@@ -9,7 +9,7 @@ How Delta runs in production: first-time setup, deploys, database changes, backu
 | Piece | Service | Notes |
 |---|---|---|
 | Frontend (React build) | Cloudflare Pages | Static files; `frontend/public/_headers` sets caching and security headers |
-| API (FastAPI) | Railway, Southeast Asia (Singapore) region, **1 replica** | Built from `backend/Dockerfile`; runs `alembic upgrade head` on every start |
+| API (FastAPI) | Railway, Southeast Asia (Singapore) region, **1 replica** (more once `RATE_LIMIT_STORAGE_URI` is set, see §8) | Built from `backend/Dockerfile`; runs `alembic upgrade head` on every start (replicas take turns: advisory lock) |
 | Database + sign-in | Supabase, Mumbai (`ap-south-1`) | Postgres 17 + Supabase Auth |
 | AI | Google Gemini API (Groq optional) | Models from `GEMINI_MODEL` / `GEMINI_LITE_MODEL` |
 | Interviewer voice | Google Cloud Text-to-Speech | Optional; without it the interview uses the browser voice + 2D avatar |
@@ -18,7 +18,7 @@ How Delta runs in production: first-time setup, deploys, database changes, backu
 | Backups | GitHub Actions → Cloudflare R2 | Nightly, `age`-encrypted, kept 30 days |
 | Errors / uptime | Sentry + UptimeRobot | |
 
-Keep **one API replica** for now: the reminder scheduler runs inside the API process, and rate limits are counted in memory per process.
+One API replica is enough for now. More are safe once rate limits use a shared store (`RATE_LIMIT_STORAGE_URI`, §8); everything else that runs inside the API process (reminder sweep, background jobs, migrations, startup schema sync) already coordinates through the database.
 
 ## 2. First-time setup
 
@@ -40,7 +40,7 @@ Do these in order. Each step lists the values to copy into the next.
 
 ### 2.3 Railway (API)
 1. New service from the GitHub repo. **Root directory:** `backend`. Builder: Dockerfile. Region: Southeast Asia.
-2. **Healthcheck path:** `/health`. Replicas: 1.
+2. **Healthcheck path:** `/health`. Replicas: 1 (see §8 before raising it).
 3. Variables: see section 3. **Never** set `ALLOW_HEADER_AUTH` or `DEV_MODE` here.
 4. Generate a domain; this is the API base (`https://<api>`). The frontend uses `https://<api>/api`.
 
@@ -88,7 +88,8 @@ Full list with comments: `backend/.env.example`. The production essentials:
 | `GMAIL_*` or `BREVO_*`, `REMINDER_SECRET`, `EMAIL_LINK_SECRET` | Reminder emails + unsubscribe links |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Browser push reminders (optional) |
 | `SENTRY_DSN` | Error reports |
-| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 5 / 5 (fine for one replica) |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 5 / 5 per replica (keep replicas × 10 under the Supabase pooler's limit) |
+| `RATE_LIMIT_STORAGE_URI` | Empty for one replica. Before a second: an Upstash Redis URL, e.g. `rediss://default:<token>@<host>.upstash.io:6379` (§8) |
 | `JOB_WORKERS` / `JOB_POLL_SECONDS` | 2 / 1. Background job threads in the API process (planning weeks). `0` turns them off |
 | `JOB_STALE_MINUTES` / `JOB_KEEP_DAYS` | 10 / 7. A job stuck "running" longer is retried once, then failed; finished jobs are deleted after this many days |
 | **Must be unset or false** | `ALLOW_HEADER_AUTH`, `DEV_MODE`, `ENABLE_DOCS` |
@@ -159,4 +160,9 @@ Watch opt-outs: a rising opt-out rate means reminders are too frequent or too pu
 - Gemini: per-key rate limits; rotation across up to 5 keys. Spend: the AI usage view (section 7A).
 - Google TTS: free monthly character quota, then pay-per-character. Keep the budget alert on.
 - Supabase free: 500 MB database, pauses when idle.
-- One API replica: before adding a second, move the reminder scheduler and rate-limit counters to shared storage (Master Plan backlog). The background job queue is already safe across replicas (`SKIP LOCKED`).
+- **More than one API replica.** Before raising Railway's replica count:
+  1. Create an Upstash Redis database (region: Mumbai, ap-south-1; TLS on) and set its `rediss://…` URL as `RATE_LIMIT_STORAGE_URI`, so rate limits are shared instead of multiplied by the number of replicas. Optionally set the same URL as `REDIS_URL` with `CACHE_ENABLED=true` to share the cache too.
+  2. Check `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` × replicas fits the Supabase connection limit.
+  3. Run the load test (Master Plan backlog #7) on staging first.
+
+  Already safe across replicas: background jobs (`SKIP LOCKED`), the reminder sweep (one server at a time, Postgres advisory lock), migrations and the startup schema sync (advisory locks), budget alerts and AI caps (database constraints). If Redis becomes unreachable, rate limits fall back to each process's memory (logged) rather than failing requests.

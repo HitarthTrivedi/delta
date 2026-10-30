@@ -118,6 +118,10 @@ class Settings(BaseSettings):
     SQL_ECHO: bool = parse_bool_env("SQL_ECHO", False)
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     CACHE_ENABLED: bool = parse_bool_env("CACHE_ENABLED", True)
+    # Where rate-limit counters live. Empty = in this process's memory (fine for
+    # one API replica). Set to a Redis URL (e.g. Upstash rediss://...) before
+    # running more than one replica, so limits are shared, not multiplied.
+    RATE_LIMIT_STORAGE_URI: str = os.getenv("RATE_LIMIT_STORAGE_URI", "")
 
     @property
     def CORS_ORIGINS(self) -> list[str]:

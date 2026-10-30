@@ -41,6 +41,13 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        if connection.dialect.name == "postgresql":
+            # Every API replica runs migrations on start: the first takes this lock,
+            # the others wait, then find nothing left to do. Freed when the connection closes.
+            from sqlalchemy import text
+            from app.services.cluster_lock import _key
+            connection.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _key("migrations")})
+            connection.commit()
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

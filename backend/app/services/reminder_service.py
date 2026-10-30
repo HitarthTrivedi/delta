@@ -245,7 +245,17 @@ def run_daily_reminders(force: bool = False) -> dict:
 
     `force=True` (manual test endpoint) ignores the time of day and the daily claim,
     but still only reaches opted-in learners who haven't studied today.
+    Only one API replica runs the sweep at a time; the others return `locked`.
     """
+    from app.services.cluster_lock import cluster_lock
+    with cluster_lock("reminder-sweep") as got:
+        if not got:
+            logger.debug("Reminder sweep already running on another server")
+            return {"sent": 0, "skipped": 0, "failed": 0, "locked": True}
+        return _sweep(force)
+
+
+def _sweep(force: bool) -> dict:
     db = SessionLocal()
     sent = skipped = failed = 0
     try:

@@ -8,6 +8,8 @@ import jwt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.config import settings
+
 
 def _client_key(request):
     """Who to count a request against.
@@ -35,4 +37,14 @@ def _client_key(request):
 
 # default_limits apply to every route (a global safety net against abuse / quota
 # burn on the AI endpoints); routes may add tighter per-endpoint limits.
-limiter = Limiter(key_func=_client_key, default_limits=["100/minute"])
+# With RATE_LIMIT_STORAGE_URI set (Redis), every API replica shares the same
+# counters. If that store is unreachable, limits fall back to this process's
+# memory instead of failing requests: rate limiting must never take the API down.
+limiter = Limiter(
+    key_func=_client_key,
+    default_limits=["100/minute"],
+    storage_uri=settings.RATE_LIMIT_STORAGE_URI or None,
+    key_prefix="delta-rl",
+    in_memory_fallback_enabled=True,
+    swallow_errors=True,
+)

@@ -238,7 +238,7 @@ Chosen to stay cheap while bootstrapped, with a known paid upgrade for every fre
 
 **Week 1 after the v1 beta launch** (deliberately not done before it):
 - Frontend: move from Create React App (deprecated; its build tooling carries most `npm audit` findings) to Vite; remove unused dependencies (all `@radix-ui/*`, `cmdk`, `vaul`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `react-hook-form`, `zod`, `date-fns`, `motion`, `cra-template`) and the unused `components/ui/*`, `CareerChat.jsx`, `mockData.js`, `plugins/health-check`; self-host Monaco (today loaded from jsdelivr).
-- Before a 2nd API replica: advisory lock around the reminder scheduler, shared rate-limit storage.
+- ✅ Ready for a 2nd API replica: the reminder sweep, migrations and startup schema sync take Postgres advisory locks (`services/cluster_lock.py`); rate limits use `RATE_LIMIT_STORAGE_URI` (Upstash Redis) when set. Remaining before scaling: the load test (backlog #7). See OPERATIONS.md §8.
 - Interview: stream replies sentence by sentence; resume abandoned sessions; a male interviewer variant (same `tools/avatar/` pipeline, e.g. `toigo_male_suit_tie_and_jacket`) and a male/female choice.
 - React Query + skeletons on the remaining pages; frontend Sentry; k6 load test (500 concurrent) on staging.
 - Decide on the unlinked `/dashboard` page (link it or remove it).
