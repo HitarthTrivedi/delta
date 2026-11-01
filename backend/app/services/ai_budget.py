@@ -23,7 +23,7 @@ from app.services import ai_usage
 
 logger = logging.getLogger("delta.ai_budget")
 CHECK_EVERY_SECONDS = 60
-_state = {"checked_at": 0.0, "degraded": False}
+_state = {"checked_at": float("-inf"), "degraded": False}  # -inf: never checked (monotonic can be < 60 s after boot)
 _lock = threading.Lock()
 
 
