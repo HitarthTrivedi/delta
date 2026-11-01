@@ -170,7 +170,7 @@ This is the full user-facing surface. Each feature lists **what it does** and
 **how it does it** (the code path behind it).
 
 ### 6.1 Public marketing site
-- **What:** Landing page, About, Careers, Contact, Partners, Investors, Early
+- **What:** Landing page, About, Careers, Contact, Partners, Early
   Access, Privacy, Terms. Public, no auth.
 - **How:** `frontend/src/components/*` (Hero, Showcase, HowItWorks, Feedback,
   Footer) and `pages/*Page.jsx`, code-split via `React.lazy`.
@@ -548,7 +548,7 @@ A CRA + CRACO single-page app. `App.js` wires routing, the React Query client,
 auth gating, and route-level code-splitting.
 
 **Routing & gating:**
-- **Public:** `/`, `/about`, `/careers`, `/contact`, `/partners`, `/investors`,
+- **Public:** `/`, `/about`, `/careers`, `/contact`, `/partners`,
   `/early-access`, `/privacy`, `/terms`, `/login`.
 - **Auth only (no onboarding required):** `/onboarding`, `/intake`.
 - **Auth + onboarding complete:** `/dashboard`, `/weekly-plan`, `/roadmap`,

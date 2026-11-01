@@ -25,7 +25,6 @@ const AboutPage = lazy(() => import("./pages/AboutPage"));
 const CareersPage = lazy(() => import("./pages/CareersPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const PartnersPage = lazy(() => import("./pages/PartnersPage"));
-const InvestorsPage = lazy(() => import("./pages/InvestorsPage"));
 const EarlyAccessPage = lazy(() => import("./pages/EarlyAccessPage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
@@ -131,7 +130,7 @@ function LayoutWrapper({ children }) {
 
   const isLanding = location.pathname === "/";
   const isLogin = location.pathname === "/login" || location.pathname === "/unsubscribe" || location.pathname.startsWith("/v/") || location.pathname.startsWith("/parent-consent/") || isRecruiterArea || isCollegeArea || location.pathname.startsWith("/school/learn");
-  const isPublicPage = ["/about", "/careers", "/contact", "/partners", "/investors", "/early-access"].includes(location.pathname);
+  const isPublicPage = ["/about", "/careers", "/contact", "/partners", "/early-access"].includes(location.pathname);
 
   return (
     <div className="min-h-screen bg-bone text-ink selection:bg-primary-500/30 selection:text-ink">
@@ -206,7 +205,6 @@ function AppContent() {
         <Route path="/careers" element={<CareersPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/partners" element={<PartnersPage />} />
-        <Route path="/investors" element={<InvestorsPage />} />
         <Route path="/early-access" element={<EarlyAccessPage />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />

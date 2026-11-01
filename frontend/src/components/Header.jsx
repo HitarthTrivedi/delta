@@ -19,7 +19,6 @@ const Header = () => {
     { label: 'Workflow', href: '#how-it-works' },
     { label: 'About', href: '/about' },
     { label: 'Partners', href: '/partners' },
-    { label: 'Investors', href: '/investors' },
     { label: 'Contact', href: '/contact' },
   ];
 
