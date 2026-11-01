@@ -311,7 +311,7 @@ A CRA + CRACO single-page app. `App.js` wires routing, the React Query client,
 auth gating, and route-level code-splitting.
 
 ### Routing & gating
-- **Public:** `/`, `/about`, `/careers`, `/contact`, `/partners`, `/investors`,
+- **Public:** `/`, `/about`, `/careers`, `/contact`, `/partners`,
   `/early-access`, `/privacy`, `/terms`, `/login`.
 - **Auth only (no onboarding required):** `/onboarding`, `/intake`.
 - **Auth + onboarding complete:** `/dashboard`, `/weekly-plan`, `/roadmap`,

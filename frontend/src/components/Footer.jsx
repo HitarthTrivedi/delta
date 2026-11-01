@@ -45,7 +45,6 @@ const Footer = () => {
           <FooterLink href="/careers">Careers</FooterLink>
           <FooterLink href="/contact">Contact</FooterLink>
           <FooterLink href="/partners">Partners</FooterLink>
-          <FooterLink href="/investors">Investors</FooterLink>
         </div>
 
         {/* Legal */}
